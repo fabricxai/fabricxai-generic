@@ -43,8 +43,11 @@ export function NewSampleButton({ orders }: { orders: readonly OrderChoice[] }) 
 
   function pickOrder(id: string) {
     setOrderId(id)
+    // The code FOLLOWS the order — the PP gate looks the sample up by order + style
+    // code, so a stale code from a previously-picked order is a sample that never opens
+    // its gate. A hand edit after picking still sticks; switching orders resets it.
     const order = orders.find((option) => option.id === id)
-    if (order?.styleCode && styleCode.trim() === '') setStyleCode(order.styleCode)
+    if (order?.styleCode) setStyleCode(order.styleCode)
   }
 
   function submit() {
