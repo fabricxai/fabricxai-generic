@@ -5,6 +5,7 @@ import { FloorScreen } from '@/components/fx/floor'
 import { PageHeader } from '@/components/shell/page-shell'
 import { tui } from '@/lib/i18n-ui'
 import { requestLocale } from '@/lib/ui-locale'
+import { udRegister } from '@/modules/commercial/ud-queries'
 import { getCtx } from '@/modules/core/session'
 import { itemList } from '@/modules/store/queries'
 import { locations } from '@/modules/store/schema'
@@ -37,14 +38,21 @@ export default async function StoreReceivePage() {
 
   const locale = await requestLocale()
 
-  const [items, locationRows] = await Promise.all([
+  const [items, locationRows, udCards] = await Promise.all([
     itemList(ctx),
     withTenantRead(ctx, (tx) =>
       tx
         .select({ id: locations.id, code: locations.code, name: locations.name, kind: locations.kind })
         .from(locations),
     ),
+    // Read via 2.2's own queries (rule 11): a bonded receipt must name its declaration,
+    // so the form needs the live ones to offer.
+    udRegister(ctx, { now: new Date() }),
   ])
+
+  const uds = udCards
+    .filter((card) => card.status === 'active')
+    .map((card) => ({ id: card.id, number: card.number }))
 
   return (
     <FloorScreen>
@@ -54,7 +62,7 @@ export default async function StoreReceivePage() {
         meta={tui(locale, 'ui.store.receive_meta')}
         ownsAmber
       />
-      <ReceiveClient items={items} locations={locationRows} />
+      <ReceiveClient items={items} locations={locationRows} uds={uds} />
     </FloorScreen>
   )
 }

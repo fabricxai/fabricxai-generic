@@ -74,9 +74,12 @@ const label: React.CSSProperties = {
 export function ReceiveClient({
   items,
   locations,
+  uds,
 }: {
   items: readonly ItemOption[]
   locations: readonly LocationOption[]
+  /** Live declarations, for a bonded receipt to name. */
+  uds: readonly { id: string; number: string }[]
 }) {
   const t = useT()
   const { capture, online, queued, syncing, refused, sync, clear } = useOfflineQueue()
@@ -85,6 +88,7 @@ export function ReceiveClient({
   const [receivedAt, setReceivedAt] = useState(() => factoryToday())
   const [itemId, setItemId] = useState(items[0]?.id ?? '')
   const [locationId, setLocationId] = useState(locations[0]?.id ?? '')
+  const [udId, setUdId] = useState('')
   const [qty, setQty] = useState('')
   const [rolls, setRolls] = useState<RollDraft[]>([])
   const [received, setReceived] = useState<string[]>([])
@@ -171,10 +175,13 @@ export function ReceiveClient({
     setError(null)
     if (!complete || !item) return
 
-    if (bonded) {
-      // The schema's check constraint refuses a bonded GRN with no UD, and module 2.2 owns
-      // UDs. Refusing here with a sentence beats a constraint violation at the sync layer.
-      setError(t('ui.store.bonded_refused'))
+    if (bonded && !udId) {
+      // The schema's check constraint refuses a bonded GRN with no UD. This screen used
+      // to refuse ALL bonded receipts here — the picker below did not exist, so the one
+      // thing a bonded warehouse does could not be recorded from the product at all
+      // (live-test finding, Phase 4). Now only a bonded receipt with no declaration
+      // NAMED is refused, which is the real rule.
+      setError(t('ui.store.bonded_needs_ud'))
       return
     }
 
@@ -184,7 +191,8 @@ export function ReceiveClient({
       payload: {
         challanNo: challanNo.trim(),
         receivedAt,
-        bonded: false,
+        bonded,
+        ...(bonded && udId ? { udId } : {}),
         ...(challanPhoto ? { documentId: challanPhoto.documentId } : {}),
         lines: [
           {
@@ -357,6 +365,23 @@ export function ReceiveClient({
             ))}
           </select>
         </label>
+
+        {bonded ? (
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <span style={label}>{t('ui.store.ud_label')}</span>
+            <select value={udId} onChange={(e) => setUdId(e.target.value)} style={field}>
+              <option value="">{t('ui.store.ud_choose')}</option>
+              {uds.map((ud) => (
+                <option key={ud.id} value={ud.id}>
+                  {ud.number}
+                </option>
+              ))}
+            </select>
+            <span style={{ font: "400 12px/1.5 var(--fx-font-sans)", color: 'var(--fx-text-tertiary)' }}>
+              {t('ui.store.ud_hint')}
+            </span>
+          </label>
+        ) : null}
         <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <span style={label}>
             {t('ui.store.field_qty_on_challan', { unit: item?.uom ?? '—' })}

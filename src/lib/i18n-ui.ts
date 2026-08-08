@@ -565,9 +565,13 @@ export const UI_MESSAGES: Catalogue = {
     'ui.store.field_qty_on_challan': 'Quantity on the challan ({unit})',
     'ui.store.location_bonded_suffix': ' (bonded)',
     'ui.store.bonded_warning':
-      '{code} is a bonded location. Duty-free cloth must be received against a Utilization Declaration — that record belongs to the commercial desk, and this screen cannot raise one.',
-    'ui.store.bonded_refused':
-      'Bonded receipts must name a Utilization Declaration, and UDs belong to the commercial desk (module 2.2). Receive to a general location, or ask commercial to raise the UD first.',
+      '{code} is a bonded location. Duty-free cloth must be received against a Utilization Declaration — pick it below; raising a new one belongs to the commercial desk.',
+    'ui.store.bonded_needs_ud':
+      'A bonded receipt must name its Utilization Declaration — pick it above. If none is listed, commercial has to raise it first.',
+    'ui.store.ud_label': 'Utilization Declaration',
+    'ui.store.ud_choose': 'Choose the declaration',
+    'ui.store.ud_hint':
+      'Named on the receipt, drawn at issue: receiving bonded cloth records which declaration covers it; the balance only moves when rolls leave the store.',
     'ui.store.rolls_counted_eyebrow': '{count} counted',
     'ui.store.rolls_heading': 'Rolls at the rack',
     'ui.store.rolls_mismatch':
@@ -1704,9 +1708,13 @@ export const UI_MESSAGES: Catalogue = {
     'ui.store.field_qty_on_challan': 'চালানে লেখা পরিমাণ ({unit})',
     'ui.store.location_bonded_suffix': ' (বন্ড)',
     'ui.store.bonded_warning':
-      '{code} একটি বন্ডেড জায়গা। শুল্কমুক্ত কাপড় UD ছাড়া নেওয়া যাবে না — UD কমার্শিয়াল ডেস্কের কাজ, এই পাতা থেকে করা যায় না।',
-    'ui.store.bonded_refused':
-      'বন্ডেড রসিদে UD থাকতেই হবে, আর UD কমার্শিয়াল ডেস্কের (মডিউল ২.২)। সাধারণ জায়গায় নিন, বা আগে কমার্শিয়ালকে UD করতে বলুন।',
+      '{code} একটি বন্ডেড জায়গা। শুল্কমুক্ত কাপড় UD ছাড়া নেওয়া যাবে না — নিচে থেকে UD বাছুন; নতুন UD করা কমার্শিয়াল ডেস্কের কাজ।',
+    'ui.store.bonded_needs_ud':
+      'বন্ডেড রসিদে UD-র নাম থাকতেই হবে — উপরে বাছুন। তালিকায় না থাকলে আগে কমার্শিয়ালকে UD করতে বলুন।',
+    'ui.store.ud_label': 'ইউটিলাইজেশন ডিক্লারেশন',
+    'ui.store.ud_choose': 'ডিক্লারেশন বাছুন',
+    'ui.store.ud_hint':
+      'রসিদে নাম লেখা হয়, ইস্যুতে টান পড়ে: বন্ডেড কাপড় নেওয়ার সময় কোন UD-র আওতায় তা লেখা হয়; রোল স্টোর ছাড়লেই কেবল ব্যালেন্স কমে।',
     'ui.store.rolls_counted_eyebrow': '{count}টি গোনা হয়েছে',
     'ui.store.rolls_heading': 'র‍্যাকে থাকা রোল',
     'ui.store.rolls_mismatch':
