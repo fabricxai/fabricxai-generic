@@ -314,9 +314,13 @@ export const NAV: readonly NavItem[] = [
     label: 'UD workbench',
     href: '/ud',
     section: 'floor',
-    // Bonded fabric is a woven-unit concern: the shell fabric is imported
-    // duty-free against a UD. Knit units buy or knit their own.
-    factoryTypes: ['woven'],
+    // Bonded fabric is a concern of any unit that IMPORTS shell fabric: pure woven
+    // always, and a knit-composite the moment it runs a woven program — its knit fabric
+    // comes off its own machines, but the denim for a jacket order arrives duty-free
+    // against a UD exactly as it would at a woven unit. Only a pure knit factory,
+    // which buys or knits everything locally, has no declaration to work. (Found live:
+    // the knit-composite tenant had bonded denim on order and no UD workbench anywhere.)
+    factoryTypes: ['woven', 'knit-composite'],
     roles: ['store', 'commercial', 'compliance'],
     // Store requests an overdraw, commercial records the declaration, compliance runs
     // the reconciliation the customs office asks for.
