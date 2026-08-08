@@ -97,8 +97,13 @@ export function LcDetailClient({
 
   // eslint-disable-next-line fabricxai/no-float-money -- local BTB headroom preview only; the server re-runs the exact gate (rule 8) and only its answer writes
   const free = Number.parseFloat(lc.headroom.free)
+  // Commas stripped BEFORE parsing: parseFloat("62,000.00") silently stops at the comma
+  // and answers 62 — which is how a live tester opened a sixty-two-DOLLAR back-to-back
+  // while typing sixty-two thousand, sailing under the headroom gate on a formatting
+  // character. The server's zod would have refused the comma; the old code converted it
+  // to a clean wrong number first.
   // eslint-disable-next-line fabricxai/no-float-money -- half-typed keyboard value for the same preview; NaN falls back to 0, the server recomputes exactly
-  const asking = Number.parseFloat(btbValue) || 0
+  const asking = Number.parseFloat(btbValue.replace(/,/g, '')) || 0
   // Local preview only. The server runs the same check and its answer is the one that counts.
   const wouldExceed = asking > 0 && asking > free
 
