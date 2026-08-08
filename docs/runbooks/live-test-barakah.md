@@ -136,6 +136,13 @@ payroll in the nav, prices masked. Start there.
     the 5120-02 trap fires (ΣBTB 140,900 > 138,600) — LC-4471's 44,300 stays far
     inside 70% of 244,800 either way.
 
+17. **Phase 3, neither an LC nor a UD can be corrected from a screen.** Deliberate once
+    the record is in use (a customs paper, a bank instrument) — but a transcription
+    typo BEFORE first use has no door either: LC-4471's docs checklist and
+    UD-2026-031's item name ("0/1" for "30/1") were both corrected by hand in the
+    database. A "correct before first draw/presentation" affordance is owed; until it
+    exists, typos in these two registers are an operator-with-psql job.
+
 ## Honest status of the traps
 
 The gates the runbook pokes (PP blocks cutting, UD overdraw block, BTB headroom, EXP
