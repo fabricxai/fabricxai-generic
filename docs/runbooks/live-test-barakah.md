@@ -143,6 +143,26 @@ payroll in the nav, prices masked. Start there.
     database. A "correct before first draw/presentation" affordance is owed; until it
     exists, typos in these two registers are an operator-with-psql job.
 
+18. **Phase 4, the procurement chain needed both missing links built.** A requisition
+    could not be raised (action existed, no screen, no MARBIM tool) and a quote could
+    not be entered (`recordQuote` was on the unreachable list) — so the requisition
+    page compared quotes that could not exist. Both doors landed during the test:
+    "New requisition" on /procurement, "Record a quote" on the requisition page.
+    Also: NOBODY in the tenant holds the `procurement` role — grant it to Karim from
+    Settings → Who can do what (itself a real product path) or run the desk as
+    Tanvir (commercial), who the actions also accept.
+19. **Phase 4, bonded receipts name the UD; issues draw it.** The receive screen used
+    to refuse ALL bonded receipts (no picker existed); it now offers the live
+    declarations whenever the location is bonded. The balance moves at ISSUE, not at
+    receipt. The kit's UD balances (13,440 kg / 1,200 yds) assume pre-test
+    consumption; that history was staged as dated `ud_consumptions` rows so the
+    workbench shows the runbook's numbers and the ISS-118 overdraw trap is real.
+20. **Phase 4, SPO-1105's trap fires differently.** The platform's financing gate
+    requires an import PO to NAME a BTB and re-verifies the MASTER's ceiling under a
+    lock at issue — but it does not sum PO values against the named BTB's own value,
+    so "top-up exceeds the BTB" as the kit scripts it has no implementation (gap,
+    worth the report). The demonstrable refusal is an import PO with no BTB.
+
 ## Honest status of the traps
 
 The gates the runbook pokes (PP blocks cutting, UD overdraw block, BTB headroom, EXP
