@@ -163,6 +163,15 @@ payroll in the nav, prices masked. Start there.
     so "top-up exceeds the BTB" as the kit scripts it has no implementation (gap,
     worth the report). The demonstrable refusal is an import PO with no BTB.
 
+21. **Phase 4, the store had no locations and no way to make one.** The day-0 load
+    seeded items but not racks, and NOTHING creates a location — no screen, no
+    action, no MARBIM tool — so the receive form's "Into" box was empty and no goods
+    could ever arrive. GEN-01 (general), BND-01 (bonded) and FLR-01 (floor) were
+    seeded by hand; a location-management surface is owed, and any new tenant hits
+    this wall on day one. Also owed from this phase: procurement's actions still
+    throw (a double-click on "Issue the purchase order" masks its refusal as React
+    #441), and a requisition has a cancelled state with no cancel button.
+
 ## Honest status of the traps
 
 The gates the runbook pokes (PP blocks cutting, UD overdraw block, BTB headroom, EXP
