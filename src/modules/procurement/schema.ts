@@ -38,6 +38,9 @@ export const supplierTypeEnum = pgEnum('supplier_type', [
   'trims',
   'embellishment',
   'subcontract',
+  // A knit factory's PRIMARY input, and the enum could not name it — the vocabulary was
+  // built with a woven mindset (live-test finding, Phase 4: Square Yarns Ltd had no kind).
+  'yarn',
 ])
 export const supplierOriginEnum = pgEnum('supplier_origin', ['local', 'import'])
 export const prStatusEnum = pgEnum('pr_status', ['open', 'quoted', 'ordered', 'cancelled'])

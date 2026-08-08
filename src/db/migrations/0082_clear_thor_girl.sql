@@ -1,0 +1,1 @@
+ALTER TYPE "public"."supplier_type" ADD VALUE 'yarn';

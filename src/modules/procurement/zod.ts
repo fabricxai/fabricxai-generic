@@ -17,7 +17,7 @@ export const pct = z.string().regex(/^\d{1,3}(\.\d{1,2})?$/, 'expected a percent
 export const supplierPayload = z.object({
   code: z.string().min(1).max(60),
   name: z.string().min(1).max(200),
-  type: z.enum(['fabric_mill', 'trims', 'embellishment', 'subcontract']),
+  type: z.enum(['fabric_mill', 'trims', 'embellishment', 'subcontract', 'yarn']),
   origin: z.enum(['local', 'import']),
   paymentTerms: z.string().max(200).optional(),
   contacts: z

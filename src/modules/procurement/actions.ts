@@ -38,7 +38,7 @@ function refresh(prId?: string): void {
 export async function createSupplier(input: {
   code: string
   name: string
-  type: 'fabric_mill' | 'trims' | 'embellishment' | 'subcontract'
+  type: 'fabric_mill' | 'trims' | 'embellishment' | 'subcontract' | 'yarn'
   origin: 'local' | 'import'
   paymentTerms?: string
   defaultCurrency?: string

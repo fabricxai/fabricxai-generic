@@ -575,6 +575,13 @@
       "when": 1786029171225,
       "tag": "0081_pgbouncer_refuse_bypassrls",
       "breakpoints": true
+    },
+    {
+      "idx": 82,
+      "version": "7",
+      "when": 1786223578262,
+      "tag": "0082_clear_thor_girl",
+      "breakpoints": true
     }
   ]
 }

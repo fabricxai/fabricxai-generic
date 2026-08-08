@@ -10,7 +10,7 @@ import { Button } from '@/components/fx/primitives'
 import { actionErrorMessage } from '@/lib/action-error'
 import { createSupplier } from '@/modules/procurement/actions'
 
-const TYPES = ['fabric_mill', 'trims', 'embellishment', 'subcontract'] as const
+const TYPES = ['yarn', 'fabric_mill', 'trims', 'embellishment', 'subcontract'] as const
 const ORIGINS = ['local', 'import'] as const
 
 /**
