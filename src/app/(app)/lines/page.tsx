@@ -42,7 +42,7 @@ export default async function LinesPage() {
   // in a `{lines.length === 0 ? null : null}` left from an earlier draft — so it was a
   // database round trip on every load of a floor screen, feeding nothing. The header's
   // count comes from `rows`, which is the board itself.
-  const [rows, policy, lineRows, orderRows] = await Promise.all([
+  const [allRows, policy, allLineRows, orderRows] = await Promise.all([
     board(ctx, { producedOn: today, shiftHours: SHIFT_HOURS }),
     getPolicy<ProductionPolicy>(ctx, 'production'),
     // The plan-the-day door's choices (live-test finding: daily_line_plans had no
@@ -56,6 +56,15 @@ export default async function LinesPage() {
     ),
     orderList(ctx),
   ])
+
+  // The caller's line narrowing, honoured (live-test finding: a chief scoped to L1/L2
+  // saw all eight). Scope comes from the session, never the client.
+  const rows = ctx.lineScope
+    ? allRows.filter((row) => ctx.lineScope!.includes(row.code))
+    : allRows
+  const lineRows = ctx.lineScope
+    ? allLineRows.filter((row) => ctx.lineScope!.includes(row.code))
+    : allLineRows
 
   // Behind means MATERIALLY behind, against the company's own threshold.
   //

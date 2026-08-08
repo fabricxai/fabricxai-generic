@@ -43,7 +43,7 @@ export default async function HourlyPage() {
 
   const today = factoryToday()
 
-  const [rows, planRows, openStoppages] = await Promise.all([
+  const [allRows, planRows, openStoppages] = await Promise.all([
     board(ctx, { producedOn: today, shiftHours: SHIFT_HOURS }),
     withTenantRead(ctx, (tx) =>
       tx
@@ -70,6 +70,14 @@ export default async function HourlyPage() {
         .where(and(isNull(downtimes.endedAt))),
     ),
   ])
+
+  // The caller's line narrowing, honoured — a chief scoped to L1/L2 enters L1/L2.
+  const rows = ctx.lineScope
+    ? allRows.filter((row) => ctx.lineScope!.includes(row.code))
+    : allRows
+  const stoppages = ctx.lineScope
+    ? openStoppages.filter((s) => ctx.lineScope!.includes(s.lineCode))
+    : openStoppages
 
   if (rows.length === 0) {
     return (
@@ -103,13 +111,13 @@ export default async function HourlyPage() {
         eyebrow={tui(locale, 'ui.production.hourly_eyebrow_dated', { date: today })}
         title={tui(locale, 'ui.production.hour_title', { hour: currentHour })}
         meta={
-          openStoppages.length > 0
+          stoppages.length > 0
             ? tui(
                 locale,
-                openStoppages.length === 1
+                stoppages.length === 1
                   ? 'ui.production.lines_stopped_one'
                   : 'ui.production.lines_stopped_other',
-                { count: openStoppages.length },
+                { count: stoppages.length },
               )
             : undefined
         }
@@ -126,7 +134,7 @@ export default async function HourlyPage() {
           orderId: planByLine.get(row.lineId)?.orderId ?? null,
           alreadyEntered: row.hours.some((h) => h.hourSlot === currentHour),
         }))}
-        stoppages={openStoppages.map((s) => ({
+        stoppages={stoppages.map((s) => ({
           id: s.id,
           lineId: s.lineId,
           lineCode: s.lineCode,

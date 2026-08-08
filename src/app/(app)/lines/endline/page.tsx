@@ -36,7 +36,7 @@ export default async function EndlinePage() {
 
   const today = factoryToday()
 
-  const [lineRows, counts] = await Promise.all([
+  const [allLineRows, counts] = await Promise.all([
     withTenantRead(ctx, (tx) =>
       tx
         .select({ id: lines.id, code: lines.code, name: lines.name })
@@ -59,6 +59,11 @@ export default async function EndlinePage() {
         .where(eq(endlineCounts.countedOn, today)),
     ),
   ])
+
+  // The caller's line narrowing, honoured — a chief scoped to L1/L2 counts L1/L2.
+  const lineRows = ctx.lineScope
+    ? allLineRows.filter((row) => ctx.lineScope!.includes(row.code))
+    : allLineRows
 
   if (lineRows.length === 0) {
     return (
