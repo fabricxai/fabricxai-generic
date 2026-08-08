@@ -129,6 +129,76 @@ export const actualizeMilestonePayload = z.object({
 // — which is what makes a tightened schema able to reject an old draft.
 // ─────────────────────────────────────────────────────────────────────────────
 
+// ── Transcription tolerance, extraction drafts ONLY ──────────────────────────
+//
+// The model reads a PAPER purchase order: "Ship date: 15 NOV 2026", "USD 244,800.00",
+// "36,000 pcs". The first live PO intake failed on every one of those — the draft schema
+// demanded the database's shapes from a document that has never heard of them. Same cure
+// as costing's tech-pack layer: transcribe here, keep `createOrderPayload` strict — the
+// commit path re-validates against the strict shapes, so nothing lenient reaches a row.
+
+const MONTH_BY_NAME: Record<string, string> = {
+  jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06',
+  jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12',
+}
+
+/** "15 NOV 2026", "Nov 15, 2026", "15.11.2026", "15/11/2026" → "2026-11-15". */
+const transcribedCalendarDate = z.preprocess((value) => {
+  if (typeof value !== 'string') return value
+  const text = value.trim()
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text
+
+  let m = /^(\d{1,2})[ ./-]([A-Za-z]{3,9})[ ./,-]*(\d{4})$/.exec(text)
+  if (m) {
+    const month = MONTH_BY_NAME[m[2]!.slice(0, 3).toLowerCase()]
+    if (month) return `${m[3]}-${month}-${m[1]!.padStart(2, '0')}`
+  }
+  m = /^([A-Za-z]{3,9})[ .]*(\d{1,2}),?\s*(\d{4})$/.exec(text)
+  if (m) {
+    const month = MONTH_BY_NAME[m[1]!.slice(0, 3).toLowerCase()]
+    if (month) return `${m[3]}-${month}-${m[2]!.padStart(2, '0')}`
+  }
+  m = /^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/.exec(text)
+  if (m) {
+    // Day-first (the buyers here are European; so is the kit's PO). A first part that
+    // can only be a month ("11/15/2026") is read as US order — 15 is not a month.
+    let day = Number(m[1])
+    let month = Number(m[2])
+    if (month > 12 && day <= 12) [day, month] = [month, day]
+    return `${m[3]}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+  }
+  return value
+}, calendarDate)
+
+/** "USD 244,800.00" → "244800.00" · "6.9500" → "6.95". Never rounds — trailing zeros only. */
+const transcribedMoney = z.preprocess((value) => {
+  if (typeof value === 'number') return String(value)
+  if (typeof value !== 'string') return value
+  const match = /\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?/.exec(value)
+  if (!match) return value
+  const [whole, fraction = ''] = match[0].replace(/,/g, '').split('.')
+  const trimmed = fraction.length > 2 ? fraction.replace(/0+$/, '') : fraction
+  return trimmed ? `${whole}.${trimmed}` : whole
+}, moneyAmount)
+
+/** "36,000" or "36,000 pcs" → 36000. */
+const transcribedCount = z.preprocess((value) => {
+  if (typeof value === 'string') {
+    const digits = /\d+/.exec(value.replace(/,/g, ''))?.[0]
+    if (digits) return Number(digits)
+  }
+  return value
+}, z.number().int().positive())
+
+/** A style as the model transcribes it off the PO. Strict twin: `orderStylePayload`. */
+const orderStyleDraft = z.object({
+  styleCode: z.string().min(1),
+  description: z.string().optional(),
+  contractedQty: transcribedCount.optional(),
+  unitPrice: transcribedMoney.optional(),
+  currency: currencyCode.default('USD'),
+})
+
 /** What MARBIM extracts from a buyer PO scan. Every field is uncertain, hence optional. */
 /**
  * An order drafted from a buyer's purchase order.
@@ -139,15 +209,17 @@ export const actualizeMilestonePayload = z.object({
  *
  * `buyerId` is the one field no document carries: the PO names the buyer in words, and the
  * uuid is ours. MARBIM's intake collects it from a picker and merges it in at confidence 1
- * (`marbim/intake.ts`).
+ * (`marbim/intake.ts`) — AFTER the provider validates the model's own output, which is why
+ * whatever id-shaped string the model transcribed is dropped here rather than refused: the
+ * picker's value is the one that counts, and `createOrder` still requires a real uuid.
  */
 export const orderFromPoDraft = z.object({
-  buyerId: z.uuid(),
+  buyerId: z.uuid().optional().catch(undefined),
   poNumbers: z.array(z.string().min(1)).min(1),
-  totalValue: moneyAmount.optional(),
+  totalValue: transcribedMoney.optional(),
   currency: currencyCode.default('USD'),
-  plannedExFactoryDate: calendarDate.optional(),
-  styles: z.array(orderStylePayload).min(1),
+  plannedExFactoryDate: transcribedCalendarDate.optional(),
+  styles: z.array(orderStyleDraft).min(1),
 })
 
 /** A buyer's amendment, drafted from an email or an amended PO. */
