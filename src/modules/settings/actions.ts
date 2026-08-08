@@ -3,6 +3,7 @@
 import { headers } from 'next/headers'
 import { revalidatePath } from 'next/cache'
 
+import { surfaced, type ActionFailure } from '@/lib/action-failure'
 import { requireRole } from '@/modules/core/session'
 
 import {
@@ -100,11 +101,15 @@ export async function revokeUserRole(input: {
 export async function saveModulePolicy(input: {
   moduleId: string
   patch: Record<string, unknown>
-}): Promise<Awaited<ReturnType<typeof setPolicy>>> {
+}): Promise<Awaited<ReturnType<typeof setPolicy>> | ActionFailure> {
   const ctx = await requireRole(await headers(), 'owner', 'admin')
-  const result = await setPolicy(ctx, input)
+  // Refusal as a value (lib/action-failure): a rejected patch must reach the screen as
+  // the validator's sentence, not as production's masked React #441.
+  return surfaced(async () => {
+    const result = await setPolicy(ctx, input)
 
-  // A policy is read by whichever module owns it, on screens all over the product.
-  revalidatePath('/', 'layout')
-  return result
+    // A policy is read by whichever module owns it, on screens all over the product.
+    revalidatePath('/', 'layout')
+    return result
+  })
 }

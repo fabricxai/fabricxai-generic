@@ -55,7 +55,6 @@ const NO_SCREEN_YET: Record<string, string> = {
 
   // Written in 5.8 for the policy editor, which is the one piece of that item still owed.
   // The action and its service gate are done; the screen renders policies read-only.
-  'settings/saveModulePolicy': 'the policy override editor is still a read-only panel',
 
   // `orders/generateOrderTna` lived here from 5.1 until the live test: the TNA tab's
   // generate control (template picker + ship date) now calls it, so the entry is gone —

@@ -1,7 +1,6 @@
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 
-import { Card } from '@/components/fx/data'
 import { Badge } from '@/components/fx/primitives'
 import { SectionHeading } from '@/components/fx/signature'
 import { PageHeader } from '@/components/shell/page-shell'
@@ -9,6 +8,7 @@ import { getCtx } from '@/modules/core/session'
 import { auditTrail, auditedTables, companyProfile, listPolicies, roleMatrix } from '@/modules/settings/service'
 
 import { AuditViewer } from './audit-viewer'
+import { PolicyCard } from './policy-card'
 import { RoleControls } from './role-controls'
 import { FactoryTypePanel, ProfileForm } from './settings-client'
 
@@ -80,86 +80,20 @@ export default async function SettingsPage() {
 
         <section>
           <SectionHeading eyebrow={`${policies.length} modules`}>Policy</SectionHeading>
+          {/* Editable in place since the live test found the card read-only over a
+              complete write path — see PolicyCard. */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {policies.map((p) => {
-              const overridden = Object.keys(p.overrides).length
-              return (
-                <Card key={p.moduleId} padding="18px 20px">
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
-                    <span style={{ font: "600 15px/1.3 var(--fx-font-sans)" }}>{p.label}</span>
-                    <span data-mono style={{ font: "400 12px/1 var(--fx-font-mono)", color: 'var(--fx-text-tertiary)' }}>
-                      {p.moduleId}
-                    </span>
-                    {/* Effective and overridden are shown apart, because a
-                        deliberate 2% and a default 2% are different answers to
-                        the question asked when the number turns out to be wrong. */}
-                    <span style={{ marginLeft: 'auto' }}>
-                      {p.unresolvable ? (
-                        <Badge tone="danger">will not resolve</Badge>
-                      ) : overridden > 0 ? (
-                        <Badge tone="info">{overridden} overridden</Badge>
-                      ) : (
-                        <Badge>all defaults</Badge>
-                      )}
-                    </span>
-                  </div>
-
-                  {/* Says which value is wrong and where, because the person
-                      reading this is the one who has to correct it. */}
-                  {p.unresolvable ? (
-                    <div
-                      style={{
-                        marginTop: 12,
-                        font: "400 13px/1.55 var(--fx-font-sans)",
-                        color: 'var(--fx-danger)',
-                        textWrap: 'pretty',
-                      }}
-                    >
-                      {p.unresolvable}
-                    </div>
-                  ) : null}
-
-                  <div
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-                      gap: 10,
-                      marginTop: 14,
-                    }}
-                  >
-                    {Object.entries(p.effective).map(([key, value]) => {
-                      const isOverride = key in p.overrides
-                      return (
-                        <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                          <span
-                            style={{
-                              font: "400 11.5px/1.3 var(--fx-font-mono)",
-                              color: 'var(--fx-text-tertiary)',
-                            }}
-                          >
-                            {key}
-                          </span>
-                          <span
-                            data-numeric
-                            style={{
-                              font: "500 13px/1.3 var(--fx-font-mono)",
-                              color: isOverride ? 'var(--fx-text-primary)' : 'var(--fx-text-secondary)',
-                            }}
-                          >
-                            {formatValue(value)}
-                            {isOverride ? (
-                              <span style={{ color: 'var(--fx-text-tertiary)', marginLeft: 6 }}>
-                                (set)
-                              </span>
-                            ) : null}
-                          </span>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </Card>
-              )
-            })}
+            {policies.map((p) => (
+              <PolicyCard
+                key={p.moduleId}
+                moduleId={p.moduleId}
+                label={p.label}
+                effective={p.effective}
+                overrides={p.overrides}
+                unresolvable={p.unresolvable}
+                canEdit={canEdit}
+              />
+            ))}
           </div>
         </section>
 
@@ -270,11 +204,4 @@ export default async function SettingsPage() {
       </div>
     </>
   )
-}
-
-function formatValue(value: unknown): string {
-  if (value === null || value === undefined) return '—'
-  if (typeof value === 'boolean') return value ? 'yes' : 'no'
-  if (typeof value === 'object') return JSON.stringify(value)
-  return String(value)
 }
