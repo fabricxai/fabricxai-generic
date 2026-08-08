@@ -151,6 +151,14 @@ export async function getUdBalance(
 export interface UdDrawInput {
   udId: string
   itemRef: string
+  /**
+   * Other names the same material answers to, tried when `itemRef` is not on the
+   * declaration. A declaration typed from the customs paper authorizes "12oz stretch
+   * denim"; the store issues FAB-DEN-12 — same cloth, two vocabularies, and the ledger
+   * must be written in the DECLARATION's or the reconciliation will not balance. The
+   * first ref the declaration actually authorizes is the one recorded.
+   */
+  itemRefAliases?: readonly string[]
   qty: string
   unit: string
   /** The issue this draw belongs to. Set by module 3.1. */
@@ -182,10 +190,20 @@ export async function drawUd(
 ): Promise<{ consumptionId: string; decision: UdDrawDecision }> {
   const { ud, consumptions } = await loadUd(ctx, tx, input.udId, true)
 
+  // The ledger is written in the declaration's vocabulary: the first candidate ref the
+  // declaration authorizes wins; when none does, the primary ref carries the refusal so
+  // the message names what the store calls the thing.
+  const authorized = new Set(
+    (ud.authorizedItems as { itemRef?: string }[]).map((item) => item.itemRef).filter(Boolean),
+  )
+  const itemRef =
+    [input.itemRef, ...(input.itemRefAliases ?? [])].find((ref) => authorized.has(ref)) ??
+    input.itemRef
+
   const decision = checkUdDraw({
     ud,
     consumptions,
-    itemRef: input.itemRef,
+    itemRef,
     qty: input.qty,
     unit: input.unit,
     today: input.today ?? factoryToday(),
@@ -207,7 +225,9 @@ export async function drawUd(
       companyId: ctx.companyId,
       udId: input.udId,
       storeIssueId: input.storeIssueId ?? null,
-      itemRef: input.itemRef,
+      // The RESOLVED ref — the declaration's own word for the material, never the
+      // store's, or computeUdBalance refuses the whole ledger as inconsistent.
+      itemRef,
       qty: input.qty,
       unit: input.unit,
       overrideOf: input.approvedOverride && !decision.allowed ? input.udId : null,

@@ -235,6 +235,42 @@ describe('3.1 · goods out draws the UD in the same transaction', () => {
     expect(untouched?.status).toBe('in_stock')
   })
 
+  it('resolves the declaration through the roll’s GRN when the caller names none', async () => {
+    /*
+     * The live client never sent `udId` on a line — it did not know it — so the first
+     * bonded issue on the live tenant left the warehouse with no draw recorded and the
+     * customs gate never consulted. The roll knows its GRN and the GRN names its
+     * declaration; the resolution belongs HERE, where no client can skip it.
+     */
+    await receiveGrn(ctx, {
+      challanNo: 'CH-0002',
+      receivedAt: '2026-06-02',
+      bonded: true,
+      udId,
+      lines: [
+        {
+          itemId: fabricId,
+          qty: '100.00',
+          unit: 'M',
+          rolls: [{ rollNo: 'R-003', qty: '100.00', locationId: bondedLocationId, shadeGroup: 'A' }],
+        },
+      ],
+    })
+    const [roll] = await db.select().from(rolls).where(eq(rolls.rollNo, 'R-003'))
+
+    const result = await issueStock(ctx, {
+      orderId,
+      // No udId on the line — exactly what the screen sends.
+      lines: [{ itemId: fabricId, rollId: roll!.id, qty: '100.00', unit: 'M' }],
+    })
+
+    expect(result.udDraws).toHaveLength(1)
+    expect(result.udDraws[0]?.udId).toBe(udId)
+
+    const draws = await db.select().from(udConsumptions).where(eq(udConsumptions.udId, udId))
+    expect(draws).toHaveLength(2)
+  })
+
   it('refuses to issue a roll that has already gone out', async () => {
     const [roll] = await db.select().from(rolls).where(eq(rolls.rollNo, 'R-001'))
 
@@ -325,7 +361,8 @@ describe('3.1 · offline replay is a no-op', () => {
     expect(lines).toHaveLength(1)
 
     const draws = await db.select().from(udConsumptions).where(eq(udConsumptions.udId, udId))
-    expect(draws).toHaveLength(2) // the earlier 200 plus this 150 — not 350 twice
+    // The earlier 200, the GRN-resolved 100, and this 150 — recorded once each, never twice.
+    expect(draws).toHaveLength(3)
   })
 
   it('a rejected row stays rejected on replay rather than retrying forever', async () => {

@@ -8,7 +8,13 @@ import { tui } from '@/lib/i18n-ui'
 import { requestLocale } from '@/lib/ui-locale'
 import { getCtx } from '@/modules/core/session'
 import { orderList } from '@/modules/orders/queries'
-import { itemList, outstandingRequisitions, rollsForItem, type RollRow } from '@/modules/store/queries'
+import {
+  issuedShadeGroups,
+  itemList,
+  outstandingRequisitions,
+  rollsForItem,
+  type RollRow,
+} from '@/modules/store/queries'
 import { getStock } from '@/modules/store/service'
 
 import { IssueClient } from './issue-client'
@@ -70,9 +76,13 @@ export default async function StoreIssuePage() {
   }
 
   const itemIds = [...new Set(outstanding.map((line) => line.itemId))]
-  const [stock, rollLists] = await Promise.all([
+  const orderIds = [...new Set(outstanding.map((line) => line.orderId))]
+  const [stock, rollLists, shadeHistory] = await Promise.all([
     getStock(ctx, { itemIds }),
     Promise.all(itemIds.map((id) => rollsForItem(ctx, id))),
+    // What each order already holds, shade-wise — the mixing warning must remember
+    // yesterday's issue, not just today's pick.
+    issuedShadeGroups(ctx, orderIds),
   ])
 
   const rollsByItem: Record<string, RollRow[]> = {}
@@ -107,6 +117,7 @@ export default async function StoreIssuePage() {
         rollsByItem={rollsByItem}
         freeByItem={freeByItem}
         onHandByItem={onHandByItem}
+        shadeHistoryByOrder={shadeHistory}
       />
     </FloorScreen>
   )

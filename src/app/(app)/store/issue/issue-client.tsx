@@ -32,11 +32,14 @@ export function IssueClient({
   rollsByItem,
   freeByItem,
   onHandByItem,
+  shadeHistoryByOrder = {},
 }: {
   lines: readonly OutstandingLine[]
   rollsByItem: Record<string, RollRow[]>
   freeByItem: Record<string, string>
   onHandByItem: Record<string, string>
+  /** Shade groups each order has ALREADY been issued — the warning must remember them. */
+  shadeHistoryByOrder?: Record<string, string[]>
 }) {
   const t = useT()
   const { capture, online, queued, syncing, refused, sync, clear } = useOfflineQueue()
@@ -75,10 +78,16 @@ export function IssueClient({
    */
   const available = line ? Math.min(onHand, free + required) : 0
 
-  // Distinct shade groups among the picked rolls. Ungrouped rolls do not count as a group
-  // of their own — a trim with no dye lot cannot clash with anything.
-  const shadeGroups = [...new Set(pickedRolls.map((r) => r.shadeGroup).filter(Boolean))]
-  const mixingShades = shadeGroups.length > 1
+  // Distinct shade groups across the picked rolls AND what this order was already issued.
+  // The cross-issue case is the one that actually reaches a cutting table: two rolls of B
+  // in one pick is obvious at the rack; one roll of B a day after 6,000 yards of A is not,
+  // and it used to pass here silently. Ungrouped rolls do not count as a group of their
+  // own — a trim with no dye lot cannot clash with anything.
+  const alreadyIssuedGroups = line ? (shadeHistoryByOrder[line.orderId] ?? []) : []
+  const shadeGroups = [
+    ...new Set([...alreadyIssuedGroups, ...pickedRolls.map((r) => r.shadeGroup)].filter(Boolean)),
+  ]
+  const mixingShades = pickedRolls.length > 0 && shadeGroups.length > 1
   const overFree = issuing > available
   const bonded = pickedRolls.some((roll) => roll.locationKind === 'bonded')
 

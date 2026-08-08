@@ -640,7 +640,7 @@ export const UI_MESSAGES: Catalogue = {
     'ui.store.issue_blocked_over_free':
       'This issue is blocked — {issuing} {unit} is more than the {available} {unit} this order may draw. {onHand} {unit} is on hand, and the rest is already promised to other orders. Nothing has been written.',
     'ui.store.issue_bonded_note':
-      'Bonded rolls are picked — this issue draws on a customs declaration. The UD balance check lands with module 2.2; until then the draw is recorded but not validated against a UD.',
+      'Bonded rolls are picked — this issue draws on its Utilization Declaration in the same transaction, and the balance gate can refuse it under the lock. What the workbench shows is a guide; the lock decides.',
     'ui.store.issue_button': 'Issue {qty} {unit}',
     'ui.store.issue_button_blocked': 'Blocked — over free stock',
     'ui.store.issue_done': 'Issued {list}.',
@@ -1782,7 +1782,7 @@ export const UI_MESSAGES: Catalogue = {
     'ui.store.issue_blocked_over_free':
       'এই ইস্যু আটকানো — আপনি {issuing} {unit} দিতে চাইছেন, কিন্তু এই অর্ডার সর্বোচ্চ {available} {unit} নিতে পারে। মজুদ {onHand} {unit}, বাকিটা অন্য অর্ডারের জন্য রাখা আছে। কিছুই লেখা হয়নি।',
     'ui.store.issue_bonded_note':
-      'বন্ডেড রোল বাছা হয়েছে — এই ইস্যু কাস্টমসের ঘোষণা থেকে যাচ্ছে। UD ব্যালেন্স মেলানোর কাজ হবে মডিউল ২.২-এ; ততদিন এই ইস্যু লেখা থাকবে, কিন্তু UD-র সাথে মেলানো হবে না।',
+      'বন্ডেড রোল বাছা হয়েছে — এই ইস্যু একই লেনদেনে UD থেকে টানে, আর ব্যালেন্স গেট লকের নিচে তা আটকাতে পারে। ওয়ার্কবেঞ্চের সংখ্যা কেবল আন্দাজ; সিদ্ধান্ত লকের।',
     'ui.store.issue_button': '{qty} {unit} ইস্যু করুন',
     'ui.store.issue_button_blocked': 'আটকানো — ফ্রি স্টকের বেশি',
     'ui.store.issue_done': '{list} ইস্যু করা হয়েছে।',

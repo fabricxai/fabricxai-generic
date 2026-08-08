@@ -443,6 +443,28 @@ export async function issueStockIn(
 
   const rollById = new Map(picked.map((roll) => [roll.id, roll]))
 
+  /*
+   * Which declaration covers each picked roll: roll → GRN line → GRN. Resolved HERE and
+   * never trusted from the client, because the client never sent it — the receive screen
+   * names the UD on the GRN, the roll carries its GRN line, and the first live bonded
+   * issue left the warehouse with no draw recorded and the customs gate never consulted
+   * (live-test finding, Phase 4: the workbench balance sat still while 6,000 bonded yards
+   * walked). An explicit `line.udId` still wins — trims issued by quantity have no roll
+   * to resolve through.
+   */
+  const grnLineIds = [...new Set(picked.map((roll) => roll.grnLineId))]
+  const udByGrnLine = new Map<string, string>()
+  if (grnLineIds.length > 0) {
+    const covered = await tx
+      .select({ grnLineId: grnLines.id, udId: grns.udId })
+      .from(grnLines)
+      .innerJoin(grns, eq(grns.id, grnLines.grnId))
+      .where(scoped(grnLines, ctx, inArray(grnLines.id, grnLineIds)))
+    for (const row of covered) {
+      if (row.udId) udByGrnLine.set(row.grnLineId, row.udId)
+    }
+  }
+
   for (const line of payload.lines) {
     if (!line.rollId) continue
     const roll = rollById.get(line.rollId)
@@ -530,20 +552,25 @@ export async function issueStockIn(
     // Keyed on `udId` alone, NOT on a roll being named. Trims and accessories are issued
     // by quantity with no roll behind them, and an earlier version that required a roll
     // let those lines skip the customs gate entirely — bonded material leaving with no
-    // draw recorded against it.
-    if (line.udId) {
+    // draw recorded against it. A roll's declaration is resolved through its GRN when the
+    // caller did not name one.
+    const udId = line.udId ?? (roll ? udByGrnLine.get(roll.grnLineId) : undefined)
+    if (udId) {
       const [item] = await tx.select().from(items).where(scoped(items, ctx, eq(items.id, line.itemId)))
       const itemRef = item?.code ?? line.itemId
 
-      await drawUd(ctx, tx, {
-        udId: line.udId,
+      const draw = await drawUd(ctx, tx, {
+        udId,
         itemRef,
+        // A scanned declaration speaks the paper's prose, the store speaks codes — the
+        // draw resolves to whichever the declaration authorizes.
+        itemRefAliases: item?.name ? [item.name] : [],
         qty: line.qty,
         unit: line.unit,
         storeIssueId: issue.id,
       })
 
-      udDraws.push({ udId: line.udId, itemRef, qty: line.qty })
+      udDraws.push({ udId, itemRef: draw.decision.itemRef ?? itemRef, qty: line.qty })
     }
 
     await tx.insert(issueLines).values({

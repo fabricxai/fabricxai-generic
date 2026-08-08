@@ -27,6 +27,8 @@ import { orders } from '@/modules/orders/schema'
 import {
   grnLines,
   grns,
+  issueLines,
+  issues,
   items,
   locations,
   requisitionLines,
@@ -235,6 +237,37 @@ export interface OutstandingLine {
   issuedQty: string
   outstandingQty: string
   unit: string
+}
+
+/**
+ * The shade groups each order has ALREADY been issued.
+ *
+ * The pick screen's mixing warning used to see only the current pick — two rolls of B in
+ * one issue warned, one roll of B after yesterday's A went through silently, and the
+ * cross-issue case is the one that actually reaches a cutting table (live-test finding,
+ * Phase 4). The service records the warning either way; this is what lets the screen say
+ * it BEFORE the rolls leave the rack.
+ */
+export async function issuedShadeGroups(
+  ctx: AnyCtx,
+  orderIds: readonly string[],
+): Promise<Record<string, string[]>> {
+  if (orderIds.length === 0) return {}
+  return withTenantRead(ctx, async (tx) => {
+    const rows = await tx
+      .selectDistinct({ orderId: issues.orderId, shadeGroup: rolls.shadeGroup })
+      .from(issueLines)
+      .innerJoin(issues, eq(issues.id, issueLines.issueId))
+      .innerJoin(rolls, eq(rolls.id, issueLines.rollId))
+      .where(scoped(issueLines, ctx, inArray(issues.orderId, [...orderIds])))
+
+    const byOrder: Record<string, string[]> = {}
+    for (const row of rows) {
+      if (!row.shadeGroup) continue
+      ;(byOrder[row.orderId] ??= []).push(row.shadeGroup)
+    }
+    return byOrder
+  })
 }
 
 export async function outstandingRequisitions(ctx: AnyCtx): Promise<OutstandingLine[]> {
