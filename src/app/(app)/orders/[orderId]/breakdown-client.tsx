@@ -63,6 +63,36 @@ export function OrderBreakdown({
   const [failure, setFailure] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
 
+  // The first grid is typed HERE, cell by cell — a style fresh off a won RFQ has no
+  // breakdown at all, and an editor that only re-types existing cells left it permanently
+  // empty (the same missing-first-row bug the costing studio had). Colour survives an add,
+  // because a PO grid is entered row-major: White S, White M, White L…
+  const [newColor, setNewColor] = useState('')
+  const [newSize, setNewSize] = useState('')
+  const [newQty, setNewQty] = useState('')
+
+  function addCell() {
+    const color = newColor.trim()
+    const size = newSize.trim()
+    // eslint-disable-next-line fabricxai/no-float-money -- pieces, not money
+    const qty = Number.parseInt(newQty, 10)
+    if (!color || !size || !Number.isInteger(qty) || qty <= 0) return
+
+    setDraft((rows) => {
+      const key = compositeKey(color, size)
+      const existing = rows.findIndex((row) => compositeKey(row.color, row.size) === key)
+      // The same cell typed twice is a correction of itself, not a second cell.
+      if (existing >= 0) return rows.map((row, i) => (i === existing ? { ...row, qty } : row))
+      return [...rows, { color, size, qty }]
+    })
+    setNewSize('')
+    setNewQty('')
+  }
+
+  const addable =
+    // eslint-disable-next-line fabricxai/no-float-money -- pieces, not money
+    newColor.trim() !== '' && newSize.trim() !== '' && Number.parseInt(newQty, 10) > 0
+
   const original = useMemo(
     () => new Map(cells.map((c) => [compositeKey(c.color, c.size), c.qty])),
     [cells],
@@ -197,6 +227,44 @@ export function OrderBreakdown({
               ))}
             </div>
           )}
+
+          <div
+            className="fx-stack-tablet"
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'minmax(0, 1fr) minmax(0, .7fr) 100px auto',
+              gap: 10,
+              alignItems: 'end',
+            }}
+          >
+            <TextInput
+              label={t('ui.orders.cell_color')}
+              value={newColor}
+              onChange={(e) => setNewColor(e.target.value)}
+            />
+            <TextInput
+              label={t('ui.orders.cell_size')}
+              mono
+              value={newSize}
+              onChange={(e) => setNewSize(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && addable) addCell()
+              }}
+            />
+            <TextInput
+              label={t('ui.orders.cell_qty')}
+              mono
+              inputMode="numeric"
+              value={newQty}
+              onChange={(e) => setNewQty(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && addable) addCell()
+              }}
+            />
+            <Button variant="secondary" onClick={addCell} disabled={!addable}>
+              {t('ui.orders.add_cell')}
+            </Button>
+          </div>
 
           {/*
             * The two numbers that decide whether this is right. Shown together because a

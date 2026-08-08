@@ -273,6 +273,10 @@ export const UI_MESSAGES: Catalogue = {
     'ui.orders.edit_breakdown': 'Edit the breakdown',
     'ui.orders.no_cells':
       'This style has no grid yet. A breakdown is entered against the colours and sizes the buyer ordered.',
+    'ui.orders.cell_color': 'Colour',
+    'ui.orders.cell_size': 'Size',
+    'ui.orders.cell_qty': 'Pieces',
+    'ui.orders.add_cell': '＋ add the cell',
     'ui.orders.total_now': 'now {total} pcs',
     'ui.orders.total_after': 'after {total} pcs',
     'ui.orders.cells_changed': '{count} cell(s) changed',
@@ -1408,6 +1412,10 @@ export const UI_MESSAGES: Catalogue = {
     'ui.orders.edit_breakdown': 'ব্রেকডাউন এডিট করুন',
     'ui.orders.no_cells':
       'এই স্টাইলের এখনো কোনো গ্রিড নেই। বায়ার যে রং ও সাইজ দিয়েছে তার বিপরীতে ব্রেকডাউন লেখা হয়।',
+    'ui.orders.cell_color': 'রং',
+    'ui.orders.cell_size': 'সাইজ',
+    'ui.orders.cell_qty': 'পিস',
+    'ui.orders.add_cell': '＋ ঘর যোগ করুন',
     'ui.orders.total_now': 'এখন {total} পিস',
     'ui.orders.total_after': 'পরে {total} পিস',
     'ui.orders.cells_changed': '{count}টি ঘর বদলেছে',
