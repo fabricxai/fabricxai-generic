@@ -55,7 +55,7 @@ export async function getCtx(headers: Headers): Promise<RequestCtx | null> {
   // lookup in `membershipsForUser` needs the SECURITY DEFINER path.
   const memberships = await withTenantRead({ companyId, userId: result.user.id, roles: [] }, (tx) =>
     tx
-      .select({ role: rolesTable.role })
+      .select({ role: rolesTable.role, scope: rolesTable.scope })
       .from(rolesTable)
       .where(
         and(
@@ -70,10 +70,33 @@ export async function getCtx(headers: Headers): Promise<RequestCtx | null> {
   // take effect on the next request, not on the next login.
   if (memberships.length === 0) return null
 
+  /*
+   * Line narrowing, honoured at last. Each role may carry {"lines": [...]} — the union
+   * across scoped roles is what the caller may see, and ONE unscoped role widens them to
+   * the whole floor (an admin who also supervises a line is not narrowed by the narrower
+   * grant). Stored since the schema shipped; read by nothing until a live line chief
+   * scoped to L1/L2 saw all eight lines.
+   */
+  let lineScope: string[] | undefined = []
+  for (const m of memberships) {
+    const scopedLines = (m.scope as { lines?: unknown }).lines
+    if (
+      Array.isArray(scopedLines) &&
+      scopedLines.length > 0 &&
+      scopedLines.every((code) => typeof code === 'string')
+    ) {
+      lineScope = [...new Set([...(lineScope ?? []), ...(scopedLines as string[])])]
+    } else {
+      lineScope = undefined
+      break
+    }
+  }
+
   return {
     companyId,
     userId: result.user.id,
     roles: memberships.map((m) => m.role),
+    ...(lineScope !== undefined ? { lineScope } : {}),
     requestId: headers.get('x-request-id') ?? undefined,
     ipAddress: headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? undefined,
     userAgent: headers.get('user-agent') ?? undefined,
