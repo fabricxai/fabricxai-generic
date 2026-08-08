@@ -18,6 +18,7 @@
  * that `actionErrorMessage` knows how to read — so existing catch-and-show code keeps
  * working with the real sentence in hand.
  */
+import { AppError } from '@/modules/core/errors'
 
 export interface ActionFailure {
   /** Discriminant. Never present on a success payload. */
@@ -32,6 +33,31 @@ export interface ActionFailure {
    * any generic sentence filed under the key.
    */
   reason?: string
+}
+
+/**
+ * The boundary translation, for the SERVER side of an action.
+ *
+ * Wrap the service call: an `AppError` — an expected, typed refusal — comes back as an
+ * `ActionFailure` value the client can read; anything else is a genuine bug and stays
+ * thrown, where production's masking is correct. Adopt this in every action whose refusal
+ * a person needs to read; the modules still throwing surface #441 until they do.
+ */
+export async function surfaced<T>(work: () => Promise<T>): Promise<T | ActionFailure> {
+  try {
+    return await work()
+  } catch (error) {
+    if (error instanceof AppError) {
+      const reason = error.details.reason
+      return {
+        failed: true,
+        code: error.code,
+        messageKey: error.messageKey,
+        ...(typeof reason === 'string' ? { reason } : {}),
+      }
+    }
+    throw error
+  }
 }
 
 export function isActionFailure(value: unknown): value is ActionFailure {

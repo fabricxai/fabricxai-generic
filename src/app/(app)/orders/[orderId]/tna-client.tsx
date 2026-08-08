@@ -8,6 +8,7 @@ import { useLocale, useT } from '@/components/fx/locale'
 import { Button } from '@/components/fx/primitives'
 import { MilestoneTimeline, type Milestone } from '@/components/fx/tna'
 import { actionErrorMessage } from '@/lib/action-error'
+import { unwrap } from '@/lib/action-failure'
 import { factoryToday } from '@/lib/dates'
 import {
   actualizeMilestone,
@@ -347,7 +348,7 @@ function GenerateSchedule({
           onClick={() =>
             startTransition(async () => {
               try {
-                await generateOrderTna({ orderId, templateId, exFactoryDate: exFactory })
+                unwrap(await generateOrderTna({ orderId, templateId, exFactoryDate: exFactory }))
                 setFailure(null)
                 router.refresh()
               } catch (error) {

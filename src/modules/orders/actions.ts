@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { headers } from 'next/headers'
 
+import { surfaced, type ActionFailure } from '@/lib/action-failure'
 import { propose } from '@/modules/core/pending-changes'
 import { requireRole } from '@/modules/core/session'
 
@@ -245,12 +246,16 @@ export async function generateOrderTna(input: {
   orderId: string
   templateId: string
   exFactoryDate: string
-}): Promise<{ milestones: number; preserved: number }> {
+}): Promise<{ milestones: number; preserved: number } | ActionFailure> {
   const ctx = await requireRole(await headers(), ...WRITERS)
-  const result = await generateTna(ctx, input)
+  // Refusal as a VALUE (lib/action-failure): production masks anything thrown, and a
+  // malformed template's "template_invalid" surfaced as React #441 on the live tenant.
+  return surfaced(async () => {
+    const result = await generateTna(ctx, input)
 
-  refresh(input.orderId)
-  return { milestones: result.milestones.length, preserved: result.preserved }
+    refresh(input.orderId)
+    return { milestones: result.milestones.length, preserved: result.preserved }
+  })
 }
 
 /**

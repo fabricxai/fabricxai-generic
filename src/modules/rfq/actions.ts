@@ -3,8 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { headers } from 'next/headers'
 
-import type { ActionFailure } from '@/lib/action-failure'
-import { AppError } from '@/modules/core/errors'
+import { surfaced, type ActionFailure } from '@/lib/action-failure'
 import { requireRole } from '@/modules/core/session'
 import { getPolicy } from '@/modules/settings/service'
 
@@ -46,33 +45,12 @@ function refresh(): void {
   revalidatePath('/rfq')
 }
 
-/**
- * A refusal crosses the boundary as a VALUE, because production masks anything thrown.
- *
- * Every gate in this module — the margin floor, "no live quote", "an order needs a
- * requested ship date" — reached the screen as "Minified React error #441" in production,
- * which taught three testers in a row that the system had crashed when it had in fact
- * refused, correctly, with a sentence attached. Services keep throwing `AppError`; this is
- * the boundary translation the framework's own guidance asks for ("action returns are
- * serialized to the client"). Anything that is NOT an AppError is a genuine bug and stays
- * thrown — its masking is correct.
+/*
+ * Every write below returns its refusals as VALUES via `surfaced` (lib/action-failure):
+ * production masks anything a server action throws, and every gate in this module — the
+ * margin floor, "no live quote", "an order needs a requested ship date" — reached the
+ * screen as "Minified React error #441" until it did.
  */
-async function surfaced<T>(work: () => Promise<T>): Promise<T | ActionFailure> {
-  try {
-    return await work()
-  } catch (error) {
-    if (error instanceof AppError) {
-      const reason = error.details.reason
-      return {
-        failed: true,
-        code: error.code,
-        messageKey: error.messageKey,
-        ...(typeof reason === 'string' ? { reason } : {}),
-      }
-    }
-    throw error
-  }
-}
 
 /** Record an enquiry that arrived by email or on a call. */
 export async function createRfq(input: {
