@@ -15,7 +15,13 @@ export const quantity = z
 export const calendarDate = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, 'expected YYYY-MM-DD')
-  .refine((value) => new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value, {
+  .refine((value) => {
+    // Date#toISOString THROWS on an invalid date — the old guard crashed with "Invalid
+    // time value" on exactly the input it exists to refuse ("0000-00-00" matches the
+    // regex). Date.parse returns NaN instead, which a refine can answer false to.
+    const time = Date.parse(`${value}T00:00:00Z`)
+    return !Number.isNaN(time) && new Date(time).toISOString().slice(0, 10) === value
+  }, {
     message: 'not a real calendar date',
   })
 

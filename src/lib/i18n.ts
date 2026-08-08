@@ -77,6 +77,11 @@ export const MESSAGES: Catalogue = {
     'orders.milestones.finishing': 'Finishing and packing',
     'orders.milestones.final_inspection': 'Final inspection · buyer QA',
     'orders.milestones.ex_factory': 'Ex-factory',
+    // EU-template milestones (live-test kit): converted from the kit's tna.json.
+    'orders.milestones.knitting_complete': 'Knitting complete',
+    'orders.milestones.dyeing_complete': 'Dyeing complete',
+    'orders.milestones.wash_approval': 'Wash approved',
+    'orders.milestones.shell_fabric_inspection': 'Shell fabric inspected',
 
     'orders.notifications.milestone_at_risk.title': '{milestone} is at risk',
     'orders.notifications.milestone_at_risk.body':
@@ -642,6 +647,10 @@ export const MESSAGES: Catalogue = {
     'orders.milestones.finishing': 'ফিনিশিং ও প্যাকিং',
     'orders.milestones.final_inspection': 'ফাইনাল ইন্সপেকশন · বায়ার কিউএ',
     'orders.milestones.ex_factory': 'এক্স-ফ্যাক্টরি',
+    'orders.milestones.knitting_complete': 'নিটিং সম্পন্ন',
+    'orders.milestones.dyeing_complete': 'ডাইং সম্পন্ন',
+    'orders.milestones.wash_approval': 'ওয়াশ অনুমোদিত',
+    'orders.milestones.shell_fabric_inspection': 'শেল ফ্যাব্রিক পরিদর্শিত',
 
     'orders.notifications.milestone_at_risk.title': '{milestone} ঝুঁকিতে আছে',
     'orders.notifications.milestone_at_risk.body':
