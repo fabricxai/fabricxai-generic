@@ -62,6 +62,23 @@ export const endlineCount = z.object({
   rework: z.number().int().min(0),
 })
 
+/**
+ * The day's plan for one line: which order it runs, at what target, with how many people.
+ * The record everything else on the floor hangs off — hourly outputs take their orderId
+ * from it, the board takes its targets, the day-close takes SMV and manpower.
+ */
+export const dayPlan = z.object({
+  lineId: z.uuid(),
+  orderId: z.uuid(),
+  planDate: calendarDate,
+  targetPerHour: z.number().int().positive(),
+  manpowerPlanned: z.number().int().positive(),
+  smv: z
+    .string()
+    .regex(/^\d{1,6}(\.\d{1,2})?$/, 'expected minutes, like 18.40')
+    .optional(),
+})
+
 export const PRODUCTION_ZOD_MAP = {} as const
 
 export type HourlyOutputEntry = z.infer<typeof hourlyOutputEntry>

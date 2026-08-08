@@ -1,17 +1,22 @@
 import Link from 'next/link'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
+import { eq } from 'drizzle-orm'
 
 import { EmptyState } from '@/components/fx/feedback'
 import { PageHeader } from '@/components/shell/page-shell'
 import { tui } from '@/lib/i18n-ui'
 import { requestLocale } from '@/lib/ui-locale'
 import { getCtx } from '@/modules/core/session'
+import { withTenantRead } from '@/modules/core/tenancy'
+import { orderList } from '@/modules/orders/queries'
+import { lines } from '@/modules/planning/schema'
 import type { ProductionPolicy } from '@/modules/production/service'
 import { getPolicy } from '@/modules/settings/service'
 import { board } from '@/modules/production/queries'
 
 import { LineBoard } from './board-client'
+import { PlanDayButton } from './plan-day'
 import { factoryToday } from '@/lib/dates'
 
 /**
@@ -37,9 +42,19 @@ export default async function LinesPage() {
   // in a `{lines.length === 0 ? null : null}` left from an earlier draft — so it was a
   // database round trip on every load of a floor screen, feeding nothing. The header's
   // count comes from `rows`, which is the board itself.
-  const [rows, policy] = await Promise.all([
+  const [rows, policy, lineRows, orderRows] = await Promise.all([
     board(ctx, { producedOn: today, shiftHours: SHIFT_HOURS }),
     getPolicy<ProductionPolicy>(ctx, 'production'),
+    // The plan-the-day door's choices (live-test finding: daily_line_plans had no
+    // origin outside the seed). Orders read via the owner's queries, rule 11.
+    withTenantRead(ctx, (tx) =>
+      tx
+        .select({ id: lines.id, code: lines.code })
+        .from(lines)
+        .where(eq(lines.isActive, true))
+        .orderBy(lines.code),
+    ),
+    orderList(ctx),
   ])
 
   // Behind means MATERIALLY behind, against the company's own threshold.
@@ -72,6 +87,17 @@ export default async function LinesPage() {
           behind > 0 ? tui(locale, 'ui.production.behind_target_meta', { count: behind }) : undefined
         }
         ownsAmber={false}
+        actions={
+          <PlanDayButton
+            lines={lineRows}
+            orders={orderRows
+              .filter((row) => !['shipped_full', 'closed', 'cancelled'].includes(row.status))
+              .map((row) => ({
+                id: row.id,
+                label: `${row.poNumbers[0] ?? row.id.slice(0, 8)} · ${row.styleCode ?? ''}`,
+              }))}
+          />
+        }
       />
 
       <nav style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 20 }}>

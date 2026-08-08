@@ -43,7 +43,53 @@ import {
   endlineCounts,
   hourlyOutputs,
 } from './schema'
-import { closeDowntime, endlineCount, hourlyOutputBatch, openDowntime } from './zod'
+import { closeDowntime, dayPlan, endlineCount, hourlyOutputBatch, openDowntime } from './zod'
+
+/**
+ * Plan one line's day: which order it runs, at what target, with how many people.
+ *
+ * `daily_line_plans` was written only by the seed (live-test finding, Phase 6) — no
+ * screen, no action, no tool — so on a real tenant the hourly board had no targets,
+ * outputs attached to no order, and the efficiency day-close skipped every line. This is
+ * the record everything on the floor hangs off, and it had no origin.
+ *
+ * Upsert on (line, date): re-planning a day is a correction, not a second plan.
+ */
+export async function planLineDay(
+  ctx: RequestCtx,
+  input: unknown,
+): Promise<{ planId: string }> {
+  const payload = dayPlan.parse(input)
+
+  return withTenantTx(ctx, async (tx) => {
+    const [row] = await tx
+      .insert(dailyLinePlans)
+      .values({
+        companyId: ctx.companyId,
+        lineId: payload.lineId,
+        orderId: payload.orderId,
+        planDate: payload.planDate,
+        targetPerHour: payload.targetPerHour,
+        manpowerPlanned: payload.manpowerPlanned,
+        smv: payload.smv ?? null,
+        createdBy: ctx.userId,
+      })
+      .onConflictDoUpdate({
+        target: [dailyLinePlans.lineId, dailyLinePlans.planDate],
+        set: {
+          orderId: payload.orderId,
+          targetPerHour: payload.targetPerHour,
+          manpowerPlanned: payload.manpowerPlanned,
+          smv: payload.smv ?? null,
+          updatedAt: new Date(),
+        },
+      })
+      .returning({ id: dailyLinePlans.id })
+
+    if (!row) throw new Error('daily_line_plans upsert returned nothing')
+    return { planId: row.id }
+  })
+}
 
 export interface RecordOutputResult {
   written: number
