@@ -5,9 +5,10 @@ import { useState, useTransition } from 'react'
 
 import { InlineAlert } from '@/components/fx/feedback'
 import { actionErrorMessage } from '@/lib/action-error'
+import { unwrap } from '@/lib/action-failure'
 import { Badge, Button } from '@/components/fx/primitives'
 import { SectionHeading } from '@/components/fx/signature'
-import { openBtbCredit, recordLcAmendment } from '@/modules/commercial/actions'
+import { linkLcToOrder, openBtbCredit, recordLcAmendment } from '@/modules/commercial/actions'
 import { factoryToday } from '@/lib/dates'
 
 interface Amendment {
@@ -29,6 +30,14 @@ interface Btb {
   expiryDate: string | null
 }
 
+interface LinkedOrder {
+  orderId: string
+  poNumbers: string[]
+  plannedExFactoryDate: string | null
+  status: string
+  floatDays: number | null
+}
+
 interface Lc {
   id: string
   number: string
@@ -42,6 +51,7 @@ interface Lc {
   amendments: Amendment[]
   btbs: Btb[]
   headroom: { limit: string; used: string; free: string; limitPct: number }
+  linkedOrders: LinkedOrder[]
 }
 
 const AMENDABLE: readonly { key: string; label: string; date: boolean }[] = [
@@ -63,10 +73,13 @@ export function LcDetailClient({
   lc,
   daysToLatestShipment,
   daysToExpiry,
+  coverable,
 }: {
   lc: Lc
   daysToLatestShipment: number | null
   daysToExpiry: number | null
+  /** The buyer's live orders this credit does not cover yet. */
+  coverable: readonly { id: string; label: string }[]
 }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
@@ -77,6 +90,7 @@ export function LcDetailClient({
 
   const [btbNumber, setBtbNumber] = useState('')
   const [btbValue, setBtbValue] = useState('')
+  const [coverOrderId, setCoverOrderId] = useState('')
 
   const [noted, setNoted] = useState<string | null>(null)
   const [failure, setFailure] = useState<string | null>(null)
@@ -105,6 +119,27 @@ export function LcDetailClient({
         router.refresh()
       } catch (error) {
         setFailure(actionErrorMessage(error, 'The amendment was not recorded.'))
+      }
+    })
+  }
+
+  function cover() {
+    if (!coverOrderId) return
+    setFailure(null)
+    startTransition(async () => {
+      try {
+        const result = unwrap(await linkLcToOrder({ lcId: lc.id, orderId: coverOrderId }))
+        setNoted(
+          result.floatDays === null
+            ? 'Covered. The order has no planned ex-factory date yet, so the float cannot be computed.'
+            : result.floatDays < 0
+              ? `Covered — and already in CONFLICT: the order ships ${-result.floatDays} day(s) after the latest shipment date.`
+              : `Covered. ${result.floatDays} day(s) of float before the latest shipment date.`,
+        )
+        setCoverOrderId('')
+        router.refresh()
+      } catch (error) {
+        setFailure(actionErrorMessage(error, 'The order was not covered.'))
       }
     })
   }
@@ -207,6 +242,98 @@ export function LcDetailClient({
           documents must be at the bank by expiry. Meeting one and missing the other is still
           an unpaid shipment.
         </p>
+      </section>
+
+      {/* ── The orders this credit covers ───────────────────────────────────
+        * The join the conflict detector and the countdown alerts run through. It had no
+        * writer until the live test reached Phase 3 — every conflict the module could
+        * detect was unreachable, because this list was permanently empty.
+        */}
+      <section>
+        <SectionHeading
+          eyebrow={
+            lc.linkedOrders.length > 0
+              ? `${lc.linkedOrders.length} covered`
+              : 'conflict detection has nothing to check until an order is covered'
+          }
+        >
+          Orders this credit covers
+        </SectionHeading>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {lc.linkedOrders.map((order) => (
+            <div
+              key={order.orderId}
+              style={{
+                display: 'flex',
+                gap: 14,
+                flexWrap: 'wrap',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '12px 16px',
+                background: 'var(--fx-bg-surface)',
+                border: '1px solid var(--fx-border-subtle)',
+                borderRadius: 'var(--fx-radius-md)',
+              }}
+            >
+              <span style={{ font: "500 14px/1.3 var(--fx-font-mono)" }}>
+                {order.poNumbers[0] ?? order.orderId.slice(0, 8)}
+                <span style={{ marginLeft: 10 }}>
+                  <Badge>{order.status}</Badge>
+                </span>
+              </span>
+              <span
+                style={{
+                  font: "400 12.5px/1.4 var(--fx-font-mono)",
+                  color:
+                    order.floatDays === null
+                      ? 'var(--fx-text-tertiary)'
+                      : order.floatDays < 0
+                        ? 'var(--fx-danger)'
+                        : order.floatDays <= 2
+                          ? 'var(--fx-warning)'
+                          : 'var(--fx-text-secondary)',
+                }}
+              >
+                {order.floatDays === null
+                  ? 'no ex-factory date — float unknown'
+                  : order.floatDays < 0
+                    ? `ships ${-order.floatDays} day(s) AFTER latest shipment — conflict`
+                    : `ships ${order.plannedExFactoryDate} · ${order.floatDays} day(s) of float`}
+              </span>
+            </div>
+          ))}
+
+          {coverable.length > 0 ? (
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+              <label
+                style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: '1 1 260px', minWidth: 0 }}
+              >
+                <span style={fieldLabel}>Cover an order of this buyer</span>
+                <select
+                  value={coverOrderId}
+                  onChange={(e) => setCoverOrderId(e.target.value)}
+                  style={control}
+                >
+                  <option value="">Choose the order</option>
+                  {coverable.map((order) => (
+                    <option key={order.id} value={order.id}>
+                      {order.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <Button variant="secondary" onClick={cover} disabled={pending || coverOrderId === ''}>
+                Cover it
+              </Button>
+            </div>
+          ) : lc.linkedOrders.length === 0 ? (
+            <p style={{ margin: 0, font: "400 12.5px/1.6 var(--fx-font-mono)", color: 'var(--fx-text-tertiary)' }}>
+              This buyer has no live order to cover yet — the order comes first, then the credit
+              that pays for it.
+            </p>
+          ) : null}
+        </div>
       </section>
 
       {/* ── Amendments ───────────────────────────────────────────────────── */}

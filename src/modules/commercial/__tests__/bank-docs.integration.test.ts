@@ -26,6 +26,7 @@ import {
   amendLc,
   buyerRealizationLag,
   createLc,
+  linkOrder,
   openBtb,
   openSubmission,
   postRealization,
@@ -656,5 +657,60 @@ describe('2.1 · tenancy', () => {
     await expect(
       amendLc(otherCtx, { lcId, diff: { tolerancePct: '9' }, receivedAt: '2026-07-30' }),
     ).rejects.toThrow(/lc_not_found/)
+  })
+})
+
+describe('2.1 · covering an order (the join everything else runs through)', () => {
+  /*
+   * `order_lcs` was read by the amendment conflict re-check and the countdown job and
+   * written by NOTHING — every conflict the module can detect was unreachable until the
+   * live test hit Phase 3. These vectors pin the writer.
+   */
+  it('links, computes the float, and is idempotent on the pair', async () => {
+    // Order ships 2026-09-20 (beforeAll); credit's latest shipment 2026-09-30 → 10 days.
+    const lcId = await newLc()
+
+    const first = await linkOrder(ctx, { lcId, orderId })
+    expect(first).toEqual({ linked: true, floatDays: 10 })
+
+    // Re-linking is a no-op, never a duplicate row.
+    const again = await linkOrder(ctx, { lcId, orderId })
+    expect(again.linked).toBe(false)
+
+    const rows = await withTenantRead(ctx, async (tx) =>
+      tx.select().from(orderLcs).where(eq(orderLcs.lcId, lcId)),
+    )
+    expect(rows).toHaveLength(1)
+  })
+
+  it('refuses a credit from a different buyer', async () => {
+    const [stranger] = await db
+      .insert(buyers)
+      .values({ companyId: COMPANY, code: 'ZR', name: 'Zara' })
+      .returning({ id: buyers.id })
+    const [strangerLc] = await db
+      .insert(lcs)
+      .values({
+        companyId: COMPANY,
+        buyerId: stranger!.id,
+        number: `LC-${randomUUID().slice(0, 8)}`,
+        value: '50000.00',
+        currency: 'USD',
+        tolerancePct: '5',
+        status: 'active',
+        createdBy: USER,
+      })
+      .returning({ id: lcs.id })
+
+    // A credit from one buyer covering another buyer's order is goods shipping against
+    // a promise that cannot pay for them.
+    await expect(linkOrder(ctx, { lcId: strangerLc!.id, orderId })).rejects.toMatchObject({
+      messageKey: 'commercial.errors.lc_order_buyer_mismatch',
+    })
+  })
+
+  it('another company cannot link through this factory’s LC', async () => {
+    const lcId = await newLc()
+    await expect(linkOrder(otherCtx, { lcId, orderId })).rejects.toThrow(/lc_not_found/)
   })
 })

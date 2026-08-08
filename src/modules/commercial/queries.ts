@@ -259,6 +259,20 @@ export interface LcDetail {
   submissions: SubmissionRow[]
   /** Back-to-back headroom against this master, at the factory's configured limit. */
   headroom: { limit: string; used: string; free: string; limitPct: number }
+  /**
+   * The orders this credit covers, with their shipping float. The join every conflict
+   * check runs through — shown so a commercial officer sees what the detector sees.
+   */
+  linkedOrders: LinkedOrderRow[]
+}
+
+export interface LinkedOrderRow {
+  orderId: string
+  poNumbers: string[]
+  plannedExFactoryDate: string | null
+  status: string
+  /** latest shipment − planned ex-factory, in days. Negative means already in conflict. */
+  floatDays: number | null
 }
 
 /**
@@ -314,6 +328,35 @@ export async function lcDetail(
         .orderBy(desc(docSubmissions.createdAt)),
     ])
 
+    // The orders this credit covers — the exact join the conflict detector and the
+    // countdown job run through, so the screen shows what the machinery sees.
+    const { orderLcs, orders } = await import('@/modules/orders/schema')
+    const linkedRows = await tx
+      .select({
+        orderId: orders.id,
+        poNumbers: orders.poNumbers,
+        plannedExFactoryDate: orders.plannedExFactoryDate,
+        status: orders.status,
+      })
+      .from(orderLcs)
+      .innerJoin(orders, eq(orders.id, orderLcs.orderId))
+      .where(scoped(orderLcs, ctx, eq(orderLcs.lcId, lcId)))
+
+    const linkedOrders: LinkedOrderRow[] = linkedRows.map((row) => ({
+      orderId: row.orderId,
+      poNumbers: row.poNumbers ?? [],
+      plannedExFactoryDate: row.plannedExFactoryDate,
+      status: row.status,
+      floatDays:
+        lc.latestShipmentDate && row.plannedExFactoryDate
+          ? Math.round(
+              (Date.parse(`${lc.latestShipmentDate}T00:00:00Z`) -
+                Date.parse(`${row.plannedExFactoryDate}T00:00:00Z`)) /
+                86_400_000,
+            )
+          : null,
+    }))
+
     // Draft and active BTBs hold headroom; expired and closed ones have stopped being
     // outstanding commitments against the master. The question a commercial officer is
     // actually asking is "can I open another one", and a settled BTB does not stand in the
@@ -357,6 +400,7 @@ export async function lcDetail(
         realizedAt: s.realizedAt,
       })),
       headroom: { ...headroom, limitPct },
+      linkedOrders,
     }
   })
 }

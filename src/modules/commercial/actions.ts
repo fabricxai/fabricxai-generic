@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { headers } from 'next/headers'
 
+import { surfaced, type ActionFailure } from '@/lib/action-failure'
 import { requireRole } from '@/modules/core/session'
 
 import { getPolicy } from '@/modules/settings/service'
@@ -12,6 +13,7 @@ import {
   checkUdBalance,
   createLc as createLcIn,
   createUd as createUdIn,
+  linkOrder as linkOrderIn,
   openBtb,
   openSubmission,
   postRealization,
@@ -56,6 +58,27 @@ export async function createLc(input: {
   // The shipment desk reads the credit's dates before it confirms a departure.
   revalidatePath('/shipment')
   return result
+}
+
+/**
+ * Tie a credit to the order it pays for.
+ *
+ * The join both the conflict detector and the countdown job run through finally gets its
+ * writer — see `linkOrder` in the service for the history. Refusals (a buyer mismatch,
+ * a vanished order) come back as values: production masks thrown messages, and "that
+ * credit belongs to a different buyer" is a sentence a person must read.
+ */
+export async function linkLcToOrder(input: {
+  lcId: string
+  orderId: string
+}): Promise<{ linked: boolean; floatDays: number | null } | ActionFailure> {
+  const ctx = await requireRole(await headers(), 'commercial')
+  return surfaced(async () => {
+    const result = await linkOrderIn(ctx, input)
+    revalidatePath('/lcs')
+    revalidatePath('/orders')
+    return result
+  })
 }
 
 /**

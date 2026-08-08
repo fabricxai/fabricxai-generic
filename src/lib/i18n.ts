@@ -239,6 +239,10 @@ export const MESSAGES: Catalogue = {
     'commercial.errors.shipment_not_found':
       'That shipment no longer exists, so a presentation cannot be opened against it.',
     'commercial.errors.lc_not_found': 'That letter of credit no longer exists.',
+    'commercial.errors.order_not_found':
+      'That order no longer exists, so the credit cannot cover it.',
+    'commercial.errors.lc_order_buyer_mismatch':
+      'This credit was issued by a different buyer than that order — a credit cannot pay for goods it was never opened against.',
     'commercial.errors.lc_number_exists':
       'A letter of credit with that number is already recorded.',
     'commercial.errors.no_btb_limit':
@@ -664,6 +668,9 @@ export const MESSAGES: Catalogue = {
       'LC {lcNumber}: শেষ শিপমেন্টের ({date}) বাকি {daysLeft} দিন',
     'commercial.notifications.lc_countdown_expiry.title':
       'LC {lcNumber}: মেয়াদ শেষের ({date}) বাকি {daysLeft} দিন',
+    'commercial.errors.order_not_found': 'সেই অর্ডারটি আর নেই, তাই ক্রেডিট এটি কভার করতে পারবে না।',
+    'commercial.errors.lc_order_buyer_mismatch':
+      'এই ক্রেডিট অন্য বায়ারের খোলা — যে পণ্যের জন্য ক্রেডিট খোলা হয়নি তার দাম এটি দিতে পারে না।',
     'commercial.lc.conflict.expiry': 'LC {lcNumber}-এর মেয়াদ শিপমেন্টের আগেই শেষ হয়ে যাবে',
     'commercial.lc.conflict.latest_shipment':
       'LC {lcNumber}-এর শেষ শিপমেন্ট তারিখ পরিকল্পিত ex-factory তারিখের আগে',

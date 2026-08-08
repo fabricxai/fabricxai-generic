@@ -348,6 +348,47 @@ export async function orderDetail(ctx: AnyCtx, orderId: string): Promise<OrderDe
   })
 }
 
+export interface CoverableOrder {
+  id: string
+  poNumbers: string[]
+  plannedExFactoryDate: string | null
+  status: string
+}
+
+/**
+ * A buyer's live orders, for commercial to pick which one a credit covers.
+ *
+ * Lives here because the rows are this module's (rule 11) while the LINK is commercial's
+ * decision — its `linkOrder` writes `order_lcs`, and this is the list its screen picks
+ * from. Settled orders are out: a credit tied to an order that already shipped in full is
+ * an entry in a drawer, not a cover.
+ */
+export async function coverableOrders(ctx: AnyCtx, buyerId: string): Promise<CoverableOrder[]> {
+  return withTenantRead(ctx, async (tx) => {
+    const rows = await tx
+      .select({
+        id: orders.id,
+        poNumbers: orders.poNumbers,
+        plannedExFactoryDate: orders.plannedExFactoryDate,
+        status: orders.status,
+      })
+      .from(orders)
+      .where(
+        scoped(
+          orders,
+          ctx,
+          and(
+            eq(orders.buyerId, buyerId),
+            sql`${orders.status} NOT IN ('shipped_full', 'closed', 'cancelled')`,
+          ),
+        ),
+      )
+      .orderBy(asc(orders.plannedExFactoryDate))
+
+    return rows.map((row) => ({ ...row, poNumbers: row.poNumbers ?? [] }))
+  })
+}
+
 export interface OrderInProduction {
   id: string
   poNumber: string | null

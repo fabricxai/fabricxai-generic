@@ -5,6 +5,7 @@ import { PageHeader } from '@/components/shell/page-shell'
 import { lcDetail } from '@/modules/commercial/queries'
 import type { BankDocsPolicy } from '@/modules/commercial/service'
 import { getCtx } from '@/modules/core/session'
+import { coverableOrders } from '@/modules/orders/queries'
 import { getPolicy } from '@/modules/settings/service'
 
 import { LcDetailClient } from './lc-detail-client'
@@ -34,6 +35,10 @@ export default async function LcDetailPage({ params }: { params: Promise<{ lcId:
   const lc = await lcDetail(ctx, lcId, policy.btbLimitPct ?? 75)
   if (!lc) notFound()
 
+  // The buyer's live orders this credit could cover, minus the ones it already does.
+  const linked = new Set(lc.linkedOrders.map((o) => o.orderId))
+  const coverable = (await coverableOrders(ctx, lc.buyerId)).filter((o) => !linked.has(o.id))
+
   const today = factoryToday()
   const daysTo = (date: string | null): number | null =>
     date === null
@@ -57,6 +62,10 @@ export default async function LcDetailPage({ params }: { params: Promise<{ lcId:
         }}
         daysToLatestShipment={daysTo(lc.latestShipmentDate)}
         daysToExpiry={daysTo(lc.expiryDate)}
+        coverable={coverable.map((o) => ({
+          id: o.id,
+          label: `${o.poNumbers[0] ?? o.id.slice(0, 8)}${o.plannedExFactoryDate ? ` · ships ${o.plannedExFactoryDate}` : ''}`,
+        }))}
       />
     </>
   )

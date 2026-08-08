@@ -545,6 +545,78 @@ function wrapBankDocsError<T>(run: () => T): T {
 }
 
 /**
+ * Tie a credit to the order it pays for ⚖.
+ *
+ * `order_lcs` has been READ since 2.1 shipped — the amendment path re-checks conflicts
+ * through it, the countdown job fans alerts out through it — and had no writer anywhere:
+ * not a service function, not an action, not a screen. Every conflict the module can
+ * detect was unreachable, because the join it detects through was permanently empty.
+ * The orders module's register says why the door belongs HERE: linking a credit is a
+ * commercial decision (rule 11 — one writer per shared table, and this is it).
+ *
+ * The buyer must match. A credit from one buyer covering another buyer's order is goods
+ * shipping against a promise that cannot pay for them.
+ */
+export async function linkOrder(
+  ctx: RequestCtx,
+  input: { lcId: string; orderId: string },
+): Promise<{ linked: boolean; floatDays: number | null }> {
+  return withTenantTx(ctx, async (tx) => {
+    const [lc] = await tx.select().from(lcs).where(scoped(lcs, ctx, eq(lcs.id, input.lcId)))
+    if (!lc) throw notFound('commercial.errors.lc_not_found', { lcId: input.lcId })
+
+    const { orderLcs, orders } = await import('@/modules/orders/schema')
+    const [order] = await tx
+      .select({
+        id: orders.id,
+        buyerId: orders.buyerId,
+        poNumbers: orders.poNumbers,
+        plannedExFactoryDate: orders.plannedExFactoryDate,
+      })
+      .from(orders)
+      .where(scoped(orders, ctx, eq(orders.id, input.orderId)))
+    if (!order) throw notFound('commercial.errors.order_not_found', { orderId: input.orderId })
+
+    if (order.buyerId !== lc.buyerId) {
+      throw new AppError('validation_failed', 'commercial.errors.lc_order_buyer_mismatch', {
+        reason: `${lc.number} was issued by a different buyer than this order — a credit cannot pay for goods it was never opened against`,
+      })
+    }
+
+    // Idempotent on the pair: re-linking is a no-op, never a duplicate row.
+    const inserted = await tx
+      .insert(orderLcs)
+      .values({ companyId: ctx.companyId, orderId: order.id, lcId: lc.id })
+      .onConflictDoNothing()
+      .returning({ id: orderLcs.id })
+
+    // Days between planned ex-factory and the credit's latest shipment. The number a
+    // commercial officer actually watches: 1 is a working credit, negative is a refusal
+    // at the bank already written into the plan.
+    const floatDays =
+      lc.latestShipmentDate && order.plannedExFactoryDate
+        ? Math.round(
+            (Date.parse(`${lc.latestShipmentDate}T00:00:00Z`) -
+              Date.parse(`${order.plannedExFactoryDate}T00:00:00Z`)) /
+              86_400_000,
+          )
+        : null
+
+    if (inserted.length > 0) {
+      await recordChange(ctx, tx, {
+        action: 'update',
+        targetTable: 'lcs',
+        targetId: lc.id,
+        before: {},
+        after: { linkedOrderId: order.id, poNumbers: order.poNumbers ?? [], floatDays },
+      })
+    }
+
+    return { linked: inserted.length > 0, floatDays }
+  })
+}
+
+/**
  * Amend an LC ⚖ (brief: "amend LC (versioned diff, re-runs conflict detector)").
  *
  * The detector runs against the AMENDED terms and its findings are stored on the amendment
