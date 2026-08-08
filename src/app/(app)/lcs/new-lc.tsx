@@ -38,6 +38,11 @@ const DOC_KINDS = [
   'bl',
   'certificate_of_origin',
   'beneficiary_certificate',
+  // A buyer's credit routinely calls for both (LC-4471 on the live tenant did): the
+  // third-party inspection certificate, and the EXP form copy the bank requires before
+  // any export proceeds move. The map accepts any kind — only this list was short.
+  'inspection_certificate',
+  'exp_form',
 ] as const
 
 export function NewLcButton({ buyers }: { buyers: readonly { id: string; name: string }[] }) {
