@@ -106,6 +106,17 @@ payroll in the nav, prices masked. Start there.
     quote" and the winning-terms refusal all read as sentences. Other modules still
     throw — expect #441 there until the pattern is adopted module by module.
 
+13. **Phase 2, the buyer PO on an RFQ-won order: reject the intake draft.** The
+    "buyer's purchase order" intake kind drafts a NEW order — right for a PO that
+    arrives cold, wrong for one whose order already exists from Mark won: approving it
+    would book the same 36,000 pcs twice. Reject the draft (reason: order already
+    exists), then type the colour × size grid on the order itself via "Edit the
+    breakdown". The PO numbers (PO-BF-2044 + 4711-88-2044) were attached to the won
+    order by hand in the database — the product has NO surface for renaming an order
+    from its RFQ placeholder to the buyer's real PO number, which is a genuine gap:
+    every RFQ-won order will face it the day the paper PO lands. Also noted: the
+    extractor captured only the buyer's PO number, not the supplier ref line.
+
 ## Honest status of the traps
 
 The gates the runbook pokes (PP blocks cutting, UD overdraw block, BTB headroom, EXP
