@@ -172,6 +172,22 @@ payroll in the nav, prices masked. Start there.
     throw (a double-click on "Issue the purchase order" masks its refusal as React
     #441), and a requisition has a cancelled state with no cancel button.
 
+22. **Phase 4 ran, and found the phase's severity-1.** A bonded issue left the
+    warehouse with NO customs draw recorded — the service drew only when the client
+    named the UD on the line, and the screen never did; the banner's "recorded but not
+    validated" text was stale copy confessing it. Fixed at the root (the roll's
+    declaration resolves through its GRN server-side; the ledger is written in the
+    declaration's vocabulary via alias matching; the escaped 6,000-yd draw was
+    backfilled and tied to its issue). The shade-mix warning also only saw the current
+    pick — one B roll after 6,000 yds of A passed silently; it now remembers the
+    order's history. Both traps then fired live: the warning named A and B, and the
+    overdraw block refused 3,000 against 1,000 with nothing written. Owed: the offline
+    queue reports a refusal as "1 write the server refused" without the gate's own
+    sentence — the shortfall numbers exist server-side and deserve the banner. The
+    trap arithmetic was restaged (UD-2026-044 history 14,000, not the kit's 22,800):
+    the kit's numbers are self-inconsistent (23,500 yds received under 1,200 of
+    headroom) and whole-roll picking cannot issue under a 1,200-yd balance at all.
+
 ## Honest status of the traps
 
 The gates the runbook pokes (PP blocks cutting, UD overdraw block, BTB headroom, EXP
