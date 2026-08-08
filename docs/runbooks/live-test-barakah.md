@@ -117,6 +117,25 @@ payroll in the nav, prices masked. Start there.
     every RFQ-won order will face it the day the paper PO lands. Also noted: the
     extractor captured only the buyer's PO number, not the supplier ref line.
 
+14. **Phase 3, LCs arrive by hand, not by drop.** There is no LC intake kind (six kinds,
+    SWIFT is not one), so both credits are entered via LC register → "New LC" with the
+    values in `structured-data/03-commercial/lcs.json` — tick LC-4471's six document
+    kinds in the checklist. The register stores no 44E port field, and NOTHING in the
+    codebase compares B/L port spelling to the LC — Phase 7's Chattogram/Chittagong
+    "discrepancy card" is a human writing discrepancy notes, not an automated catch.
+15. **Phase 3, the order comes before the credit.** PO-BF-2051 does not exist (only the
+    Bestseller flow was run); create it manually first — Order desk → New order: H&M,
+    ST-2712, 12,000 pcs at 16.50 USD, ex-factory 2026-11-16. Then LC detail →
+    "Orders this credit covers" → Cover it. That section is NEW: `order_lcs` was read
+    by the conflict detector and the countdown job and written by nothing, so every
+    conflict the module can detect was unreachable until now. The float shows on the
+    covered row (LC-5120's latest shipment 11-17 vs ex-factory 11-16 → 1 day).
+16. **Phase 3, the BTB limit is company policy, not per-LC.** The kit assigns 75% to
+    LC-4471 and 70% to LC-5120; the platform has ONE `btbLimitPct` for the factory
+    (Settings → Policy → commercial, default 75). Set it to 70 before the BTB step so
+    the 5120-02 trap fires (ΣBTB 140,900 > 138,600) — LC-4471's 44,300 stays far
+    inside 70% of 244,800 either way.
+
 ## Honest status of the traps
 
 The gates the runbook pokes (PP blocks cutting, UD overdraw block, BTB headroom, EXP
