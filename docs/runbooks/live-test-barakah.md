@@ -188,6 +188,22 @@ payroll in the nav, prices masked. Start there.
     the kit's numbers are self-inconsistent (23,500 yds received under 1,200 of
     headroom) and whole-roll picking cannot issue under a 1,200-yd balance at all.
 
+23. **Phase 5 ran end to end.** The sample-request door was built during the test
+    (raiseSampleRequest had an action and no screen, and no MARBIM tool despite
+    sample_requests being a pending target — the PP gate's chain started at a record
+    nothing could create). Both gate flavours were exhibited: `no_sample` before, and
+    `rejected` for 2051 after the H&M verdict — the gate distinguishes "nobody asked"
+    from "the buyer said no". The marker travelled chat → draft → inbox → approve.
+    Deviations from the kit's script: the cut report validates each lay against its
+    MARKER plan (order-level cells appear as the cumulative "order needs" column, and
+    a colour/size with no breakdown cell shows "—" rather than vanishing); over
+    tolerance FLAGS and records with the variance stored, it does not demand an
+    override to save — deliberate, "the pieces are already cut". The style-code
+    prefill in the new-sample modal was fixed mid-test (it kept the previous order's
+    code; the PP gate matches on order + style code, so a stale code is a gate that
+    never opens). Multi-tenant caught one tester: fabricxai@gmail.com belongs to a
+    different company, and its approve inbox is empty of Barakah's drafts by design.
+
 ## Honest status of the traps
 
 The gates the runbook pokes (PP blocks cutting, UD overdraw block, BTB headroom, EXP
