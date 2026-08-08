@@ -12,7 +12,7 @@ import { getCtx } from '@/modules/core/session'
 import { companyProfile } from '@/modules/settings/service'
 import { orderDetail, tnaTemplateChoices } from '@/modules/orders/queries'
 import { orderRunRate } from '@/modules/production/queries'
-import { factoryToday } from '@/lib/dates'
+import { factoryToday, FACTORY_TIMEZONE } from '@/lib/dates'
 
 import { OrderBreakdown } from './breakdown-client'
 import { OrderTna } from './tna-client'
@@ -149,6 +149,96 @@ export default async function OrderDetailPage({
             canWrite={mayWrite}
           />
         </section>
+
+        {/*
+          * The evidence, finally on a screen. Every revision has written a cell-level
+          * before/after with its reason and author since the module shipped — the row
+          * that answers "the buyer says they never asked for that" — and nothing read
+          * it until a live tester approved an amendment and asked where the change
+          * went. Newest first: the question is always about the latest one.
+          */}
+        {order.revisions.length > 0 ? (
+          <section>
+            <SectionHeading eyebrow="who changed the grid, and why">
+              Revision history
+            </SectionHeading>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {order.revisions.map((rev) => (
+                <div
+                  key={rev.revision}
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 6,
+                    padding: '12px 18px',
+                    background: 'var(--fx-bg-surface)',
+                    border: '1px solid var(--fx-border-subtle)',
+                    borderRadius: 'var(--fx-radius-md)',
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: 12,
+                      flexWrap: 'wrap',
+                      alignItems: 'baseline',
+                      justifyContent: 'space-between',
+                    }}
+                  >
+                    <span style={{ font: "500 13px/1.4 var(--fx-font-sans)" }}>
+                      <Badge tone={rev.revision === order.style?.activeRevision ? 'success' : 'neutral'}>
+                        rev {rev.revision}
+                      </Badge>{' '}
+                      {rev.reason ?? ''}
+                    </span>
+                    <span
+                      style={{
+                        font: "400 12px/1.4 var(--fx-font-mono)",
+                        color: 'var(--fx-text-tertiary)',
+                      }}
+                    >
+                      {rev.byName ?? 'someone who has left'} ·{' '}
+                      {new Intl.DateTimeFormat('en-GB', {
+                        timeZone: FACTORY_TIMEZONE,
+                        day: '2-digit',
+                        month: 'short',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      }).format(rev.at)}
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: 14,
+                      flexWrap: 'wrap',
+                      font: "400 12.5px/1.5 var(--fx-font-mono)",
+                      color: 'var(--fx-text-secondary)',
+                    }}
+                  >
+                    {rev.cells.map((cell) => (
+                      <span key={cell.key}>
+                        {cell.key}{' '}
+                        {cell.from === null
+                          ? `new · ${cell.to?.toLocaleString()}`
+                          : cell.to === null
+                            ? `${cell.from.toLocaleString()} → removed`
+                            : `${cell.from.toLocaleString()} → ${cell.to.toLocaleString()}`}
+                      </span>
+                    ))}
+                    {rev.totalBefore !== null &&
+                    rev.totalAfter !== null &&
+                    rev.totalBefore !== rev.totalAfter ? (
+                      <span style={{ color: 'var(--fx-warning)' }}>
+                        total {rev.totalBefore.toLocaleString()} → {rev.totalAfter.toLocaleString()}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
       </div>
     </>
   )

@@ -15,7 +15,16 @@ import { readJsonbArray } from '@/modules/core/jsonb'
 import { scoped } from '@/modules/core/scoped'
 import { withTenantRead } from '@/modules/core/tenancy'
 
-import { orderBreakdowns, orderStyles, orders, tnaMilestones, tnaTemplates } from './schema'
+import { users } from '@/db/schema/core'
+
+import {
+  orderBreakdowns,
+  orderRevisions,
+  orderStyles,
+  orders,
+  tnaMilestones,
+  tnaTemplates,
+} from './schema'
 import { milestoneDependency } from './zod'
 
 /** How a row reads on the desk: the worst thing true about the order. */
@@ -185,7 +194,26 @@ export interface OrderDetail {
   } | null
   milestones: MilestoneRow[]
   breakdown: BreakdownCell[]
+  /**
+   * Why each revision happened, newest first. Written as evidence since the module
+   * shipped — cell-level before/after, reason, author — and read by NOTHING until a live
+   * tester approved an amendment and asked "where does it show the changes?". The row
+   * that answers "the buyer says they never asked for that" answers nobody while only
+   * the database can see it.
+   */
+  revisions: RevisionRow[]
   health: OrderHealth
+}
+
+export interface RevisionRow {
+  revision: number
+  reason: string | null
+  /** `{from: null}` is a new cell; `{to: null}` a removed one. */
+  cells: { key: string; from: number | null; to: number | null }[]
+  totalBefore: number | null
+  totalAfter: number | null
+  byName: string | null
+  at: Date
 }
 
 export async function orderDetail(ctx: AnyCtx, orderId: string): Promise<OrderDetail | null> {
@@ -237,6 +265,42 @@ export async function orderDetail(ctx: AnyCtx, orderId: string): Promise<OrderDe
           ))
       : []
 
+    // The name is joined THROUGH the tenant-scoped revisions row — `users` is global and
+    // must never be reached bare (rule 2; same shape as the approvals trail).
+    const revisionRows = await tx
+      .select({
+        revision: orderRevisions.revision,
+        reason: orderRevisions.reason,
+        diff: orderRevisions.diff,
+        at: orderRevisions.createdAt,
+        byName: users.name,
+      })
+      .from(orderRevisions)
+      .leftJoin(users, eq(users.id, orderRevisions.createdBy))
+      .where(scoped(orderRevisions, ctx, eq(orderRevisions.orderId, orderId)))
+      .orderBy(desc(orderRevisions.revision))
+
+    const revisions: RevisionRow[] = revisionRows.map((r) => {
+      const diff = (r.diff ?? {}) as {
+        cells?: Record<string, { from?: number | null; to?: number | null }>
+        totalBefore?: number
+        totalAfter?: number
+      }
+      return {
+        revision: r.revision,
+        reason: r.reason,
+        cells: Object.entries(diff.cells ?? {}).map(([key, change]) => ({
+          key,
+          from: change?.from ?? null,
+          to: change?.to ?? null,
+        })),
+        totalBefore: diff.totalBefore ?? null,
+        totalAfter: diff.totalAfter ?? null,
+        byName: r.byName,
+        at: r.at,
+      }
+    })
+
     const { health } = healthOf(row.status, milestones)
 
     return {
@@ -278,6 +342,7 @@ export async function orderDetail(ctx: AnyCtx, orderId: string): Promise<OrderDe
         }
       }),
       breakdown,
+      revisions,
       health,
     }
   })
