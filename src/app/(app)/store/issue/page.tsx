@@ -7,10 +7,12 @@ import { PageHeader } from '@/components/shell/page-shell'
 import { tui } from '@/lib/i18n-ui'
 import { requestLocale } from '@/lib/ui-locale'
 import { getCtx } from '@/modules/core/session'
-import { outstandingRequisitions, rollsForItem, type RollRow } from '@/modules/store/queries'
+import { orderList } from '@/modules/orders/queries'
+import { itemList, outstandingRequisitions, rollsForItem, type RollRow } from '@/modules/store/queries'
 import { getStock } from '@/modules/store/service'
 
 import { IssueClient } from './issue-client'
+import { NewStoreRequisition } from './new-requisition'
 
 /**
  * 3.1 Store · issue to production (canvas P3).
@@ -37,6 +39,19 @@ export default async function StoreIssuePage() {
 
   const outstanding = await outstandingRequisitions(ctx)
 
+  // The door the desk never had: material needs are sized HERE (live-test finding,
+  // Phase 4 — `createRequisition` had no caller anywhere). Orders read through the
+  // owner's queries (rule 11); settled ones are not offered.
+  const [orderRows, items] = await Promise.all([orderList(ctx), itemList(ctx)])
+  const orders = orderRows
+    .filter((row) => !['shipped_full', 'closed', 'cancelled'].includes(row.status))
+    .map((row) => ({
+      id: row.id,
+      label: `${row.poNumbers[0] ?? row.id.slice(0, 8)} · ${row.styleCode ?? ''}`,
+      qty: row.contractedQty,
+    }))
+  const requestDoor = <NewStoreRequisition orders={orders} items={items} />
+
   if (outstanding.length === 0) {
     return (
       <FloorScreen>
@@ -44,6 +59,7 @@ export default async function StoreIssuePage() {
           eyebrow={tui(locale, 'ui.store.issue_eyebrow')}
           title={tui(locale, 'ui.store.issue_title_empty')}
           ownsAmber
+          actions={requestDoor}
         />
         <EmptyState
           title={tui(locale, 'ui.store.issue_empty_title')}
@@ -84,6 +100,7 @@ export default async function StoreIssuePage() {
         )}
         meta={tui(locale, 'ui.store.issue_meta')}
         ownsAmber
+        actions={requestDoor}
       />
       <IssueClient
         lines={outstanding}

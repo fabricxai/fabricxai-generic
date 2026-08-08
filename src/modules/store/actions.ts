@@ -3,8 +3,35 @@
 import { headers } from 'next/headers'
 import { revalidatePath } from 'next/cache'
 
+import { surfaced, type ActionFailure } from '@/lib/action-failure'
 import { propose } from '@/modules/core/pending-changes'
 import { requireRole } from '@/modules/core/session'
+
+import { createRequisition } from './service'
+
+/**
+ * Size an order's material need, from a screen.
+ *
+ * `createRequisition` had the whole contract — BOM-sized or explicit lines, wastage,
+ * computed totals — and no caller: not an action, not a screen, so the issue desk served
+ * requisition lines that could not exist (live-test finding, Phase 4; the same missing
+ * first link as procurement's). A server action rather than the offline endpoint because
+ * sizing a need is a desk decision, not a floor event — nothing physical happened yet.
+ */
+export async function raiseMaterialRequisition(input: {
+  orderId: string
+  orderQty: number
+  wastagePct?: string
+  bomId?: string
+  lines?: { itemId: string; consumptionPerPiece: string; unit: string }[]
+}): Promise<{ requisitionId: string; lines: number; source: 'bom' | 'explicit' } | ActionFailure> {
+  const ctx = await requireRole(await headers(), 'store', 'planner', 'production')
+  return surfaced(async () => {
+    const result = await createRequisition(ctx, input)
+    revalidatePath('/store')
+    return result
+  })
+}
 
 /**
  * Draft a stock correction.
