@@ -7,7 +7,9 @@ import { InlineAlert } from '@/components/fx/feedback'
 import { actionErrorMessage } from '@/lib/action-error'
 import { Badge, Button } from '@/components/fx/primitives'
 import { SectionHeading } from '@/components/fx/signature'
-import { issuePurchaseOrder } from '@/modules/procurement/actions'
+import { TextInput } from '@/components/fx/forms'
+import { factoryToday } from '@/lib/dates'
+import { issuePurchaseOrder, recordQuote } from '@/modules/procurement/actions'
 import type { QuoteComparison } from '@/modules/procurement/procurement'
 
 interface Supplier {
@@ -72,6 +74,50 @@ export function RequisitionClient({
   const [fxRate, setFxRate] = useState(rate ?? '0.0083')
   const [noted, setNoted] = useState<string | null>(null)
   const [failure, setFailure] = useState<string | null>(null)
+
+  // The quote being typed. Keyed by itemId; a line left fully blank is simply not quoted.
+  const [quoteSupplierId, setQuoteSupplierId] = useState('')
+  const [quotedOn, setQuotedOn] = useState(factoryToday())
+  const [quoteLines, setQuoteLines] = useState<
+    Record<string, { unitPrice: string; leadTimeDays: string; freight: string; dutyPct: string }>
+  >({})
+
+  const quotedEntries = lines.flatMap((line) => {
+    const draft = quoteLines[line.itemId]
+    return draft && draft.unitPrice.trim() !== '' && draft.leadTimeDays.trim() !== ''
+      ? [{ line, draft }]
+      : []
+  })
+  const quoteReady = quoteSupplierId !== '' && quotedOn !== '' && quotedEntries.length > 0
+
+  function saveQuote() {
+    if (!quoteReady) return
+    setFailure(null)
+
+    startTransition(async () => {
+      try {
+        await recordQuote({
+          purchaseRequisitionId: prId,
+          supplierId: quoteSupplierId,
+          currency: supplierOf(quoteSupplierId)?.currency ?? 'USD',
+          quotedOn,
+          lines: quotedEntries.map(({ line, draft }) => ({
+            itemId: line.itemId,
+            unitPrice: draft.unitPrice.trim(),
+            leadTimeDays: Number(draft.leadTimeDays),
+            ...(draft.freight.trim() ? { freight: draft.freight.trim() } : {}),
+            ...(draft.dutyPct.trim() ? { dutyPct: draft.dutyPct.trim() } : {}),
+          })),
+        })
+        setNoted(`Quote recorded for ${supplierOf(quoteSupplierId)?.name ?? 'the supplier'}.`)
+        setQuoteLines({})
+        setQuoteSupplierId('')
+        router.refresh()
+      } catch (error) {
+        setFailure(actionErrorMessage(error, 'The quote was not recorded.'))
+      }
+    })
+  }
 
   const supplierOf = (id: string) => suppliers.find((s) => s.id === id) ?? null
 
@@ -276,6 +322,109 @@ export function RequisitionClient({
             The rate travels with the comparison so the decision can be reconstructed later.
             A rate fetched at render time makes last month&rsquo;s choice unexplainable.
           </span>
+        </div>
+      </section>
+
+      {/* ── Record a quote ───────────────────────────────────────────────────
+        * The chain's missing middle link (live-test finding, Phase 4): the comparison
+        * above ranks quotes and the section below issues a PO from the chosen one, and
+        * NOTHING could enter a quote — `recordQuote` sat on the unreachable list, so a
+        * requisition could be raised and never answered. Lead time is required per line:
+        * a cheap quote arriving after the fabric is needed is not a cheaper quote.
+        */}
+      <section>
+        <SectionHeading eyebrow="what a supplier answered — lead time is part of the price">
+          Record a quote
+        </SectionHeading>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 5, flex: '1 1 240px' }}>
+              <span style={fieldLabel}>Supplier</span>
+              <select
+                value={quoteSupplierId}
+                onChange={(e) => setQuoteSupplierId(e.target.value)}
+                style={control}
+              >
+                <option value="">Choose the supplier</option>
+                {suppliers.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} · {s.origin} · {s.currency}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 5, flex: '0 1 170px' }}>
+              <span style={fieldLabel}>Quoted on</span>
+              <input
+                type="date"
+                value={quotedOn}
+                onChange={(e) => setQuotedOn(e.target.value)}
+                style={control}
+              />
+            </label>
+          </div>
+
+          {lines.map((line) => {
+            const draft = quoteLines[line.itemId] ?? { unitPrice: '', leadTimeDays: '', freight: '', dutyPct: '' }
+            const patch = (next: Partial<typeof draft>) =>
+              setQuoteLines((all) => ({ ...all, [line.itemId]: { ...draft, ...next } }))
+            return (
+              <div
+                key={line.itemId}
+                className="fx-stack-tablet"
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'minmax(0, 1fr) 110px 90px 100px 90px',
+                  gap: 10,
+                  alignItems: 'end',
+                }}
+              >
+                <span style={{ font: "400 13px/1.4 var(--fx-font-sans)", alignSelf: 'center' }}>
+                  {line.itemName}
+                  <span style={{ color: 'var(--fx-text-tertiary)' }}> · {line.qty} {line.unit}</span>
+                </span>
+                <TextInput
+                  label="Unit price"
+                  mono
+                  inputMode="decimal"
+                  value={draft.unitPrice}
+                  onChange={(e) => patch({ unitPrice: e.target.value })}
+                />
+                <TextInput
+                  label="Lead days"
+                  mono
+                  inputMode="numeric"
+                  value={draft.leadTimeDays}
+                  onChange={(e) => patch({ leadTimeDays: e.target.value })}
+                />
+                <TextInput
+                  label="Freight"
+                  mono
+                  inputMode="decimal"
+                  value={draft.freight}
+                  onChange={(e) => patch({ freight: e.target.value })}
+                />
+                <TextInput
+                  label="Duty %"
+                  mono
+                  inputMode="decimal"
+                  value={draft.dutyPct}
+                  onChange={(e) => patch({ dutyPct: e.target.value })}
+                />
+              </div>
+            )
+          })}
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <Button
+              variant="secondary"
+              disabled={pending || !quoteReady}
+              onClick={saveQuote}
+            >
+              Record the quote
+            </Button>
+          </div>
         </div>
       </section>
 

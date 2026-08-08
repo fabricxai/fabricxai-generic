@@ -10,6 +10,7 @@ import { PageHeader } from '@/components/shell/page-shell'
 import { canWrite, NAV } from '@/components/shell/nav'
 import { getCtx } from '@/modules/core/session'
 import { companyProfile } from '@/modules/settings/service'
+import { NewRequisitionButton } from './new-requisition'
 import { NewSupplierButton } from './new-supplier'
 
 import {
@@ -18,6 +19,7 @@ import {
   supplierBook,
   type PoRow,
 } from '@/modules/procurement/queries'
+import { itemList } from '@/modules/store/queries'
 
 /**
  * 4.1 Procurement & Suppliers.
@@ -59,7 +61,14 @@ export default async function ProcurementPage() {
         title={pos.length === 0 ? 'No purchase orders' : `${pos.length} purchase orders`}
         meta={late.length > 0 ? `${late.length} overdue` : undefined}
         ownsAmber
-        actions={mayWrite ? <NewSupplierButton /> : undefined}
+        actions={
+          mayWrite ? (
+            <div style={{ display: 'flex', gap: 10 }}>
+              <NewRequisitionButton items={await itemList(ctx)} />
+              <NewSupplierButton />
+            </div>
+          ) : undefined
+        }
       />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>

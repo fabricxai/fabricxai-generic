@@ -41,7 +41,6 @@ const NO_SCREEN_YET: Record<string, string> = {
   'compliance/saveCertificate': 'a certificate cannot be filed or renewed',
   'maintenance/reportMachine': 'a broken machine cannot be reported from the floor',
   'memory/findSimilarStyles': 'the similar-style lookup has no entry point on any screen',
-  'procurement/recordQuote': 'a supplier quote cannot be entered by hand',
   'procurement/updatePoStatus': 'a PO cannot be moved through its own lifecycle',
   'sampling/raiseSampleRequest': 'a sample cannot be requested — the PP gate depends on one',
   'shipment/openShipment': 'a shipment cannot be opened against an order',
