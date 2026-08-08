@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { headers } from 'next/headers'
 
+import { surfaced, type ActionFailure } from '@/lib/action-failure'
 import { requireRole } from '@/modules/core/session'
 
 import {
@@ -29,11 +30,15 @@ export async function raiseSampleRequest(input: {
   styleCode: string
   requestNo: string
   dueDate?: string
-}): Promise<{ sampleRequestId: string }> {
+}): Promise<{ sampleRequestId: string } | ActionFailure> {
   const ctx = await requireRole(await headers(), 'merchandiser')
-  const result = await createSampleRequest(ctx, input)
-  refresh()
-  return result
+  // Refusals as values (lib/action-failure): "a PP sample must belong to an order" is a
+  // sentence a person needs to read, and production masks anything thrown.
+  return surfaced(async () => {
+    const result = await createSampleRequest(ctx, input)
+    refresh()
+    return result
+  })
 }
 
 /**

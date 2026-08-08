@@ -9,7 +9,10 @@ import { SectionHeading } from '@/components/fx/signature'
 import { Ident } from '@/components/fx/format'
 import { PageHeader } from '@/components/shell/page-shell'
 import { getCtx } from '@/modules/core/session'
+import { orderList } from '@/modules/orders/queries'
 import { ppApprovedStyles, sampleBoard, type SampleRow } from '@/modules/sampling/queries'
+
+import { NewSampleButton } from './new-sample'
 
 /**
  * 1.4 Sampling Room.
@@ -49,6 +52,17 @@ export default async function SamplingPage() {
         title={samples.length === 0 ? 'No samples' : `${samples.length} samples`}
         meta={overdue.length > 0 ? `${overdue.length} overdue` : undefined}
         ownsAmber
+        actions={
+          <NewSampleButton
+            orders={(await orderList(ctx))
+              .filter((row) => !['shipped_full', 'closed', 'cancelled'].includes(row.status))
+              .map((row) => ({
+                id: row.id,
+                label: `${row.poNumbers[0] ?? row.id.slice(0, 8)} · ${row.styleCode ?? ''}`,
+                styleCode: row.styleCode,
+              }))}
+          />
+        }
       />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 30 }}>
