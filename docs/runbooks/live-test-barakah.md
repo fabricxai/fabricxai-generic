@@ -278,6 +278,46 @@ payroll in the nav, prices masked. Start there.
     wide screens; B/L port-of-loading vs LC wording (Chattogram/Chittagong) remains a
     human comparison.
 
+29. **Phase 8, scoped before clicking: the money had FIVE missing first links.** An order
+    could not be moved through its own lifecycle (`setOrderStatus` had a state machine and
+    no screen — closing, the phase's centrepiece, was impossible); an invoice could not be
+    raised (`invoices` was a pending target with a commit handler, a zod and an audit mark
+    that nothing proposed — no invoice, no receivable, nothing to realize); the waterfall
+    was never computed (`accrueOrderCosts`/`orderPnl` had no caller but the seed); the
+    presentation's invoiced amount was "filled in later" by a comment with no mechanism
+    (`finance.invoice.drafted` now carries the shipmentId and commercial fills its own row,
+    rule 11); and the GRN unit price — accepted by the zod since 3.1 — had no field on the
+    receive screen, so every accrual the module ever ran was blind and the first frozen
+    waterfall honestly reported actual margin 100% on actuals of zero. All five built
+    (f25358f, fc8efd4, a4a19cb); existing GRN lines were restaged with prices and the close
+    replayed by inserting a fresh outbox event — the consumer's own upsert idempotency is
+    what made that safe.
+
+30. **Phase 8 ran end to end, and the chain held.** Invoice drafted by finance, signed by
+    the owner, invoice + receivable born together with expectedAt +30 days from the policy
+    default; the new wire filled the presentation's invoiced amount the moment the invoice
+    existed; the realization of 150.00 against 166.80 (10.07% short) was REFUSED without a
+    written reason and posted with one; the receivable settled with the shortfall stored;
+    and the outbox reads like the design doc — invoice.drafted → order_costs.accrued →
+    margin.erosion → finance.realized → receivable.realized. The re-frozen waterfall names
+    fabric: materials actual 151.58/pc against 5.09 quoted (+146.49), margin −2081.01% —
+    the magnitude is the staging (a full fabric issue over 24 shipped pieces), stated on
+    the record rather than smoothed. The outcome card compiled honestly ("compiled
+    without: efficiency", consumption flagged "issued over pieces produced") and the
+    close-out note sealed: fabric ran 262 g/pc against 255 quoted. Bank-desk repairs
+    mid-phase (77ad5df): status moves were commercial-only while the realization always
+    allowed finance — Salma could post the money but not record that the documents went;
+    the shortfall gate's own sentence masked as React #441; and the docs line rendered
+    "[object Object]" because two writers store two shapes and the page assumed one.
+    Deviations, recorded not simulated: the order was closed before invoicing (harmless —
+    the money legs are status-independent); the tester's shortfall reason went in as
+    "Problem a", which is precisely what free-text invites and exactly what the record
+    preserves; payables still have no entry door; the similar-order card has no screen
+    (owed list); the bank advice is typed, not extracted, by the module's stated
+    philosophy; and one "Server Action was not found" was deployment skew from shipping
+    mid-session — a reload cures it, and live-deploying under an open tab is the
+    operational reality it documents.
+
 ## Honest status of the traps
 
 The gates the runbook pokes (PP blocks cutting, UD overdraw block, BTB headroom, EXP
