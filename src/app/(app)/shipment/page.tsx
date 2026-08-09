@@ -7,8 +7,16 @@ import { Eyebrow, SectionHeading } from '@/components/fx/signature'
 import { Ident } from '@/components/fx/format'
 import { ShipmentActions } from '@/components/fx/shipment-actions'
 import { PageHeader } from '@/components/shell/page-shell'
+import { eq } from 'drizzle-orm'
+
+import { lcs } from '@/modules/commercial/schema'
 import { getCtx } from '@/modules/core/session'
+import { withTenantRead } from '@/modules/core/tenancy'
+import { orderList } from '@/modules/orders/queries'
+import { orderLcs } from '@/modules/orders/schema'
 import { shipmentBoard, type ShipmentRow } from '@/modules/shipment/queries'
+
+import { NewShipmentButton } from './new-shipment'
 
 /**
  * 8.2 Shipment.
@@ -31,6 +39,31 @@ export default async function ShipmentPage() {
 
   const rows = await shipmentBoard(ctx)
 
+  /*
+   * The orders a shipment can be opened against, with the credit that covers each
+   * (live-test finding, Phase 7: `openShipment` had no screen, so the board could only
+   * show seeded shipments). The LC comes through `order_lcs` — the join the whole
+   * date-conflict machinery already runs on — so the shipment's dates are checked
+   * against the right credit without anybody re-picking it.
+   */
+  const orderRows = await orderList(ctx)
+  const coverage = await withTenantRead(ctx, (tx) =>
+    tx
+      .select({ orderId: orderLcs.orderId, lcId: lcs.id, lcNumber: lcs.number })
+      .from(orderLcs)
+      .innerJoin(lcs, eq(lcs.id, orderLcs.lcId)),
+  )
+  const lcByOrder = new Map(coverage.map((c) => [c.orderId, c]))
+  const shippableOrders = orderRows
+    .filter((row) => !['closed', 'cancelled'].includes(row.status))
+    .map((row) => ({
+      id: row.id,
+      label: `${row.poNumbers[0] ?? row.id.slice(0, 8)} · ${row.styleCode ?? ''}`,
+      plannedExFactory: row.plannedExFactoryDate,
+      lcId: lcByOrder.get(row.id)?.lcId ?? null,
+      lcNumber: lcByOrder.get(row.id)?.lcNumber ?? null,
+    }))
+
   const noExp = rows.filter((r) => !r.expNumber && r.portStatus !== 'planned')
   const pastDeadline = rows.filter(
     (r) => r.daysAgainstLatestShipment !== null && r.daysAgainstLatestShipment < 0,
@@ -44,6 +77,7 @@ export default async function ShipmentPage() {
         title={rows.length === 0 ? 'No shipments' : `${rows.length} shipments`}
         meta={ready.length > 0 ? `${ready.length} ready for the bank` : undefined}
         ownsAmber
+        actions={<NewShipmentButton orders={shippableOrders} />}
       />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 30 }}>

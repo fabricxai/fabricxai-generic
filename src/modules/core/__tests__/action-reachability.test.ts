@@ -42,7 +42,6 @@ const NO_SCREEN_YET: Record<string, string> = {
   'maintenance/reportMachine': 'a broken machine cannot be reported from the floor',
   'memory/findSimilarStyles': 'the similar-style lookup has no entry point on any screen',
   'procurement/updatePoStatus': 'a PO cannot be moved through its own lifecycle',
-  'shipment/openShipment': 'a shipment cannot be opened against an order',
   'workforce/recordGazette': 'a wage gazette cannot be entered without a document to extract',
   'workforce/makeGazetteActive': 'and one that is entered cannot be put into force',
 

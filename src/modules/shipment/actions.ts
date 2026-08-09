@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { headers } from 'next/headers'
 
+import { surfaced, type ActionFailure } from '@/lib/action-failure'
 import { requireRole } from '@/modules/core/session'
 import { unassignedCartons } from './queries'
 import { getPolicy } from '@/modules/settings/service'
@@ -35,11 +36,14 @@ export async function openShipment(input: {
   plannedExFactory: string
   forwarder?: string
   mode?: 'sea' | 'air'
-}): Promise<{ shipmentId: string }> {
+}): Promise<{ shipmentId: string } | ActionFailure> {
   const ctx = await requireRole(await headers(), 'shipment', 'commercial', 'merchandiser')
-  const result = await createShipment(ctx, input)
-  refresh()
-  return result
+  // Refusals as values (lib/action-failure) — a duplicate partial number is a sentence.
+  return surfaced(async () => {
+    const result = await createShipment(ctx, input)
+    refresh()
+    return result
+  })
 }
 
 /**
