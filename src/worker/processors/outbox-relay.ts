@@ -59,6 +59,8 @@ const QUEUE_ROUTES: readonly { prefix: string; queue: QueueName }[] = [
   { prefix: 'shipment.docs.ready_for_bank', queue: QUEUE.derive },
   { prefix: 'shipment.ex_factory.confirmed', queue: QUEUE.derive },
   { prefix: 'finance.realized', queue: QUEUE.derive },
+  // An approved invoice fills the open bank presentation's invoiced amount.
+  { prefix: 'finance.invoice.drafted', queue: QUEUE.derive },
   { prefix: 'cutting.order.complete', queue: QUEUE.derive },
   { prefix: 'quality.final.', queue: QUEUE.derive },
   { prefix: 'quality.dhu.day_closed', queue: QUEUE.derive },

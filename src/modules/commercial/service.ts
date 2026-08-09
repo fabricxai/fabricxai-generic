@@ -914,6 +914,48 @@ export async function openBtb(
 // The submission lifecycle
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Fill an open presentation's invoiced amount once 11.1 raises the invoice.
+ *
+ * A presentation is deliberately openable before the invoice exists — the desk needs a row
+ * to track while chasing it — but `postRealization` rightly refuses a realization against
+ * no invoiced amount, and NOTHING wrote the amount in later (live-test finding, Phase 8:
+ * "have it filled in later" was a comment, not a mechanism). This is the mechanism: the
+ * `finance.invoice.drafted` consumer calls it, so commercial stays the one writer of its
+ * own table (rule 11). A submission already realized, or already carrying an amount, is
+ * left alone — a bank advice reconciled against one number must not have that number move.
+ */
+export async function fillSubmissionInvoice(
+  ctx: AnyCtx,
+  input: { shipmentId: string; invoicedAmount: string; currency: string },
+): Promise<{ filled: boolean }> {
+  return withTenantTx(ctx, async (tx) => {
+    const [row] = await tx
+      .select()
+      .from(docSubmissions)
+      .where(scoped(docSubmissions, ctx, eq(docSubmissions.shipmentId, input.shipmentId)))
+      .for('update')
+
+    if (!row) return { filled: false }
+    if (row.invoicedAmount || row.bankStatus === 'realized') return { filled: false }
+
+    await tx
+      .update(docSubmissions)
+      .set({ invoicedAmount: input.invoicedAmount, currency: input.currency, updatedAt: new Date() })
+      .where(scoped(docSubmissions, ctx, eq(docSubmissions.id, row.id)))
+
+    await recordChange(ctx, tx, {
+      action: 'update',
+      targetTable: 'doc_submissions',
+      targetId: row.id,
+      before: { invoicedAmount: null },
+      after: { invoicedAmount: input.invoicedAmount, currency: input.currency },
+    })
+
+    return { filled: true }
+  })
+}
+
 /** Open a presentation for a shipment, from the checklist 8.1 handed off. */
 export async function openSubmission(
   // AnyCtx: the 8.1 → 2.1 consumer opens presentations as a system actor.

@@ -132,6 +132,27 @@ const onDocsReadyForBank: Handler = async (ctx, payload) => {
 }
 
 /**
+ * 11.1 raised an invoice → 2.1 fills the open presentation's invoiced amount.
+ *
+ * The presentation is opened when documents reach the bank, usually before the invoice is
+ * approved — and a realization cannot post against a presentation with no invoiced amount.
+ * Idempotent: `fillSubmissionInvoice` leaves alone a submission already carrying an amount
+ * or already realized.
+ */
+const onInvoiceDrafted: Handler = async (ctx, payload) => {
+  const shipmentId = payload.shipmentId ? String(payload.shipmentId) : null
+  const value = payload.value ? String(payload.value) : null
+  if (!shipmentId || !value) return
+
+  const { fillSubmissionInvoice } = await import('@/modules/commercial/service')
+  await fillSubmissionInvoice(ctx, {
+    shipmentId,
+    invoicedAmount: value,
+    currency: String(payload.currency ?? 'USD'),
+  })
+}
+
+/**
  * 2.1 posted a realization → 11.1 closes the receivable.
  *
  * The payload carries BOTH the invoiced and realized amounts, because the difference is what
@@ -527,6 +548,7 @@ async function onExtractionQueued(ctx: SystemCtx, payload: Record<string, unknow
 export const EVENT_HANDLERS: Readonly<Record<string, Handler>> = {
   'shipment.docs.ready_for_bank': onDocsReadyForBank,
   'finance.realized': onFinanceRealized,
+  'finance.invoice.drafted': onInvoiceDrafted,
   'cutting.order.complete': onCuttingComplete,
   'shipment.ex_factory.confirmed': onExFactoryConfirmed,
   'rfq.won': onRfqWon,

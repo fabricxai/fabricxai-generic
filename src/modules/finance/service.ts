@@ -231,6 +231,10 @@ export async function draftInvoiceIn(
         invoiceId: invoice.id,
         receivableId: receivable.id,
         orderId: payload.orderId,
+        // Carried so 2.1 can fill an already-open presentation's invoiced amount — a
+        // submission opened before the invoice existed had no other way to learn it, and
+        // a realization posts against nothing without it (live-test finding, Phase 8).
+        shipmentId: payload.shipmentId ?? null,
         value: payload.value,
         currency: payload.currency,
         expectedAt,
