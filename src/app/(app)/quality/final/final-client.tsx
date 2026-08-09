@@ -623,7 +623,7 @@ export function FinalClient({
             >
               {l.majorAql
                 ? `AQL ${l.majorAql} / ${l.minorAql}`
-                : t('ui.quality.no_buyer_terms')}
+                : t('ui.quality.no_terms_short')}
             </span>
 
             <span>

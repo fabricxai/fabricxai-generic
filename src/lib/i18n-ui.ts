@@ -1101,6 +1101,7 @@ export const UI_MESSAGES: Catalogue = {
     'ui.quality.need_length_width': 'length and width are needed before a rate exists',
     'ui.quality.never_inspected': 'never inspected',
     'ui.quality.no_buyer': 'no buyer',
+    'ui.quality.no_terms_short': 'no terms on file',
     'ui.quality.no_buyer_terms':
       '{buyer} has no terms on file, so there is no agreed AQL to inspect against. A level the system picked would be an acceptance number nobody signed for — set the buyer’s terms first.',
     'ui.quality.no_chart': 'no chart for this style',
@@ -2256,6 +2257,7 @@ export const UI_MESSAGES: Catalogue = {
     'ui.quality.need_length_width': 'হার বের করতে গজ আর চওড়া দুটোই লাগবে',
     'ui.quality.never_inspected': 'কখনো ইন্সপেকশন হয়নি',
     'ui.quality.no_buyer': 'বায়ার নেই',
+    'ui.quality.no_terms_short': 'শর্ত ফাইলে নেই',
     'ui.quality.no_buyer_terms':
       '{buyer}-এর কোনো শর্ত ফাইলে নেই, তাই মেনে নেওয়া AQL-ও নেই। সিস্টেম নিজে একটা লেভেল বেছে নিলে সেটা এমন সংখ্যা হবে যাতে কেউ সই করেনি — আগে বায়ারের শর্ত বসান।',
     'ui.quality.no_chart': 'এই স্টাইলের চার্ট নেই',

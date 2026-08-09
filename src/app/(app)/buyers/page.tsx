@@ -13,6 +13,7 @@ import type { BuyerDeskPolicy } from '@/modules/buyers/service'
 import { getPolicy } from '@/modules/settings/service'
 
 import { LeadOpener } from './pipeline-client'
+import { BuyerTermsButton } from './buyer-terms'
 import { NewLead } from './new-lead'
 import type { DrawerLead } from './lead-drawer'
 
@@ -251,7 +252,12 @@ export default async function BuyersPage() {
         </section>
 
         <section>
-          <SectionHeading eyebrow={`${accounts.length} accounts`}>Buyers</SectionHeading>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+            <SectionHeading eyebrow={`${accounts.length} accounts`}>Buyers</SectionHeading>
+            {mayWrite ? (
+              <BuyerTermsButton buyers={accounts.map((a) => ({ id: a.id, name: a.name }))} />
+            ) : null}
+          </div>
 
           {accounts.length === 0 ? (
             <div

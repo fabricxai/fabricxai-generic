@@ -4,6 +4,7 @@ import { headers } from 'next/headers'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 
+import { surfaced, type ActionFailure } from '@/lib/action-failure'
 import { requireRole } from '@/modules/core/session'
 
 import { getPolicy } from '@/modules/settings/service'
@@ -14,6 +15,7 @@ import {
   detectDuplicates,
   logActivity,
   setLeadStage,
+  upsertTerms,
   type BuyerDeskPolicy,
   type DuplicateCandidate,
 } from './service'
@@ -138,4 +140,31 @@ export async function convertLeadToBuyer(input: z.input<typeof convertInput>) {
   const result = await convertLead(ctx, parsed)
   revalidatePath('/buyers')
   return result
+}
+
+/**
+ * Record a new version of a buyer's commercial terms.
+ *
+ * `upsertTerms` — the versioned rows 7.1's AQL gate and 8.1's tolerance band READ — had a
+ * service, a zod and an audit mark, and no action and no screen: the final-inspection
+ * desk refused every lot with "no terms on file" and there was nowhere to put terms on
+ * file (live-test finding, Phase 7). Always a NEW version; backdating past the newest is
+ * refused by the service so "what applied on the day" never moves.
+ */
+export async function setBuyerTerms(input: {
+  buyerId: string
+  validFrom: string
+  payment: 'lc' | 'tt' | 'dp'
+  incoterm: string
+  tolerancePct: string
+  aqlLevel: string
+  minorAqlLevel?: string
+}): Promise<{ termsId: string; version: number } | ActionFailure> {
+  const ctx = await requireRole(await headers(), 'merchandiser', 'commercial')
+  return surfaced(async () => {
+    const result = await upsertTerms(ctx, input)
+    revalidatePath('/buyers')
+    revalidatePath('/quality/final')
+    return result
+  })
 }
