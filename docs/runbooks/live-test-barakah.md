@@ -228,6 +228,56 @@ payroll in the nav, prices masked. Start there.
     397 sewn · 132.33/day with "one day of output only" stated rather than a
     confident-looking projection from one morning.
 
+26. **Phase 7, quality: the AQL machinery is right, and the terms had no door.** The
+    final-inspection desk refused every lot fail-closed — correct — but `upsertTerms`,
+    the versioned rows the gate reads, had a service and no action and no screen, and
+    the refusal leaked its `{buyer}` placeholder raw. Both fixed (775aeb7): the buyers
+    desk gained "Buyer terms" (each save a new version from its valid-from date), and
+    the computed plans then matched ANSI Z1.4 exactly — 36,000 pcs → code N → 500
+    pull, Ac 21/Re 22 at AQL 2.5; 12,000 → M → 315/14, the kit's own figure derived
+    from Bestseller's terms rather than typed. The critical-defect exhibit took three
+    attempts and taught the most: the first submission PASSED honestly because the
+    needle tile was back at 0 by submit time (the server row proved only 4 majors
+    arrived — every layer from tile to verdict transmits faithfully); the clean probe
+    FI-PO-BF-2044-2 came back FAIL on `critical_defect found 1, accept 0`, and the
+    quality landing then warned "a failed lot does not ship until it is re-inspected."
+
+27. **The session trap, named.** Logging in as another tester replaces the session for
+    the WHOLE browser, and the offline queue is per-browser, not per-account — so an
+    inspection captured on Mitu's screen posts under whoever is logged in when the
+    queue drains. Two re-inspections died this way as `sync_role_forbidden`. Role
+    refusals are deliberately not persisted server-side (a verdict on the caller, not
+    the row — replay after a role fix should apply), but the device marks them
+    terminal and the banner says only "2 checks the server refused. Dismiss Dismiss" —
+    no reason, no identity, and nothing in /refused either. OWED: the refusal banner
+    carries the gate's sentence (`errorKey` is already on the device); the queue
+    should stamp who captured a write and refuse to post it under someone else.
+
+28. **Phase 7, shipment: every gate held; only the telling failed.** The packing floor
+    existed with no signpost (the sidebar is one entry per module and the board never
+    linked it — 1768efb adds the link), and its grid was built from finished ∪ packed
+    with the "+24 finished" button INSIDE a cell, so the first finishing report was
+    impossible — chicken-and-egg resolved by seeding cells from the order's own
+    breakdown revision, ordered quantity shown per cell (9c778fa). The over-pack
+    block then exhibited cleanly (White|S 24 of 24, the second carton dead at the tap
+    with the sentence; the server enforces it independently). On the desk, three
+    React #441s in one walkthrough, decoded from server logs: two were the
+    commercial-only bank handoff masking a 403 at Jahid, one was the final-inspection
+    gate refusing "Confirm ex-factory" on the failed lot — with its outbox trail
+    `shipment.final_inspection.blocked` carrying the reasons, the inspection number
+    and attemptedBy. The machinery was perfect; the person saw an error number. All
+    shipment actions now return refusals as values with requireRole inside the
+    boundary (592e9de). The close: EXP-2026-118845 recorded, checklist derived from
+    LC-4471 itself (SIX kinds — settling the Phase 5 "5 vs 6" question: the list is
+    whatever the credit demands), all six attached and submitted under the EXP.
+    Noted, not fixed: the EXP-missing trail (`shipment.exp.missing`) never fired live
+    because the number was recorded before any commercial-role attempt — integration
+    tests cover it; locking the packing list auto-accepts breakdown mismatches
+    (`acceptMismatches: true` hardcoded — 6 shortfall cells accepted in one click
+    that never showed them); the card's facts column collapses one-word-per-line on
+    wide screens; B/L port-of-loading vs LC wording (Chattogram/Chittagong) remains a
+    human comparison.
+
 ## Honest status of the traps
 
 The gates the runbook pokes (PP blocks cutting, UD overdraw block, BTB headroom, EXP
