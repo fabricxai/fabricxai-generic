@@ -82,7 +82,11 @@ export default async function PackingPage({
   ])
 
   const cells = [
-    ...new Set([...Object.keys(grid.finished), ...Object.keys(grid.packed)]),
+    ...new Set([
+      ...Object.keys(grid.ordered),
+      ...Object.keys(grid.finished),
+      ...Object.keys(grid.packed),
+    ]),
   ].sort()
 
   const overPacked = cells.filter(
@@ -105,6 +109,7 @@ export default async function PackingPage({
           label: o.poNumbers?.[0] ?? o.styleCode ?? o.id.slice(0, 8),
         }))}
         cells={cells}
+        ordered={grid.ordered}
         finished={grid.finished}
         packed={grid.packed}
         remaining={grid.remaining}

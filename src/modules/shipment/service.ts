@@ -231,11 +231,17 @@ async function packedCells(
 export async function remainingToPackFor(
   ctx: AnyCtx,
   input: { orderId: string },
-): Promise<{ remaining: CellMap; finished: CellMap; packed: CellMap }> {
+): Promise<{ remaining: CellMap; finished: CellMap; packed: CellMap; ordered: CellMap }> {
   return withTenantRead(ctx, async (tx) => {
-    const [finished, packed] = await Promise.all([
+    const [finished, packed, ordered] = await Promise.all([
       finishedCells(ctx, tx, input.orderId),
       packedCells(ctx, tx, input.orderId),
+      // The buyer's grid, so the worklist has cells BEFORE the first finished piece is
+      // reported. Built only from finished ∪ packed, the screen was a chicken-and-egg:
+      // "report finished pieces first" with the report button living inside a cell that
+      // could not exist yet (live-test finding, Phase 7). An order with no breakdown
+      // yet is an empty grid, not an error — the packer cannot fix a missing revision.
+      orderedCells(ctx, tx, input.orderId).catch(() => ({}) as CellMap),
     ])
 
     // `allowOverPack` so the report shows an existing over-pack rather than refusing to
@@ -244,6 +250,7 @@ export async function remainingToPackFor(
       remaining: wrapShipmentError(() => remainingToPack(finished, packed, { allowOverPack: true })),
       finished,
       packed,
+      ordered,
     }
   })
 }

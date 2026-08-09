@@ -49,6 +49,7 @@ export function PackingClient({
   orderStyleId,
   orders,
   cells,
+  ordered,
   finished,
   packed,
   remaining,
@@ -58,6 +59,7 @@ export function PackingClient({
   orderStyleId: string | null
   orders: readonly { id: string; label: string }[]
   cells: readonly string[]
+  ordered: CellMap
   finished: CellMap
   packed: CellMap
   remaining: CellMap
@@ -178,8 +180,9 @@ export function PackingClient({
 
       {cells.length === 0 ? (
         <InlineAlert tone="info">
-          Nothing has come off finishing yet. Report finished pieces first — a carton cannot
-          contain garments the floor has not made.
+          This order has no size breakdown on file, so there is nothing to finish or pack
+          against. The grid&rsquo;s cells come from the order&rsquo;s own colour and size
+          breakdown.
         </InlineAlert>
       ) : (
         <div
@@ -232,6 +235,7 @@ export function PackingClient({
                   }}
                 >
                   {inCartons} packed of {made} finished
+                  {ordered[cell] ? ` · ${ordered[cell]} ordered` : ''}
                 </span>
                 <span style={{ font: "500 12.5px/1 var(--fx-font-mono)" }}>
                   {Math.max(0, remaining[cell] ?? 0)} remaining
