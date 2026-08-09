@@ -133,6 +133,9 @@ describe('the routing table', () => {
   it('has a handler for every wire this commit claims to connect', () => {
     expect(Object.keys(EVENT_HANDLERS).sort()).toEqual([
       'cutting.order.complete',
+      // An approved invoice fills the open bank presentation's invoiced amount — without
+      // it a realization has nothing to post against (live-test finding, Phase 8).
+      'finance.invoice.drafted',
       'finance.realized',
       'maintenance.ticket.resolved',
       // Not a cross-module write like the others — it is the extraction runner reacting to

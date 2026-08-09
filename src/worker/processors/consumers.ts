@@ -422,6 +422,7 @@ async function onOrderStatusChanged(ctx: SystemCtx, payload: Record<string, unkn
       .from(orderStyles)
       .where(eq(orderStyles.orderId, orderId))
     return {
+      // eslint-disable-next-line fabricxai/no-float-money -- carton totalQty is pieces, a count, not money
       pieces: packed.reduce((sum, c) => sum + c.totalQty, 0),
       styleCode: style?.styleCode ?? null,
     }
