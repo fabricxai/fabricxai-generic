@@ -54,6 +54,25 @@ export function factoryToday(timeZone: string = FACTORY_TIMEZONE, now: Date = ne
 }
 
 /**
+ * The hour on the factory clock, 0–23.
+ *
+ * `new Date().getHours()` is the SERVER's hour, and the server is UTC. Dhaka is six hours
+ * ahead, so an evening deploy made the hourly screen open on 8:00 all day: at 23:00 UTC
+ * the floor is at 05:00, below the shift start, and the clamp pinned it to the first hour
+ * (live-test finding, Phase 6 — a supervisor entering the 10:00 count would have
+ * overwritten 8:00 without noticing).
+ */
+export function factoryHour(timeZone: string = FACTORY_TIMEZONE, now: Date = new Date()): number {
+  const hour = new Intl.DateTimeFormat('en-GB', {
+    timeZone,
+    hour: '2-digit',
+    hour12: false,
+  }).format(now)
+  // '24' is midnight in some ICU builds; both spellings mean hour zero.
+  return Number(hour) % 24
+}
+
+/**
  * The instant a factory day begins, as a real `Date`.
  *
  * For querying a `timestamptz` column by calendar day: `>= startOfFactoryDay(d)` and

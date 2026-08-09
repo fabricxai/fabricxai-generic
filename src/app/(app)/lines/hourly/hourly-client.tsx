@@ -77,11 +77,14 @@ export function HourlyClient({
   producedOn,
   hour,
   lines,
+  machines,
   stoppages,
 }: {
   producedOn: string
   hour: number
   lines: readonly LineRow[]
+  /** What a machine stoppage can name, so the ticket says which machine. */
+  machines: readonly { id: string; label: string; lineId: string | null }[]
   stoppages: readonly Stoppage[]
 }) {
   const t = useT()
@@ -142,7 +145,7 @@ export function HourlyClient({
     router.refresh()
   }
 
-  async function logStoppage(line: LineRow, reason: string, note: string) {
+  async function logStoppage(line: LineRow, reason: string, note: string, machineId: string) {
     setStopping(null)
     await captureThenRefresh(
       {
@@ -151,6 +154,9 @@ export function HourlyClient({
           lineId: line.lineId,
           startedAt: new Date().toISOString(),
           reason,
+          // Only a machine stoppage carries one — the ticket it raises is about THAT
+          // machine, and a mechanic should not have to walk the floor to find out which.
+          ...(reason === 'machine' && machineId ? { machineId } : {}),
           ...(note.trim() ? { note: note.trim() } : {}),
         },
       },
@@ -321,8 +327,11 @@ export function HourlyClient({
       {stopping ? (
         <StoppageDialog
           line={stopping}
+          machines={machines}
           onClose={() => setStopping(null)}
-          onLog={(reason, note) => void logStoppage(stopping, reason, note)}
+          onLog={(reason, note, machineId) =>
+            void logStoppage(stopping, reason, note, machineId)
+          }
         />
       ) : null}
     </div>
@@ -331,16 +340,22 @@ export function HourlyClient({
 
 function StoppageDialog({
   line,
+  machines,
   onClose,
   onLog,
 }: {
   line: LineRow
+  machines: readonly { id: string; label: string; lineId: string | null }[]
   onClose: () => void
-  onLog: (reason: string, note: string) => void
+  onLog: (reason: string, note: string, machineId: string) => void
 }) {
   const t = useT()
   const [reason, setReason] = useState<string>(REASONS[0].code)
   const [note, setNote] = useState('')
+  // This line's machines first — the one that stopped is almost always standing on it.
+  const onThisLine = machines.filter((m) => m.lineId === line.lineId)
+  const elsewhere = machines.filter((m) => m.lineId !== line.lineId)
+  const [machineId, setMachineId] = useState(onThisLine[0]?.id ?? '')
 
   return (
     <Modal
@@ -352,7 +367,13 @@ function StoppageDialog({
           <Button variant="ghost" onClick={onClose}>
             {t('ui.common.cancel')}
           </Button>
-          <Button variant="primary" onClick={() => onLog(reason, note)}>
+          <Button
+            variant="primary"
+            // A machine stoppage without its machine is the ticket that says "machine not
+            // identified" — the one thing the mechanic needed.
+            disabled={reason === 'machine' && machineId === ''}
+            onClick={() => onLog(reason, note, machineId)}
+          >
             {t('ui.production.log_stoppage_button')}
           </Button>
         </>
@@ -383,6 +404,43 @@ function StoppageDialog({
             ))}
           </select>
         </label>
+
+        {reason === 'machine' ? (
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <span style={{ font: "500 13px/1.3 var(--fx-font-sans)" }}>
+              {t('ui.production.field_which_machine')}
+            </span>
+            <select
+              value={machineId}
+              onChange={(e) => setMachineId(e.target.value)}
+              style={{
+                minHeight: 44,
+                padding: '10px 12px',
+                border: '1px solid var(--fx-border-default)',
+                borderRadius: 'var(--fx-radius-sm)',
+                background: 'var(--fx-bg-surface)',
+                color: 'var(--fx-text-primary)',
+                font: "400 14px/1.4 var(--fx-font-sans)",
+              }}
+            >
+              <option value="">{t('ui.production.choose_machine')}</option>
+              {onThisLine.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.label}
+                </option>
+              ))}
+              {elsewhere.length > 0 ? (
+                <optgroup label={t('ui.production.machines_elsewhere')}>
+                  {elsewhere.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.label}
+                    </option>
+                  ))}
+                </optgroup>
+              ) : null}
+            </select>
+          </label>
+        ) : null}
 
         <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <span style={{ font: "500 13px/1.3 var(--fx-font-sans)" }}>

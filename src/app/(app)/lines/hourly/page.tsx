@@ -9,12 +9,13 @@ import { tui } from '@/lib/i18n-ui'
 import { requestLocale } from '@/lib/ui-locale'
 import { getCtx } from '@/modules/core/session'
 import { withTenantRead } from '@/modules/core/tenancy'
+import { machines } from '@/modules/maintenance/schema'
 import { lines } from '@/modules/planning/schema'
 import { board } from '@/modules/production/queries'
 import { dailyLinePlans, downtimes } from '@/modules/production/schema'
 
 import { HourlyClient } from './hourly-client'
-import { factoryToday } from '@/lib/dates'
+import { factoryHour, factoryToday } from '@/lib/dates'
 
 /**
  * 6.1 Line tracking · hourly entry (canvas P1).
@@ -71,6 +72,25 @@ export default async function HourlyPage() {
     ),
   ])
 
+  /*
+   * The machines a stoppage can name. `downtimes.machine_id` has existed since 6.1 and
+   * the dialog offered only free text, so every machine stoppage reached maintenance as
+   * "machine not identified" — a mechanic walking to a floor to find out which machine
+   * (live-test finding, Phase 6). Read across the module boundary through the owner's
+   * table only for the picker's labels; the write still goes through production's zod.
+   */
+  const machineRows = await withTenantRead(ctx, (tx) =>
+    tx
+      .select({
+        id: machines.id,
+        machineType: machines.machineType,
+        serial: machines.serial,
+        lineId: machines.lineId,
+      })
+      .from(machines)
+      .orderBy(machines.machineType),
+  )
+
   // The caller's line narrowing, honoured — a chief scoped to L1/L2 enters L1/L2.
   const rows = ctx.lineScope
     ? allRows.filter((row) => ctx.lineScope!.includes(row.code))
@@ -97,9 +117,11 @@ export default async function HourlyPage() {
 
   const planByLine = new Map(planRows.map((p) => [p.lineId, p]))
 
-  // The hour the floor is in now. Outside shift hours it clamps to the last one rather
-  // than offering hour 23 — a supervisor entering at 6pm is catching up, not time-travelling.
-  const nowHour = new Date().getHours()
+  // The hour the floor is in now, on the FACTORY's clock — the server is UTC and Dhaka is
+  // six hours ahead, so `new Date().getHours()` pinned this screen to 8:00 every evening.
+  // Outside shift hours it clamps to the last one rather than offering hour 23 — a
+  // supervisor entering at 6pm is catching up, not time-travelling.
+  const nowHour = factoryHour()
   const currentHour = Math.min(
     Math.max(nowHour, SHIFT_START),
     SHIFT_START + SHIFT_HOURS - 1,
@@ -133,6 +155,11 @@ export default async function HourlyPage() {
           target: planByLine.get(row.lineId)?.targetPerHour ?? 0,
           orderId: planByLine.get(row.lineId)?.orderId ?? null,
           alreadyEntered: row.hours.some((h) => h.hourSlot === currentHour),
+        }))}
+        machines={machineRows.map((m) => ({
+          id: m.id,
+          label: `${m.serial ?? m.machineType} · ${m.machineType}`,
+          lineId: m.lineId,
         }))}
         stoppages={stoppages.map((s) => ({
           id: s.id,

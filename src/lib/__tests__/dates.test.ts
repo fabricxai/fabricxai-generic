@@ -10,6 +10,7 @@ import { describe, expect, it } from 'vitest'
 import {
   FACTORY_TIMEZONE,
   daysBetween,
+  factoryHour,
   factoryMonth,
   factoryToday,
   nextFactoryDate,
@@ -81,5 +82,26 @@ describe('calendar arithmetic', () => {
     const end = startOfFactoryDay(nextFactoryDate('2026-08-06'))
 
     expect(end.getTime() - start.getTime()).toBe(86_400_000)
+  })
+})
+
+describe('factoryHour', () => {
+  it('reads the FACTORY clock, not the server’s', () => {
+    // 23:30 UTC is 05:30 the next morning in Dhaka. The old code used the server's own
+    // hour, so an evening deploy pinned the hourly screen to the shift's first hour all
+    // day — and a supervisor entering the 10:00 count would have overwritten 8:00.
+    const instant = new Date('2026-08-08T23:30:00Z')
+    expect(factoryHour('Asia/Dhaka', instant)).toBe(5)
+    expect(factoryHour('UTC', instant)).toBe(23)
+  })
+
+  it('midnight is hour zero, whichever way ICU spells it', () => {
+    // 18:10 UTC is 00:10 in Dhaka; some ICU builds format that as "24".
+    expect(factoryHour('Asia/Dhaka', new Date('2026-08-08T18:10:00Z'))).toBe(0)
+  })
+
+  it('tracks the working day', () => {
+    // 04:00 UTC is 10:00 on the floor — mid-morning, the hour a supervisor is entering.
+    expect(factoryHour('Asia/Dhaka', new Date('2026-08-09T04:00:00Z'))).toBe(10)
   })
 })
