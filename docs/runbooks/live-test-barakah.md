@@ -204,6 +204,17 @@ payroll in the nav, prices masked. Start there.
     never opens). Multi-tenant caught one tester: fabricxai@gmail.com belongs to a
     different company, and its approve inbox is empty of Barakah's drafts by design.
 
+24. **Phase 6, two foundations were missing.** `daily_line_plans` — the record every
+    floor write hangs off (hourly outputs take their orderId from it, the board its
+    targets, the day-close its SMV) — was written only by the seed; "Plan the day"
+    on /lines is the door built for it. And role SCOPES were stored and never read:
+    Shilpi's `{"lines": ["L1","L2"]}` sat in the roles table while she saw all eight
+    lines. `ctx.lineScope` now carries the union of scoped roles (any unscoped role
+    widens to the whole floor) and the board, hourly grid, stoppage list and endline
+    counter filter by it. OWED: write-side enforcement — the offline batch handlers
+    do not yet refuse an entry for a line outside the device user's scope, so the
+    screens are the first wall, not the only one.
+
 ## Honest status of the traps
 
 The gates the runbook pokes (PP blocks cutting, UD overdraw block, BTB headroom, EXP
