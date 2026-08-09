@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { compareDecimalStrings } from '@/lib/quantity'
 import { CloseOutNote } from '@/components/fx/close-out-note'
 import { Card } from '@/components/fx/data'
+import { SavableCard } from '@/components/fx/save-card'
 import { EmptyState, LockedState } from '@/components/fx/feedback'
 import { Badge } from '@/components/fx/primitives'
 import { Eyebrow, SectionHeading } from '@/components/fx/signature'
@@ -58,7 +59,11 @@ export default async function MemoryPage() {
             const gaps = Object.entries(card.compiledSources ?? {}).filter(([, ok]) => !ok)
 
             return (
-              <Card key={card.outcomeId} padding={0}>
+              <SavableCard
+                key={card.outcomeId}
+                filename={`${card.poNumber ?? card.styleCode ?? 'order'}-outcome`}
+              >
+              <Card padding={0}>
                 <div
                   style={{
                     padding: '18px 22px 14px',
@@ -210,6 +215,7 @@ export default async function MemoryPage() {
                   </div>
                 )}
               </Card>
+              </SavableCard>
             )
           })}
         </div>

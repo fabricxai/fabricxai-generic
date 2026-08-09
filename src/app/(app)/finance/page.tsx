@@ -21,6 +21,8 @@ import {
 } from '@/modules/finance/queries'
 import { shipmentBoard } from '@/modules/shipment/queries'
 
+import { SavableCard } from '@/components/fx/save-card'
+
 import { RaiseInvoiceButton } from './raise-invoice'
 
 /**
@@ -395,8 +397,8 @@ export default async function FinancePage() {
             <SectionHeading eyebrow="worst first">What orders actually made</SectionHeading>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {orders.map((o) => (
+                <SavableCard key={o.orderId} filename={`${o.orderId.slice(0, 8)}-profitability`}>
                 <div
-                  key={o.orderId}
                   className="fx-selvage"
                   data-status={
                     o.actualMarginPct && o.quotedMarginPct
@@ -462,6 +464,7 @@ export default async function FinancePage() {
                     ) : null}
                   </div>
                 </div>
+                </SavableCard>
               ))}
             </div>
           </section>

@@ -7,6 +7,7 @@ import { Badge } from '@/components/fx/primitives'
 import { Eyebrow, SectionHeading } from '@/components/fx/signature'
 import { Ident } from '@/components/fx/format'
 import { ShipmentActions } from '@/components/fx/shipment-actions'
+import { SavableCard } from '@/components/fx/save-card'
 import { PageHeader } from '@/components/shell/page-shell'
 import { eq } from 'drizzle-orm'
 
@@ -128,7 +129,12 @@ export default async function ShipmentPage() {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             {rows.map((s) => (
-              <ShipmentCard key={s.id} shipment={s} />
+              <SavableCard
+                key={s.id}
+                filename={`${s.poNumber ?? s.id.slice(0, 8)}-shipment-${s.partialNo}`}
+              >
+                <ShipmentCard shipment={s} />
+              </SavableCard>
             ))}
           </div>
         )}
