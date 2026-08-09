@@ -12,7 +12,7 @@ import {
   advanceCap,
   closeCap,
   openCap,
-  recordAudit,
+  recordAuditWithFindings,
   recordTraining,
   upsertCertificate,
   type CompliancePolicy,
@@ -38,9 +38,9 @@ export async function logAudit(input: {
   // (live-test finding, Phase 9: the module had complete services and no doors at all).
   return surfaced(async () => {
     const ctx = await requireRole(await headers(), 'compliance')
-    const result = await recordAudit(ctx, input)
+    const result = await recordAuditWithFindings(ctx, input)
     refresh()
-    return result
+    return { auditId: result.auditId }
   })
 }
 

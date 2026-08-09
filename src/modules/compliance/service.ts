@@ -141,6 +141,48 @@ export async function recordAudit(ctx: RequestCtx, input: unknown): Promise<{ au
 }
 
 /**
+ * Record an audit AND its findings, as the desk types them (live-test finding, Phase 9).
+ *
+ * The action had always accepted a `findings` array and `recordAudit`'s zod silently
+ * stripped it — the success banner counted findings the server never kept, and the desk
+ * recorded audits that could never grow a CAP. One transaction: an audit that exists
+ * while its findings failed would be the same lie in a different order.
+ */
+export async function recordAuditWithFindings(
+  ctx: RequestCtx,
+  input: {
+    regime: string
+    auditor: string
+    auditedOn: string
+    findings: { description: string; severity: string; clause?: string }[]
+  },
+): Promise<{ auditId: string; findings: number }> {
+  const { auditId } = await recordAudit(ctx, {
+    regime: input.regime,
+    auditor: input.auditor,
+    auditedOn: input.auditedOn,
+  })
+
+  if (input.findings.length === 0) return { auditId, findings: 0 }
+
+  await withTenantTx(ctx, (tx) =>
+    commitFindingsBatch(ctx, tx, {
+      payload: {
+        auditId,
+        findings: input.findings.map((f) => ({
+          severity: f.severity,
+          // The schema has no clause column; the clause is part of what the auditor wrote.
+          text: f.clause?.trim() ? `${f.clause.trim()} — ${f.description}` : f.description,
+          evidence: [],
+        })),
+      },
+    }),
+  )
+
+  return { auditId, findings: input.findings.length }
+}
+
+/**
  * Commit an approved findings batch — the module's own write for its pending target.
  *
  * An audit is a parent and its findings are children, which core's generic single-row write
