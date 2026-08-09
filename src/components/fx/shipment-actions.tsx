@@ -6,6 +6,7 @@ import { useRef, useState, useTransition } from 'react'
 
 import { InlineAlert } from '@/components/fx/feedback'
 import { actionErrorMessage } from '@/lib/action-error'
+import { unwrap } from '@/lib/action-failure'
 import { uploadDocument } from '@/lib/upload-document'
 import { Badge, Button } from '@/components/fx/primitives'
 import {
@@ -101,10 +102,12 @@ export function ShipmentActions({ state }: { state: ShipmentActionState }) {
             disabled={pending}
             onClick={() =>
               run(async () => {
-                const r = await loadOrderCartons({
-                  shipmentId: state.shipmentId,
-                  orderId: state.orderId,
-                })
+                const r = unwrap(
+                  await loadOrderCartons({
+                    shipmentId: state.shipmentId,
+                    orderId: state.orderId,
+                  }),
+                )
                 return `${r.loaded} cartons loaded onto this shipment.`
               })
             }
@@ -119,10 +122,12 @@ export function ShipmentActions({ state }: { state: ShipmentActionState }) {
           disabled={pending || state.cartonCount === 0}
           onClick={() =>
             run(async () => {
-              const r = await regeneratePackingList({
-                orderId: state.orderId,
-                shipmentId: state.shipmentId,
-              })
+              const r = unwrap(
+                await regeneratePackingList({
+                  orderId: state.orderId,
+                  shipmentId: state.shipmentId,
+                }),
+              )
               return `Packing list v${r.version} generated from ${state.cartonCount} cartons.`
             })
           }
@@ -136,12 +141,14 @@ export function ShipmentActions({ state }: { state: ShipmentActionState }) {
             disabled={pending}
             onClick={() =>
               run(async () => {
-                const r = await lockPackingList({
-                  packingListId: state.packingList!.id!,
-                  // Mismatches against the breakdown are accepted deliberately, with the
-                  // record that says who did it — never silently on the way past.
-                  acceptMismatches: true,
-                })
+                const r = unwrap(
+                  await lockPackingList({
+                    packingListId: state.packingList!.id!,
+                    // Mismatches against the breakdown are accepted deliberately, with the
+                    // record that says who did it — never silently on the way past.
+                    acceptMismatches: true,
+                  }),
+                )
                 return `Packing list v${r.version} approved and locked.`
               })
             }
@@ -173,10 +180,12 @@ export function ShipmentActions({ state }: { state: ShipmentActionState }) {
               disabled={pending}
               onClick={() =>
                 run(async () => {
-                  const r = await confirmShipmentLeft({
-                    shipmentId: state.shipmentId,
-                    actualExFactory: leftOn,
-                  })
+                  const r = unwrap(
+                    await confirmShipmentLeft({
+                      shipmentId: state.shipmentId,
+                      actualExFactory: leftOn,
+                    }),
+                  )
                   return r.lateAgainstLc
                     ? 'Ex-factory confirmed — AFTER the LC latest-shipment date. The bank will raise this.'
                     : 'Ex-factory confirmed. The TNA milestone moves with it.'
@@ -203,7 +212,7 @@ export function ShipmentActions({ state }: { state: ShipmentActionState }) {
           disabled={pending || !exp.trim() || exp.trim() === state.expNumber}
           onClick={() =>
             run(async () => {
-              await recordExpNumber({ shipmentId: state.shipmentId, expNumber: exp.trim() })
+              unwrap(await recordExpNumber({ shipmentId: state.shipmentId, expNumber: exp.trim() }))
               return `EXP ${exp.trim()} recorded.`
             })
           }
@@ -234,7 +243,7 @@ export function ShipmentActions({ state }: { state: ShipmentActionState }) {
           disabled={pending}
           onClick={() =>
             run(async () => {
-              const r = await buildShipmentDocChecklist({ shipmentId: state.shipmentId })
+              const r = unwrap(await buildShipmentDocChecklist({ shipmentId: state.shipmentId }))
               return r.kinds.length === 0
                 ? 'The LC lists no required documents, so there is nothing to check off.'
                 : `Checklist built from the LC — ${r.kinds.join(', ')}.`
@@ -249,7 +258,7 @@ export function ShipmentActions({ state }: { state: ShipmentActionState }) {
           disabled={pending}
           onClick={() =>
             run(async () => {
-              const r = await sendDocsToBank({ shipmentId: state.shipmentId })
+              const r = unwrap(await sendDocsToBank({ shipmentId: state.shipmentId }))
               return `Sent to the bank under EXP ${r.expNumber} — ${r.submitted.join(', ')}.`
             })
           }
@@ -286,10 +295,12 @@ export function ShipmentActions({ state }: { state: ShipmentActionState }) {
             disabled={pending || reason.trim().length < 10}
             onClick={() =>
               run(async () => {
-                await requestToleranceException({
-                  shipmentId: state.shipmentId,
-                  reason: reason.trim(),
-                })
+                unwrap(
+                  await requestToleranceException({
+                    shipmentId: state.shipmentId,
+                    reason: reason.trim(),
+                  }),
+                )
                 setShowException(false)
                 setReason('')
                 return 'The exception is in the approve inbox. Nothing is accepted until a manager signs it.'
@@ -319,10 +330,12 @@ export function ShipmentActions({ state }: { state: ShipmentActionState }) {
             disabled={pending || lcReason.trim().length < 10}
             onClick={() =>
               run(async () => {
-                await acceptLcDateBreach({
-                  shipmentId: state.shipmentId,
-                  reason: lcReason.trim(),
-                })
+                unwrap(
+                  await acceptLcDateBreach({
+                    shipmentId: state.shipmentId,
+                    reason: lcReason.trim(),
+                  }),
+                )
                 setShowLcWaiver(false)
                 setLcReason('')
                 // Said plainly: this does not make the shipment compliant, it records who
@@ -398,7 +411,9 @@ function DocRow({
     setUploading(true)
     try {
       const uploaded = await uploadDocument(file, { kind: doc.kind, moduleId: 'shipment' })
-      await markShipmentDoc({ shipmentId, kind: doc.kind, status: 'ready', documentId: uploaded.documentId })
+      unwrap(
+        await markShipmentDoc({ shipmentId, kind: doc.kind, status: 'ready', documentId: uploaded.documentId }),
+      )
       onDone(`${label} attached and marked ready.`)
     } catch (error) {
       onFailure(actionErrorMessage(error, `${label} was not attached.`))
@@ -465,7 +480,10 @@ function DocRow({
           <button
             onClick={() =>
               void markShipmentDoc({ shipmentId, kind: doc.kind, status: 'pending' })
-                .then(() => onDone(`${label} back to pending — the file is kept.`))
+                .then((r) => {
+                  unwrap(r)
+                  onDone(`${label} back to pending — the file is kept.`)
+                })
                 .catch((error: unknown) =>
                   onFailure(actionErrorMessage(error, `${label} was not changed.`)),
                 )

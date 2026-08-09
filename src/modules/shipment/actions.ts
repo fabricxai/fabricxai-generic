@@ -37,9 +37,12 @@ export async function openShipment(input: {
   forwarder?: string
   mode?: 'sea' | 'air'
 }): Promise<{ shipmentId: string } | ActionFailure> {
-  const ctx = await requireRole(await headers(), 'shipment', 'commercial', 'merchandiser')
-  // Refusals as values (lib/action-failure) — a duplicate partial number is a sentence.
+  // Refusals as values (lib/action-failure) — a duplicate partial number is a sentence,
+  // and so is a role refusal: requireRole sits INSIDE surfaced throughout this file
+  // because production masks anything an action throws (live-test finding, Phase 7 —
+  // three React #441s on this screen: two masked 403s and the final-inspection gate).
   return surfaced(async () => {
+    const ctx = await requireRole(await headers(), 'shipment', 'commercial', 'merchandiser')
     const result = await createShipment(ctx, input)
     refresh()
     return result
@@ -57,10 +60,12 @@ export async function openShipment(input: {
 export async function recordExpNumber(input: {
   shipmentId: string
   expNumber: string
-}): Promise<void> {
-  const ctx = await requireRole(await headers(), 'shipment', 'commercial')
-  await setExpNumber(ctx, input)
-  refresh()
+}): Promise<void | ActionFailure> {
+  return surfaced(async () => {
+    const ctx = await requireRole(await headers(), 'shipment', 'commercial')
+    await setExpNumber(ctx, input)
+    refresh()
+  })
 }
 
 /**
@@ -74,12 +79,14 @@ export async function recordExpNumber(input: {
 export async function confirmShipmentLeft(input: {
   shipmentId: string
   actualExFactory: string
-}): Promise<{ lateAgainstLc: boolean }> {
-  const ctx = await requireRole(await headers(), 'shipment', 'commercial')
-  const policy = await getPolicy<ShipmentPolicy>(ctx, 'shipment')
-  const result = await confirmExFactory(ctx, input, policy)
-  refresh()
-  return { lateAgainstLc: Boolean((result as { lateAgainstLc?: boolean }).lateAgainstLc) }
+}): Promise<{ lateAgainstLc: boolean } | ActionFailure> {
+  return surfaced(async () => {
+    const ctx = await requireRole(await headers(), 'shipment', 'commercial')
+    const policy = await getPolicy<ShipmentPolicy>(ctx, 'shipment')
+    const result = await confirmExFactory(ctx, input, policy)
+    refresh()
+    return { lateAgainstLc: Boolean((result as { lateAgainstLc?: boolean }).lateAgainstLc) }
+  })
 }
 
 /**
@@ -92,11 +99,13 @@ export async function confirmShipmentLeft(input: {
 export async function regeneratePackingList(input: {
   orderId: string
   shipmentId?: string
-}): Promise<{ packingListId: string; version: number }> {
-  const ctx = await requireRole(await headers(), 'shipment')
-  const result = await generatePackingList(ctx, input)
-  refresh()
-  return { packingListId: result.packingListId, version: result.version }
+}): Promise<{ packingListId: string; version: number } | ActionFailure> {
+  return surfaced(async () => {
+    const ctx = await requireRole(await headers(), 'shipment')
+    const result = await generatePackingList(ctx, input)
+    refresh()
+    return { packingListId: result.packingListId, version: result.version }
+  })
 }
 
 /**
@@ -109,11 +118,13 @@ export async function regeneratePackingList(input: {
 export async function lockPackingList(input: {
   packingListId: string
   acceptMismatches?: boolean
-}): Promise<{ version: number }> {
-  const ctx = await requireRole(await headers(), 'shipment')
-  const result = await approvePackingList(ctx, input)
-  refresh()
-  return { version: result.version }
+}): Promise<{ version: number } | ActionFailure> {
+  return surfaced(async () => {
+    const ctx = await requireRole(await headers(), 'shipment')
+    const result = await approvePackingList(ctx, input)
+    refresh()
+    return { version: result.version }
+  })
 }
 
 /**
@@ -125,12 +136,14 @@ export async function lockPackingList(input: {
  */
 export async function sendDocsToBank(input: {
   shipmentId: string
-}): Promise<{ submitted: string[]; expNumber: string }> {
-  const ctx = await requireRole(await headers(), 'commercial')
-  const result = await handoffDocsToBank(ctx, input)
-  refresh()
-  revalidatePath('/lcs/submissions')
-  return { submitted: result.submitted, expNumber: result.expNumber }
+}): Promise<{ submitted: string[]; expNumber: string } | ActionFailure> {
+  return surfaced(async () => {
+    const ctx = await requireRole(await headers(), 'commercial')
+    const result = await handoffDocsToBank(ctx, input)
+    refresh()
+    revalidatePath('/lcs/submissions')
+    return { submitted: result.submitted, expNumber: result.expNumber }
+  })
 }
 
 /**
@@ -142,12 +155,14 @@ export async function sendDocsToBank(input: {
 export async function requestToleranceException(input: {
   shipmentId: string
   reason: string
-}): Promise<{ pendingChangeId: string }> {
-  const ctx = await requireRole(await headers(), 'commercial', 'merchandiser')
-  const result = await proposeToleranceOverride(ctx, input)
-  revalidatePath('/approve')
-  refresh()
-  return result
+}): Promise<{ pendingChangeId: string } | ActionFailure> {
+  return surfaced(async () => {
+    const ctx = await requireRole(await headers(), 'commercial', 'merchandiser')
+    const result = await proposeToleranceOverride(ctx, input)
+    revalidatePath('/approve')
+    refresh()
+    return result
+  })
 }
 
 /**
@@ -160,11 +175,13 @@ export async function requestToleranceException(input: {
 export async function acceptLcDateBreach(input: {
   shipmentId: string
   reason: string
-}): Promise<{ shipmentId: string; waivedBy: string }> {
-  const ctx = await requireRole(await headers(), 'commercial')
-  const result = await waiveLcDate(ctx, input)
-  refresh()
-  return result
+}): Promise<{ shipmentId: string; waivedBy: string } | ActionFailure> {
+  return surfaced(async () => {
+    const ctx = await requireRole(await headers(), 'commercial')
+    const result = await waiveLcDate(ctx, input)
+    refresh()
+    return result
+  })
 }
 
 /**
@@ -179,20 +196,22 @@ export async function acceptLcDateBreach(input: {
 export async function loadOrderCartons(input: {
   shipmentId: string
   orderId: string
-}): Promise<{ loaded: number }> {
-  const ctx = await requireRole(await headers(), 'shipment', 'commercial', 'merchandiser')
+}): Promise<{ loaded: number } | ActionFailure> {
+  return surfaced(async () => {
+    const ctx = await requireRole(await headers(), 'shipment', 'commercial', 'merchandiser')
 
-  const unassigned = await unassignedCartons(ctx, { orderId: input.orderId })
+    const unassigned = await unassignedCartons(ctx, { orderId: input.orderId })
 
-  if (unassigned.length === 0) return { loaded: 0 }
+    if (unassigned.length === 0) return { loaded: 0 }
 
-  const result = await loadCartons(ctx, {
-    shipmentId: input.shipmentId,
-    cartonIds: unassigned.map((c) => c.id),
+    const result = await loadCartons(ctx, {
+      shipmentId: input.shipmentId,
+      cartonIds: unassigned.map((c) => c.id),
+    })
+
+    refresh()
+    return result
   })
-
-  refresh()
-  return result
 }
 
 /**
@@ -204,11 +223,13 @@ export async function loadOrderCartons(input: {
  */
 export async function buildShipmentDocChecklist(input: {
   shipmentId: string
-}): Promise<{ kinds: string[] }> {
-  const ctx = await requireRole(await headers(), 'shipment', 'commercial')
-  const result = await buildDocChecklist(ctx, input)
-  refresh()
-  return result
+}): Promise<{ kinds: string[] } | ActionFailure> {
+  return surfaced(async () => {
+    const ctx = await requireRole(await headers(), 'shipment', 'commercial')
+    const result = await buildDocChecklist(ctx, input)
+    refresh()
+    return result
+  })
 }
 
 /**
@@ -232,8 +253,10 @@ export async function markShipmentDoc(input: {
    * presentation was unreachable through the UI.
    */
   documentId?: string
-}): Promise<void> {
-  const ctx = await requireRole(await headers(), 'shipment', 'commercial')
-  await setDocStatus(ctx, input)
-  refresh()
+}): Promise<void | ActionFailure> {
+  return surfaced(async () => {
+    const ctx = await requireRole(await headers(), 'shipment', 'commercial')
+    await setDocStatus(ctx, input)
+    refresh()
+  })
 }
