@@ -592,7 +592,10 @@ export interface AccrualResult {
  * look better, which is the wrong direction to be wrong in.
  */
 export async function accrueOrderCosts(
-  ctx: RequestCtx,
+  // AnyCtx: the order-closed consumer accrues as a system actor — which is the module's
+  // own philosophy made literal: nothing may HAND this module a cost figure, so the caller
+  // with no hands is the right caller.
+  ctx: AnyCtx,
   input: { orderId: string; pieces: number; currency: string },
   policy: FinancePolicy,
 ): Promise<AccrualResult> {
@@ -752,7 +755,8 @@ export interface PnlResult {
  * variance between two figures computed on different bases is made entirely of arithmetic.
  */
 export async function orderPnl(
-  ctx: RequestCtx,
+  // AnyCtx for the same reason as `accrueOrderCosts` — the close consumer freezes the row.
+  ctx: AnyCtx,
   input: { orderId: string; styleCode: string },
   policy: FinancePolicy,
 ): Promise<PnlResult> {

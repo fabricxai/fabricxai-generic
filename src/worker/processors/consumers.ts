@@ -378,6 +378,58 @@ async function onOrderStatusChanged(ctx: SystemCtx, payload: Record<string, unkn
   if (payload.to !== 'closed') return
 
   const orderId = String(payload.orderId)
+
+  /*
+   * Freeze the money BEFORE the outcome that reads it (live-test finding, Phase 8):
+   * `accrueOrderCosts` and `orderPnl` had no production caller at all, so
+   * `order_profitability` stayed empty forever and the outcome card's margin had nothing
+   * behind it. Accrual needs shipped pieces to divide by and a style with an approved
+   * cost sheet to compare against — an order closed without either is a legitimate close
+   * whose waterfall simply cannot exist, so those two skip with a log rather than
+   * poisoning the queue; the outcome is still compiled either way.
+   */
+  const { cartons } = await import('@/modules/shipment/schema')
+  const { orderStyles } = await import('@/modules/orders/schema')
+
+  const { pieces, styleCode } = await withTenantRead(ctx, async (tx) => {
+    const packed = await tx
+      .select({ totalQty: cartons.totalQty })
+      .from(cartons)
+      .where(eq(cartons.orderId, orderId))
+    const [style] = await tx
+      .select({ styleCode: orderStyles.styleCode })
+      .from(orderStyles)
+      .where(eq(orderStyles.orderId, orderId))
+    return {
+      pieces: packed.reduce((sum, c) => sum + c.totalQty, 0),
+      styleCode: style?.styleCode ?? null,
+    }
+  })
+
+  if (pieces > 0 && styleCode) {
+    try {
+      const { accrueOrderCosts, orderPnl } = await import('@/modules/finance/service')
+      const policy = await getPolicy<import('@/modules/finance/service').FinancePolicy>(
+        ctx,
+        'finance',
+      )
+      await accrueOrderCosts(ctx, { orderId, pieces, currency: 'USD' }, policy)
+      await orderPnl(ctx, { orderId, styleCode }, policy)
+    } catch (error) {
+      if (!isAppError(error)) throw error
+      // No approved sheet, no margin basis, nothing issued — refusals, not failures.
+      console.warn(
+        `[consumer] order ${orderId} closed without a profitability row: ${error.messageKey}`,
+      )
+    }
+  } else {
+    console.warn(
+      `[consumer] order ${orderId} closed with ${pieces} packed pieces and ${
+        styleCode ? 'a style' : 'no style'
+      } — no per-piece accrual possible`,
+    )
+  }
+
   const { compileOutcome } = await import('@/modules/memory/service')
   await compileOutcome(ctx, { orderId })
 }
