@@ -11,10 +11,12 @@ import { canWrite, NAV } from '@/components/shell/nav'
 import { getCtx } from '@/modules/core/session'
 import { companyProfile } from '@/modules/settings/service'
 import { orderDetail, tnaTemplateChoices } from '@/modules/orders/queries'
+import { orderStatusMachine, type OrderStatus } from '@/modules/orders/service'
 import { orderRunRate } from '@/modules/production/queries'
 import { factoryToday, FACTORY_TIMEZONE } from '@/lib/dates'
 
 import { OrderBreakdown } from './breakdown-client'
+import { OrderStatusControl } from './status-control'
 import { OrderTna } from './tna-client'
 
 /**
@@ -105,7 +107,15 @@ export default async function OrderDetailPage({
               </span>
             </FactPair>
             <FactPair label="Status">
-              <Badge tone={late > 0 ? 'danger' : 'neutral'}>{order.status}</Badge>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <Badge tone={late > 0 ? 'danger' : 'neutral'}>{order.status}</Badge>
+                {mayWrite ? (
+                  <OrderStatusControl
+                    orderId={order.id}
+                    nextStatuses={orderStatusMachine.next(order.status as OrderStatus)}
+                  />
+                ) : null}
+              </span>
             </FactPair>
           </div>
         </Card>

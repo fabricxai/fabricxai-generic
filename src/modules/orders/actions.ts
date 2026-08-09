@@ -268,10 +268,14 @@ export async function generateOrderTna(input: {
 export async function setOrderStatus(input: {
   orderId: string
   status: OrderStatus
-}): Promise<{ from: OrderStatus; to: OrderStatus }> {
-  const ctx = await requireRole(await headers(), ...WRITERS)
-  const result = await setOrderStatusIn(ctx, input)
+}): Promise<{ from: OrderStatus; to: OrderStatus } | ActionFailure> {
+  // Surfaced because an illegal transition is a sentence the person needs (rule 5's typed
+  // 409), and production masks anything an action throws (live-test finding, Phase 8).
+  return surfaced(async () => {
+    const ctx = await requireRole(await headers(), ...WRITERS)
+    const result = await setOrderStatusIn(ctx, input)
 
-  refresh(input.orderId)
-  return result
+    refresh(input.orderId)
+    return result
+  })
 }
