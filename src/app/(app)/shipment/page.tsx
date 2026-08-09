@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 
@@ -79,6 +80,28 @@ export default async function ShipmentPage() {
         ownsAmber
         actions={<NewShipmentButton orders={shippableOrders} />}
       />
+
+      {/* The packing floor is this module's second screen, and the sidebar carries one
+          entry per module — without this link the screen was reachable only by typing
+          the URL (live-test finding, Phase 7). */}
+      <nav style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <Link
+          href="/shipment/packing"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            minHeight: 44,
+            padding: '10px 14px',
+            borderRadius: 'var(--fx-radius-md)',
+            border: '1px solid var(--fx-border-default)',
+            font: "500 13px/1 var(--fx-font-sans)",
+            color: 'var(--fx-text-secondary)',
+            textDecoration: 'none',
+          }}
+        >
+          Packing floor
+        </Link>
+      </nav>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 30 }}>
         {noExp.length > 0 ? (
