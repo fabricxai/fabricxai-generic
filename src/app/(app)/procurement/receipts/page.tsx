@@ -59,6 +59,7 @@ export default async function ReceiptsPage() {
       </div>
 
       <PageHeader
+        back={{ href: '/procurement', label: 'Procurement' }}
         eyebrow="Procurement · goods in"
         title={
           lines.length === 0

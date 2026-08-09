@@ -62,6 +62,7 @@ export default async function StoreIssuePage() {
     return (
       <FloorScreen>
         <PageHeader
+        back={{ href: '/store', label: 'Store' }}
           eyebrow={tui(locale, 'ui.store.issue_eyebrow')}
           title={tui(locale, 'ui.store.issue_title_empty')}
           ownsAmber
@@ -102,6 +103,7 @@ export default async function StoreIssuePage() {
   return (
     <FloorScreen>
       <PageHeader
+        back={{ href: '/store', label: 'Store' }}
         eyebrow={tui(locale, 'ui.store.issue_eyebrow')}
         title={tui(
           locale,

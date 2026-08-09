@@ -66,6 +66,7 @@ export default async function PmPage() {
       </div>
 
       <PageHeader
+        back={{ href: '/maintenance', label: 'Maintenance' }}
         eyebrow="Maintenance · preventive"
         title={
           due.length === 0

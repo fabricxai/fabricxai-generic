@@ -78,6 +78,7 @@ export default async function WastagePage() {
     return (
       <FloorScreen>
         <PageHeader
+        back={{ href: '/cutting', label: 'Cutting' }}
           eyebrow={tui(locale, 'ui.cutting.wastage_eyebrow')}
           title={tui(locale, 'ui.cutting.wastage_nothing_title')}
           ownsAmber
@@ -93,6 +94,7 @@ export default async function WastagePage() {
   return (
     <FloorScreen>
       <PageHeader
+        back={{ href: '/cutting', label: 'Cutting' }}
         eyebrow={tui(locale, 'ui.cutting.wastage_eyebrow')}
         title={tui(locale, 'ui.cutting.wastage_title')}
         meta={

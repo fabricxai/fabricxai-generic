@@ -43,6 +43,7 @@ export default async function StartLayPage({
     return (
       <FloorScreen>
         <PageHeader
+        back={{ href: '/cutting', label: 'Cutting' }}
           eyebrow={tui(locale, 'ui.cutting.lay_eyebrow')}
           title={tui(locale, 'ui.cutting.lay_nothing_title')}
           ownsAmber
@@ -79,6 +80,7 @@ export default async function StartLayPage({
   return (
     <FloorScreen>
       <PageHeader
+        back={{ href: '/cutting', label: 'Cutting' }}
         eyebrow={tui(locale, 'ui.cutting.lay_eyebrow')}
         title={`${target.poNumber ?? tui(locale, 'ui.cutting.order_fallback')} · ${target.styleCode}`}
         meta={gate.passed ? undefined : tui(locale, 'ui.cutting.meta_blocked')}

@@ -72,6 +72,7 @@ export default async function SampleLibraryPage({
       </div>
 
       <PageHeader
+        back={{ href: '/sampling', label: 'Sampling' }}
         eyebrow="Sampling · library"
         title={
           searched

@@ -42,6 +42,7 @@ export default async function CutReportPage({
     return (
       <FloorScreen>
         <PageHeader
+        back={{ href: '/cutting', label: 'Cutting' }}
           eyebrow={tui(locale, 'ui.cutting.report_eyebrow')}
           title={tui(locale, 'ui.cutting.report_nothing_title')}
           ownsAmber
@@ -67,6 +68,7 @@ export default async function CutReportPage({
   return (
     <FloorScreen>
       <PageHeader
+        back={{ href: '/cutting', label: 'Cutting' }}
         eyebrow={tui(locale, 'ui.cutting.report_eyebrow')}
         title={`${lay.layNo} · ${lay.color}`}
         meta={tui(locale, 'ui.cutting.report_meta', {

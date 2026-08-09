@@ -50,6 +50,7 @@ export default async function MachinesPage() {
       </div>
 
       <PageHeader
+        back={{ href: '/maintenance', label: 'Maintenance' }}
         eyebrow="Maintenance · machine registry"
         title={
           machines.length === 0

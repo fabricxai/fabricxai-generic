@@ -36,6 +36,7 @@ export default async function StoreRollsPage({
     return (
       <FloorScreen>
         <PageHeader
+        back={{ href: '/store', label: 'Store' }}
           eyebrow={tui(locale, 'ui.store.rolls_eyebrow')}
           title={tui(locale, 'ui.store.nothing_in_stock')}
           ownsAmber
@@ -55,6 +56,7 @@ export default async function StoreRollsPage({
   return (
     <FloorScreen>
       <PageHeader
+        back={{ href: '/store', label: 'Store' }}
         eyebrow={tui(locale, 'ui.store.rolls_eyebrow')}
         title={selected.name}
         meta={tui(

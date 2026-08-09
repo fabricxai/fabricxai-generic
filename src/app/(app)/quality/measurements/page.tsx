@@ -41,6 +41,7 @@ export default async function MeasurementsPage() {
     return (
       <FloorScreen>
         <PageHeader
+        back={{ href: '/quality', label: 'Quality' }}
           eyebrow={tui(locale, 'ui.quality.measure_eyebrow')}
           title={tui(locale, 'ui.quality.measure_empty_page_title')}
           ownsAmber
@@ -58,6 +59,7 @@ export default async function MeasurementsPage() {
   return (
     <FloorScreen>
       <PageHeader
+        back={{ href: '/quality', label: 'Quality' }}
         eyebrow={tui(locale, 'ui.quality.measure_eyebrow_full')}
         title={tui(locale, 'ui.quality.charts_meta', {
           measured: subjects.length - withoutChart.length,

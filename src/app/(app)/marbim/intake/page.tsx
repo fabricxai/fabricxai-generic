@@ -83,6 +83,7 @@ export default async function IntakePage() {
       </div>
 
       <PageHeader
+        back={{ href: '/marbim', label: 'MARBIM' }}
         eyebrow="MARBIM · document intake"
         title="Give MARBIM something to read"
         meta={`${INTAKE_KINDS.length} kinds it knows how to file`}

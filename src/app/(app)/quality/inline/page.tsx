@@ -56,6 +56,7 @@ export default async function InlineQcPage({
     return (
       <FloorScreen>
         <PageHeader
+        back={{ href: '/quality', label: 'Quality' }}
           eyebrow={tui(locale, 'ui.quality.inline_eyebrow')}
           title={tui(locale, 'ui.quality.no_lines_set_up')}
           ownsAmber
@@ -89,6 +90,7 @@ export default async function InlineQcPage({
   return (
     <FloorScreen>
       <PageHeader
+        back={{ href: '/quality', label: 'Quality' }}
         eyebrow={tui(locale, 'ui.quality.inline_eyebrow_dated', { date: today })}
         title={`${active.code} · ${active.name}`}
         meta={threshold ? tui(locale, 'ui.quality.target_dhu_meta', { threshold }) : undefined}

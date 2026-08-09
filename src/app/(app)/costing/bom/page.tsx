@@ -55,6 +55,7 @@ export default async function BomPage() {
       </div>
 
       <PageHeader
+        back={{ href: '/costing', label: 'Costing studio' }}
         eyebrow="Costing · bill of materials"
         title={
           boms.length === 0

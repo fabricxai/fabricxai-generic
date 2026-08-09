@@ -47,6 +47,7 @@ export default async function FabricInspectionPage() {
     return (
       <FloorScreen>
         <PageHeader
+        back={{ href: '/quality', label: 'Quality' }}
           eyebrow={tui(locale, 'ui.quality.fabric_eyebrow')}
           title={tui(locale, 'ui.quality.fabric_empty_page_title')}
           ownsAmber
@@ -62,6 +63,7 @@ export default async function FabricInspectionPage() {
   return (
     <FloorScreen>
       <PageHeader
+        back={{ href: '/quality', label: 'Quality' }}
         eyebrow={tui(locale, 'ui.quality.fabric_eyebrow_full')}
         title={
           awaiting.length > 0

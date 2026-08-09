@@ -103,6 +103,7 @@ export default async function HourlyPage() {
     return (
       <FloorScreen>
         <PageHeader
+        back={{ href: '/lines', label: 'Line tracking' }}
           eyebrow={tui(locale, 'ui.production.hourly_eyebrow')}
           title={tui(locale, 'ui.production.no_lines_title')}
           ownsAmber
@@ -130,6 +131,7 @@ export default async function HourlyPage() {
   return (
     <FloorScreen>
       <PageHeader
+        back={{ href: '/lines', label: 'Line tracking' }}
         eyebrow={tui(locale, 'ui.production.hourly_eyebrow_dated', { date: today })}
         title={tui(locale, 'ui.production.hour_title', { hour: currentHour })}
         meta={

@@ -93,6 +93,7 @@ export default async function ScorecardPage({
       </div>
 
       <PageHeader
+        back={{ href: '/procurement', label: 'Procurement' }}
         eyebrow="Procurement · supplier scorecard"
         title={`How suppliers performed in ${monthName(period)}`}
         meta={`${scored.length} of ${rows.length} with a record`}

@@ -57,6 +57,7 @@ export default async function StoreReceivePage() {
   return (
     <FloorScreen>
       <PageHeader
+        back={{ href: '/store', label: 'Store' }}
         eyebrow={tui(locale, 'ui.store.receive_eyebrow')}
         title={tui(locale, 'ui.store.receive_title')}
         meta={tui(locale, 'ui.store.receive_meta')}

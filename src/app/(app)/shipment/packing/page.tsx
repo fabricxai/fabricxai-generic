@@ -96,6 +96,7 @@ export default async function PackingPage({
   return (
     <FloorScreen>
       <PageHeader
+        back={{ href: '/shipment', label: 'Shipment' }}
         eyebrow="Shipment · finishing and packing"
         title={active.poNumbers?.[0] ?? active.styleCode ?? 'Order'}
         meta={overPacked > 0 ? `${overPacked} cells packed beyond finished` : undefined}

@@ -63,6 +63,7 @@ export default async function FinalInspectionPage() {
     return (
       <FloorScreen>
         <PageHeader
+        back={{ href: '/quality', label: 'Quality' }}
           eyebrow={tui(locale, 'ui.quality.final_eyebrow')}
           title={tui(locale, 'ui.quality.final_empty_page_title')}
           ownsAmber
@@ -80,6 +81,7 @@ export default async function FinalInspectionPage() {
   return (
     <FloorScreen>
       <PageHeader
+        back={{ href: '/quality', label: 'Quality' }}
         eyebrow={tui(locale, 'ui.quality.final_eyebrow_full', { standard: policy.aqlStandard })}
         title={tui(
           locale,
