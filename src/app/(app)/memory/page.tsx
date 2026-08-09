@@ -1,4 +1,5 @@
 import { headers } from 'next/headers'
+import { formatFactoryDate } from '@/lib/dates'
 import { redirect } from 'next/navigation'
 
 import { compareDecimalStrings } from '@/lib/quantity'
@@ -88,7 +89,7 @@ export default async function MemoryPage() {
                     }}
                   >
                     {card.piecesProduced.toLocaleString()} pcs · compiled{' '}
-                    {card.compiledAt.toISOString().slice(0, 10)}
+                    {formatFactoryDate(card.compiledAt)}
                   </span>
                 </div>
 

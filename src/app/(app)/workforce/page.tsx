@@ -1,4 +1,4 @@
-import { factoryMonth } from '@/lib/dates'
+import { factoryMonth, formatFactoryDate} from '@/lib/dates'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 
@@ -306,7 +306,7 @@ export default async function WorkforcePage() {
                           {r.disbursedAt
                             ? `disbursed ${r.disbursedAt.toISOString().slice(0, 10)}`
                             : r.approvedAt
-                              ? `approved ${r.approvedAt.toISOString().slice(0, 10)}`
+                              ? `approved ${formatFactoryDate(r.approvedAt)}`
                               : 'not yet approved'}
                         </span>
                       </div>

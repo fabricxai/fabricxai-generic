@@ -24,7 +24,13 @@ export function Modal({
   title,
   children,
   footer,
-  width = 440,
+  /*
+   * 640, up from 440 (live-test feedback, Phase 9): at 440 any modal with a row of
+   * fields — a finding's severity/clause/description, a gazette's six grade columns —
+   * clipped its own inputs to placeholder-width slivers. Wide enough to seat a form row,
+   * still capped by the viewport on a phone.
+   */
+  width = 640,
 }: {
   open: boolean
   onClose: () => void
@@ -73,7 +79,9 @@ export function Modal({
           boxShadow: 'var(--fx-sh3)',
           padding: 32,
           width,
-          maxWidth: '100%',
+          maxWidth: 'min(100%, 94vw)',
+          maxHeight: '90vh',
+          overflowY: 'auto',
           display: 'flex',
           flexDirection: 'column',
           gap: 16,

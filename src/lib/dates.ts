@@ -125,3 +125,33 @@ export function daysBetween(from: string, to: string): number {
 export function factoryMonth(timeZone: string = FACTORY_TIMEZONE, now: Date = new Date()): string {
   return factoryToday(timeZone, now).slice(0, 7)
 }
+
+/**
+ * A date as Bangladesh reads it: dd/mm/yyyy (live-test feedback, Phase 9).
+ *
+ * Takes either a calendar date string ('2026-11-15' — reformatted directly, no timezone
+ * arithmetic, because a calendar date has no instant) or a timestamp (formatted in the
+ * FACTORY's day, which is also what fixes the class of bug where an approval made after
+ * 6 pm UTC displayed as yesterday). Displays only — storage and APIs stay ISO.
+ */
+export function formatFactoryDate(
+  value: string | Date | null | undefined,
+  timeZone: string = FACTORY_TIMEZONE,
+): string {
+  if (value === null || value === undefined || value === '') return '—'
+
+  if (typeof value === 'string') {
+    const m = value.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+    if (m) return `${m[3]}/${m[2]}/${m[1]}`
+    const parsed = new Date(value)
+    if (Number.isNaN(parsed.getTime())) return value
+    value = parsed
+  }
+
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone,
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(value)
+}

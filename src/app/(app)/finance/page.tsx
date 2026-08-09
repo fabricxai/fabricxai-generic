@@ -1,4 +1,5 @@
 import { headers } from 'next/headers'
+import { formatFactoryDate } from '@/lib/dates'
 import { redirect } from 'next/navigation'
 
 import { money, subtract } from '@/lib/money'
@@ -520,7 +521,7 @@ function ReceivableRowView({ row }: { row: ReceivableRow }) {
           {row.expectedAt
             ? late
               ? `${Math.abs(row.daysToExpected!)} d overdue`
-              : `expected ${row.expectedAt}`
+              : `expected ${formatFactoryDate(row.expectedAt)}`
             : 'no expected date'}
         </span>
 
