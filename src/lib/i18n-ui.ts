@@ -564,6 +564,9 @@ export const UI_MESSAGES: Catalogue = {
     'ui.store.field_item': 'Item',
     'ui.store.field_into': 'Into',
     'ui.store.field_qty_on_challan': 'Quantity on the challan ({unit})',
+    'ui.store.field_unit_price': 'Unit price on the challan (optional)',
+    'ui.store.unit_price_hint':
+      'What finance accrues actual material costs from. Left blank, this order’s cost report will not see these goods.',
     'ui.store.location_bonded_suffix': ' (bonded)',
     'ui.store.bonded_warning':
       '{code} is a bonded location. Duty-free cloth must be received against a Utilization Declaration — pick it below; raising a new one belongs to the commercial desk.',
@@ -1712,6 +1715,9 @@ export const UI_MESSAGES: Catalogue = {
     'ui.store.field_item': 'আইটেম',
     'ui.store.field_into': 'কোথায় রাখা হবে',
     'ui.store.field_qty_on_challan': 'চালানে লেখা পরিমাণ ({unit})',
+    'ui.store.field_unit_price': 'চালানে লেখা একক দাম (ঐচ্ছিক)',
+    'ui.store.unit_price_hint':
+      'ফাইন্যান্স এখান থেকেই প্রকৃত কাপড়ের খরচ হিসাব করে। খালি রাখলে এই মালামাল অর্ডারের খরচ রিপোর্টে দেখা যাবে না।',
     'ui.store.location_bonded_suffix': ' (বন্ড)',
     'ui.store.bonded_warning':
       '{code} একটি বন্ডেড জায়গা। শুল্কমুক্ত কাপড় UD ছাড়া নেওয়া যাবে না — নিচে থেকে UD বাছুন; নতুন UD করা কমার্শিয়াল ডেস্কের কাজ।',

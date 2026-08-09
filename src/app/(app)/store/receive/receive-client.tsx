@@ -90,6 +90,16 @@ export function ReceiveClient({
   const [locationId, setLocationId] = useState(locations[0]?.id ?? '')
   const [udId, setUdId] = useState('')
   const [qty, setQty] = useState('')
+  /*
+   * The price on the challan line (live-test finding, Phase 8). The zod has accepted an
+   * optional `unitPrice` since 3.1 and this screen never offered the field — so no GRN
+   * received through the product carried a price, and finance's actual-cost accrual,
+   * which reads GRN line prices and refuses to invent what nobody recorded, accrued
+   * zero for every order. Optional here too: a storekeeper without the price should
+   * still receive the goods, but the blank now costs a decision instead of existing
+   * invisibly.
+   */
+  const [unitPrice, setUnitPrice] = useState('')
   const [rolls, setRolls] = useState<RollDraft[]>([])
   const [received, setReceived] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -199,6 +209,7 @@ export function ReceiveClient({
             itemId: item.id,
             qty: lineQty.value,
             unit: item.uom,
+            ...(unitPrice.trim() ? { unitPrice: unitPrice.trim() } : {}),
             rolls: rolls.map((roll) => ({
               rollNo: roll.rollNo.trim(),
               qty: quantity(decimalOrZero(roll.qty), unit).value,
@@ -215,6 +226,7 @@ export function ReceiveClient({
     setReceived((done) => [...done, `${challanNo.trim()} · ${rolls.length} rolls · ${item.code}`])
     setChallanNo('')
     setQty('')
+    setUnitPrice('')
     setRolls([])
     setChallanPhoto(null)
     setPhotoState('idle')
@@ -393,6 +405,19 @@ export function ReceiveClient({
             placeholder="21000.00"
             style={{ ...field, font: "400 14px/1.4 var(--fx-font-mono)" }}
           />
+        </label>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <span style={label}>{t('ui.store.field_unit_price')}</span>
+          <input
+            inputMode="decimal"
+            value={unitPrice}
+            onChange={(e) => setUnitPrice(e.target.value)}
+            placeholder="4.20"
+            style={{ ...field, font: "400 14px/1.4 var(--fx-font-mono)" }}
+          />
+          <span style={{ font: "400 12px/1.5 var(--fx-font-sans)", color: 'var(--fx-text-tertiary)' }}>
+            {t('ui.store.unit_price_hint')}
+          </span>
         </label>
       </div>
 
