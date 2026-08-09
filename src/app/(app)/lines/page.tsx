@@ -11,6 +11,7 @@ import { getCtx } from '@/modules/core/session'
 import { withTenantRead } from '@/modules/core/tenancy'
 import { orderList } from '@/modules/orders/queries'
 import { lines } from '@/modules/planning/schema'
+import { dailyLinePlans } from '@/modules/production/schema'
 import type { ProductionPolicy } from '@/modules/production/service'
 import { getPolicy } from '@/modules/settings/service'
 import { board } from '@/modules/production/queries'
@@ -42,7 +43,7 @@ export default async function LinesPage() {
   // in a `{lines.length === 0 ? null : null}` left from an earlier draft — so it was a
   // database round trip on every load of a floor screen, feeding nothing. The header's
   // count comes from `rows`, which is the board itself.
-  const [allRows, policy, allLineRows, orderRows] = await Promise.all([
+  const [allRows, policy, allLineRows, orderRows, planRows] = await Promise.all([
     board(ctx, { producedOn: today, shiftHours: SHIFT_HOURS }),
     getPolicy<ProductionPolicy>(ctx, 'production'),
     // The plan-the-day door's choices (live-test finding: daily_line_plans had no
@@ -55,6 +56,14 @@ export default async function LinesPage() {
         .orderBy(lines.code),
     ),
     orderList(ctx),
+    // Today's plans, so a board cell opens with the planned target already in the box —
+    // the supervisor confirms it, they do not re-derive it from memory.
+    withTenantRead(ctx, (tx) =>
+      tx
+        .select({ lineId: dailyLinePlans.lineId, targetPerHour: dailyLinePlans.targetPerHour })
+        .from(dailyLinePlans)
+        .where(eq(dailyLinePlans.planDate, today)),
+    ),
   ])
 
   // The caller's line narrowing, honoured (live-test finding: a chief scoped to L1/L2
@@ -171,7 +180,14 @@ export default async function LinesPage() {
           body={tui(locale, 'ui.production.lines_empty_body')}
         />
       ) : (
-        <LineBoard rows={rows} producedOn={today} shiftHours={SHIFT_HOURS} />
+        <LineBoard
+          rows={rows}
+          producedOn={today}
+          shiftHours={SHIFT_HOURS}
+          plannedTargetByLine={Object.fromEntries(
+            planRows.map((p) => [p.lineId, p.targetPerHour]),
+          )}
+        />
       )}
     </>
   )

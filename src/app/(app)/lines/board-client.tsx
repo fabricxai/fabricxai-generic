@@ -47,10 +47,13 @@ export function LineBoard({
   rows,
   producedOn,
   shiftHours,
+  plannedTargetByLine = {},
 }: {
   rows: LineRow[]
   producedOn: string
   shiftHours: number
+  /** Today's planned target per line — a cell opens with it in the box (live-test papercut). */
+  plannedTargetByLine?: Record<string, number>
 }) {
   const t = useT()
   const { online, queued, refused, syncing, capture, sync, clear } = useOfflineQueue()
@@ -235,6 +238,7 @@ export function LineBoard({
         key={entry ? `${entry.line.lineId}-${entry.hour}` : 'none'}
         entry={entry}
         producedOn={producedOn}
+        plannedTarget={entry ? (plannedTargetByLine[entry.line.lineId] ?? null) : null}
         onClose={() => setEntry(null)}
         onSave={async (target, actual) => {
           if (!entry) return
@@ -263,17 +267,24 @@ export function LineBoard({
 function HourEntry({
   entry,
   producedOn,
+  plannedTarget,
   onClose,
   onSave,
 }: {
   entry: { line: LineRow; hour: number } | null
   producedOn: string
+  /** The day plan's target for this line, when one exists — the box opens holding it. */
+  plannedTarget: number | null
   onClose: () => void
   onSave: (target: string, actual: string) => Promise<void>
 }) {
   const t = useT()
   const existing = entry?.line.hours.find((c) => c.hourSlot === entry.hour)
-  const [target, setTarget] = useState(existing ? String(existing.target) : '')
+  // An already-counted hour keeps ITS recorded target; a fresh one opens with the plan's,
+  // because the supervisor confirms the target, they do not re-derive it from memory.
+  const [target, setTarget] = useState(
+    existing ? String(existing.target) : plannedTarget !== null ? String(plannedTarget) : '',
+  )
   const [actual, setActual] = useState(existing ? String(existing.actual) : '')
   const [busy, setBusy] = useState(false)
 
