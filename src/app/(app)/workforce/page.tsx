@@ -9,6 +9,8 @@ import { SectionHeading } from '@/components/fx/signature'
 import { Ident } from '@/components/fx/format'
 import { PageHeader } from '@/components/shell/page-shell'
 import { PayrollRunControl } from '@/components/fx/payroll-run'
+
+import { AttendanceImport, GazetteDoor } from './payroll-doors'
 import { canSee, NAV } from '@/components/shell/nav'
 import { getCtx } from '@/modules/core/session'
 import { companyProfile } from '@/modules/settings/service'
@@ -130,9 +132,14 @@ export default async function WorkforcePage() {
         {maySeePay ? (
           <>
             <section>
-              <SectionHeading eyebrow={gazette ? `v${gazette.version}` : undefined}>
-                Wage gazette
-              </SectionHeading>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+                <SectionHeading eyebrow={gazette ? `v${gazette.version}` : undefined}>
+                  Wage gazette
+                </SectionHeading>
+                <span style={{ marginLeft: 'auto' }}>
+                  <GazetteDoor />
+                </span>
+              </div>
 
               {!gazette ? (
                 <Card>
@@ -213,6 +220,10 @@ export default async function WorkforcePage() {
 
             <section>
               <SectionHeading eyebrow={`${runs.length} runs`}>Payroll</SectionHeading>
+
+              {/* The device export lands here first — a run computed on an empty month is
+                  a payroll of absences (live-test finding, Phase 9). */}
+              <AttendanceImport />
 
               <PayrollRunControl
                 defaultPeriod={factoryMonth()}

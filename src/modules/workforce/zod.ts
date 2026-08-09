@@ -53,6 +53,27 @@ export const gazetteUpload = z.object({
 })
 
 /** Factory policy, snapshotted onto each run. */
+/**
+ * One day of one worker, as the biometric device reported it — normalised by the screen
+ * from the device's own CSV dialect (live-test finding, Phase 9: attendance had no way
+ * in at all). The device is the source; a human never types a punch.
+ */
+export const deviceAttendanceRow = z.object({
+  employeeNo: z.string().min(1).max(40),
+  date: calendarDate,
+  /** 24h HH:MM, straight from the punch columns. Absent when the device has no punch. */
+  in: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+  out: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+  status: z.enum(['present', 'absent', 'leave', 'holiday']),
+  /** The device's own flag, carried verbatim: 'late arrival 08:11', 'missing punches'. */
+  exception: z.string().max(200).optional(),
+  otHours: z.string().regex(/^\d{1,3}(\.\d{1,2})?$/).default('0'),
+})
+
+export const attendanceImport = z.object({
+  rows: z.array(deviceAttendanceRow).min(1, 'the device export has no rows'),
+})
+
 export const payrollRules = z.object({
   currency: z.string().length(3).default('BDT'),
   monthDays: z.number().int().min(28).max(31).default(30),

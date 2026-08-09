@@ -3,12 +3,14 @@
 import { revalidatePath } from 'next/cache'
 import { headers } from 'next/headers'
 
+import { surfaced, type ActionFailure } from '@/lib/action-failure'
 import { requireRole } from '@/modules/core/session'
 
 import {
   activateGazette,
   approvePayrollRun,
   computePayrollRun,
+  importDeviceAttendance,
   uploadGazette,
 } from './service'
 
@@ -67,16 +69,49 @@ export async function recordGazette(input: {
   version: string
   effectiveFrom: string
   grades: { grade: string; basic: string; houseRent: string; medical: string; transport: string; food: string }[]
-}): Promise<{ gazetteId: string }> {
-  const ctx = await requireRole(await headers(), 'hr')
-  const result = await uploadGazette(ctx, input)
-  revalidatePath('/workforce')
-  return result
+}): Promise<{ gazetteId: string } | ActionFailure> {
+  return surfaced(async () => {
+    const ctx = await requireRole(await headers(), 'hr')
+    const result = await uploadGazette(ctx, input)
+    revalidatePath('/workforce')
+    return result
+  })
 }
 
 /** Make a recorded gazette the one payroll computes against. */
-export async function makeGazetteActive(input: { gazetteId: string }): Promise<void> {
-  const ctx = await requireRole(await headers(), 'hr')
-  await activateGazette(ctx, input.gazetteId)
-  revalidatePath('/workforce')
+export async function makeGazetteActive(input: { gazetteId: string }): Promise<void | ActionFailure> {
+  return surfaced(async () => {
+    const ctx = await requireRole(await headers(), 'hr')
+    await activateGazette(ctx, input.gazetteId)
+    revalidatePath('/workforce')
+  })
+}
+
+/**
+ * Import a biometric device's attendance export (live-test finding, Phase 9).
+ *
+ * The screen parses the device's own CSV dialect and sends normalised rows; the service
+ * refuses the whole file on any employee number the register does not know. hr only —
+ * attendance is a wage input, and the payroll gate below is the model.
+ */
+export async function importAttendance(input: {
+  rows: {
+    employeeNo: string
+    date: string
+    in?: string
+    out?: string
+    status: 'present' | 'absent' | 'leave' | 'holiday'
+    exception?: string
+    otHours: string
+  }[]
+}): Promise<
+  | { imported: number; exceptions: { employeeNo: string; date: string; exception: string }[] }
+  | ActionFailure
+> {
+  return surfaced(async () => {
+    const ctx = await requireRole(await headers(), 'hr')
+    const result = await importDeviceAttendance(ctx, input)
+    revalidatePath('/workforce')
+    return result
+  })
 }

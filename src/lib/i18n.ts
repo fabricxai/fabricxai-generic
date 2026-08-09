@@ -596,6 +596,8 @@ export const MESSAGES: Catalogue = {
     'workforce.errors.gazette_has_no_grades':
       'That gazette has no grade table, so a payroll computed against it would pay nothing.',
     'workforce.errors.gazette_not_found': 'That wage gazette no longer exists.',
+    'workforce.errors.unknown_employees':
+      'The export names employees who are not on the register — nothing was imported, because half a floor landing silently is a payroll short for the other half.',
     'workforce.errors.gazette_superseded': 'That gazette has been superseded.',
     'workforce.errors.no_active_gazette':
       'No wage gazette is active for that period, so there are no rates to compute against.',
@@ -972,6 +974,10 @@ export const MESSAGES: Catalogue = {
     'store.errors.roll_not_in_stock': 'এই roll স্টকে নেই।',
     'store.errors.unit_mismatch':
       'এই আইটেমটি যে ইউনিটে রাখা আছে, দেওয়া ইউনিট তার সাথে মিলছে না।',
+
+    // ── 10.1 Workforce · what a refused import says ──
+    'workforce.errors.unknown_employees':
+      'এক্সপোর্ট ফাইলে এমন কর্মী আছেন যারা রেজিস্টারে নেই — কিছুই ইমপোর্ট হয়নি। অর্ধেক ফ্লোরের হাজিরা চুপচাপ ঢুকে গেলে বাকি অর্ধেকের বেতন কম হয়ে যায়, তা ধরা পড়ে বেতনের দিনে।',
 
     // ── 9.1 Maintenance · what a refused action says ──
     'maintenance.errors.serial_exists':

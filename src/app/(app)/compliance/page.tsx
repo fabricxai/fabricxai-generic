@@ -10,6 +10,8 @@ import { CapActions } from '@/components/fx/cap-actions'
 import { canSee, NAV } from '@/components/shell/nav'
 import { getCtx } from '@/modules/core/session'
 import { capExceptions, certificateLadder, openFindings } from '@/modules/compliance/service'
+
+import { LogAuditButton, RaiseCapButton } from './compliance-doors'
 import type { CompliancePolicy } from '@/modules/compliance/service'
 import { companyProfile, getPolicy } from '@/modules/settings/service'
 import { factoryToday } from '@/lib/dates'
@@ -52,11 +54,13 @@ export default async function CompliancePage() {
   const expiring = ladder.filter((c) => c.state !== 'expired' && c.rung !== null)
   const criticals = findings.filter((f) => f.finding.severity === 'critical')
   const canClose = ctx.roles.some((r) => policy.closerRoles.includes(r))
+  const mayWrite = ctx.roles.some((r) => r === 'compliance' || r === 'admin' || r === 'owner')
 
   return (
     <>
       <PageHeader
         eyebrow="Compliance"
+        actions={mayWrite ? <LogAuditButton /> : undefined}
         title={
           exceptions.length === 0 && expired.length === 0
             ? 'Nothing outstanding'
@@ -330,14 +334,18 @@ export default async function CompliancePage() {
                         {finding.text}
                       </span>
                       {!cap ? (
-                        <span
-                          style={{
-                            font: "400 12px/1.4 var(--fx-font-mono)",
-                            color: 'var(--fx-text-tertiary)',
-                          }}
-                        >
-                          no corrective action opened yet
-                        </span>
+                        mayWrite ? (
+                          <RaiseCapButton findingId={finding.id} />
+                        ) : (
+                          <span
+                            style={{
+                              font: "400 12px/1.4 var(--fx-font-mono)",
+                              color: 'var(--fx-text-tertiary)',
+                            }}
+                          >
+                            no corrective action opened yet
+                          </span>
+                        )
                       ) : null}
                     </div>
 

@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { headers } from 'next/headers'
 
+import { surfaced, type ActionFailure } from '@/lib/action-failure'
 import { requireRole } from '@/modules/core/session'
 import { getPolicy } from '@/modules/settings/service'
 
@@ -32,11 +33,15 @@ export async function logAudit(input: {
   auditor: string
   auditedOn: string
   findings: { description: string; severity: string; clause?: string }[]
-}): Promise<{ auditId: string }> {
-  const ctx = await requireRole(await headers(), 'compliance')
-  const result = await recordAudit(ctx, input)
-  refresh()
-  return result
+}): Promise<{ auditId: string } | ActionFailure> {
+  // Surfaced with the role gate inside — this desk's refusals must arrive as sentences
+  // (live-test finding, Phase 9: the module had complete services and no doors at all).
+  return surfaced(async () => {
+    const ctx = await requireRole(await headers(), 'compliance')
+    const result = await recordAudit(ctx, input)
+    refresh()
+    return result
+  })
 }
 
 /**
@@ -48,13 +53,20 @@ export async function logAudit(input: {
  */
 export async function raiseCap(input: {
   findingId: string
-  ownerUserId: string
+  /** Defaults to the caller: the compliance officer owns a CAP until it is handed over. */
+  ownerUserId?: string
   deadline?: string
-}): Promise<{ capId: string; deadline: string }> {
-  const { ctx, policy } = await policyFor()
-  const result = await openCap(ctx, input, policy)
-  refresh()
-  return result
+}): Promise<{ capId: string; deadline: string } | ActionFailure> {
+  return surfaced(async () => {
+    const { ctx, policy } = await policyFor()
+    const result = await openCap(
+      ctx,
+      { ...input, ownerUserId: input.ownerUserId ?? ctx.userId },
+      policy,
+    )
+    refresh()
+    return result
+  })
 }
 
 /** Move a CAP along — work started, evidence submitted. */

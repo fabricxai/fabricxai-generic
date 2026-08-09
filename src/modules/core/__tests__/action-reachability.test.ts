@@ -35,15 +35,13 @@ import { describe, expect, it } from 'vitest'
  * progress unreadable.
  */
 const NO_SCREEN_YET: Record<string, string> = {
-  'compliance/logAudit': 'an audit visit cannot be recorded — 10.2 has no write surface',
-  'compliance/logTraining': 'same module, same gap',
-  'compliance/raiseCap': 'a corrective action plan cannot be opened against a finding',
+  // `logAudit` and `raiseCap` left this list in the live test (Phase 9) — the audit modal
+  // and the per-finding CAP button on /compliance. Training and certificates are still owed.
+  'compliance/logTraining': 'a training session cannot be recorded — still no write surface',
   'compliance/saveCertificate': 'a certificate cannot be filed or renewed',
   'maintenance/reportMachine': 'a broken machine cannot be reported from the floor',
   'memory/findSimilarStyles': 'the similar-style lookup has no entry point on any screen',
   'procurement/updatePoStatus': 'a PO cannot be moved through its own lifecycle',
-  'workforce/recordGazette': 'a wage gazette cannot be entered without a document to extract',
-  'workforce/makeGazetteActive': 'and one that is entered cannot be put into force',
 
   // Reachable services, unreachable actions: their screens moved to the offline queue in
   // plan 4.1, so these two are correct, gated, tested and unused HTTP surface.

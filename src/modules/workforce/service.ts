@@ -42,9 +42,9 @@ import {
   wageGrades,
   workers,
 } from './schema'
-import { gazetteUpload, payrollRules } from './zod'
+import { attendanceImport, gazetteUpload, payrollRules } from './zod'
 
-registerAuditedTables('payroll_runs', 'payroll_lines', 'wage_gazettes', 'workers')
+registerAuditedTables('payroll_runs', 'payroll_lines', 'wage_gazettes', 'workers', 'attendance')
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 🔒 Access
@@ -114,6 +114,86 @@ export type PayrollRunStatus = (typeof payrollRunMachine.states)[number]
  * exactly the kind of typing that needs a second pair of eyes before anybody is paid on
  * it.
  */
+/**
+ * Land a biometric device export as attendance (live-test finding, Phase 9).
+ *
+ * Attendance is deliberately not a pending target — a drafted attendance row is a drafted
+ * wage — and the missing consequence was that attendance had no way IN at all: zero rows,
+ * so payroll could never compute. This is the human door for the device's own record: hr
+ * imports the export file, the punches land verbatim, and the exceptions (missed punch,
+ * late) arrive as data a person resolves rather than silently normalised.
+ *
+ * Idempotent per (worker, date): re-importing the same export replaces that day's rows
+ * rather than doubling anybody's month. An unknown employee number refuses the WHOLE
+ * import — half a floor's attendance landing silently is a payroll short for the other
+ * half, discovered on payday.
+ */
+export async function importDeviceAttendance(
+  ctx: RequestCtx,
+  input: unknown,
+): Promise<{ imported: number; exceptions: { employeeNo: string; date: string; exception: string }[] }> {
+  assertPayrollAccess(ctx)
+  const payload = attendanceImport.parse(input)
+
+  return withTenantTx(ctx, async (tx) => {
+    const staff = await tx
+      .select({ id: workers.id, employeeNo: workers.employeeNo })
+      .from(workers)
+      .where(scoped(workers, ctx, sql`true`))
+    const byNo = new Map(staff.map((w) => [w.employeeNo, w.id]))
+
+    const unknown = [...new Set(payload.rows.map((r) => r.employeeNo))].filter((no) => !byNo.has(no))
+    if (unknown.length > 0) {
+      throw new AppError('validation_failed', 'workforce.errors.unknown_employees', {
+        reason: `${unknown.length} employee number(s) are not on the register: ${unknown
+          .slice(0, 5)
+          .join(', ')}${unknown.length > 5 ? '…' : ''}`,
+        employeeNos: unknown,
+      })
+    }
+
+    const exceptions: { employeeNo: string; date: string; exception: string }[] = []
+
+    for (const row of payload.rows) {
+      const workerId = byNo.get(row.employeeNo)!
+
+      await tx
+        .delete(attendance)
+        .where(scoped(attendance, ctx, sql`${attendance.workerId} = ${workerId} and ${attendance.date} = ${row.date}`))
+
+      await tx.insert(attendance).values({
+        companyId: ctx.companyId,
+        workerId,
+        date: row.date,
+        // The factory clock. The device prints wall time in Dhaka; storing it any other
+        // way re-creates the +6 bug class the floor screens were cured of.
+        inAt: row.in ? new Date(`${row.date}T${row.in}:00+06:00`) : null,
+        outAt: row.out ? new Date(`${row.date}T${row.out}:00+06:00`) : null,
+        status: row.status,
+        source: 'device',
+        exception: row.exception ?? null,
+        otHours: row.otHours,
+      })
+
+      if (row.exception) {
+        exceptions.push({ employeeNo: row.employeeNo, date: row.date, exception: row.exception })
+      }
+    }
+
+    await recordChange(ctx, tx, {
+      action: 'insert',
+      targetTable: 'attendance',
+      after: {
+        rows: payload.rows.length,
+        days: [...new Set(payload.rows.map((r) => r.date))],
+        exceptions: exceptions.length,
+      },
+    })
+
+    return { imported: payload.rows.length, exceptions }
+  })
+}
+
 export async function uploadGazette(
   ctx: RequestCtx,
   input: unknown,
