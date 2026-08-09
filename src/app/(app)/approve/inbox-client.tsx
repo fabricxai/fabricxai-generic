@@ -6,6 +6,7 @@ import { Badge, Button } from '@/components/fx/primitives'
 import { Card } from '@/components/fx/data'
 import { EmptyState, InlineAlert, Modal, Toast } from '@/components/fx/feedback'
 import { actionErrorMessage } from '@/lib/action-error'
+import { unwrap } from '@/lib/action-failure'
 import { Eyebrow } from '@/components/fx/signature'
 import { Ident } from '@/components/fx/format'
 import { MarbimMark, type MarkState } from '@/components/fx/mark'
@@ -96,14 +97,14 @@ export function ApproveInbox({
       setMark('thinking')
       startTransition(async () => {
         try {
-          const result = await approveDraft({
+          const result = unwrap(await approveDraft({
             pendingChangeId: row.id,
             // Omitted rather than sent empty: `{}` and "nothing was corrected" are the same
             // fact, and the telemetry should not record an edit that did not happen.
             ...(rowCorrections && Object.keys(rowCorrections).length > 0
               ? { corrections: rowCorrections }
               : {}),
-          })
+          }))
           flash(
             result.status === 'committed'
               ? `Approved and committed · ${row.title}`
@@ -216,7 +217,7 @@ export function ApproveInbox({
                       BATCH_CONCURRENCY,
                       async (row) => {
                         try {
-                          const result = await approveDraft({ pendingChangeId: row.id })
+                          const result = unwrap(await approveDraft({ pendingChangeId: row.id }))
                           return result.status === 'committed'
                             ? { kind: 'committed', row }
                             : {
@@ -1099,7 +1100,7 @@ function RejectDialog({
             onClick={() =>
               startTransition(async () => {
                 try {
-                  await rejectDraft({ pendingChangeId: row.id, reason, note: note || undefined })
+                  unwrap(await rejectDraft({ pendingChangeId: row.id, reason, note: note || undefined }))
                   onDone(row.title)
                 } catch (e) {
                   setError(actionErrorMessage(e, 'That did not go through'))

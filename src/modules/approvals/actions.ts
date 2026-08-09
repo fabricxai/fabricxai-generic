@@ -10,6 +10,7 @@ import {
   reject,
   type ApproveResult,
 } from '@/modules/core/pending-changes'
+import { surfaced, type ActionFailure } from '@/lib/action-failure'
 import { requireRole } from '@/modules/core/session'
 
 import { draftDetail, draftTarget, recordTrail, type DraftDetail, type RecordTrail } from './queries'
@@ -69,25 +70,34 @@ const rejectInput = z.object({
   note: z.string().max(2000).optional(),
 })
 
-export async function approveDraft(input: z.input<typeof approveInput>): Promise<ApproveResult> {
-  const ctx = await requireRole(await headers(), ...APPROVER_ROLES)
-  const parsed = approveInput.parse(input)
+export async function approveDraft(
+  input: z.input<typeof approveInput>,
+): Promise<ApproveResult | ActionFailure> {
+  // Surfaced above all for the race: two managers approving the same draft is exactly
+  // what the typed 409 exists for, and its sentence — "already decided" — was reaching
+  // the loser as React #441 (live-test finding, Phase 9, caught in the two-browser race).
+  return surfaced(async () => {
+    const ctx = await requireRole(await headers(), ...APPROVER_ROLES)
+    const parsed = approveInput.parse(input)
 
-  const result = await approve(ctx, parsed)
+    const result = await approve(ctx, parsed)
 
-  revalidatePath('/approve')
-  return result
+    revalidatePath('/approve')
+    return result
+  })
 }
 
-export async function rejectDraft(input: z.input<typeof rejectInput>): Promise<void> {
-  const ctx = await requireRole(await headers(), ...APPROVER_ROLES)
-  const { pendingChangeId, reason, note } = rejectInput.parse(input)
+export async function rejectDraft(input: z.input<typeof rejectInput>): Promise<void | ActionFailure> {
+  return surfaced(async () => {
+    const ctx = await requireRole(await headers(), ...APPROVER_ROLES)
+    const { pendingChangeId, reason, note } = rejectInput.parse(input)
 
-  // The reason is the first line of the note so it survives into `review_note`,
-  // which is what the drafter actually reads when the item comes back to them.
-  await reject(ctx, pendingChangeId, note ? `${reason}\n\n${note}` : reason)
+    // The reason is the first line of the note so it survives into `review_note`,
+    // which is what the drafter actually reads when the item comes back to them.
+    await reject(ctx, pendingChangeId, note ? `${reason}\n\n${note}` : reason)
 
-  revalidatePath('/approve')
+    revalidatePath('/approve')
+  })
 }
 
 /**
