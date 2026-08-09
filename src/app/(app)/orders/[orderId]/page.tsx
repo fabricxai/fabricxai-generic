@@ -50,6 +50,13 @@ export default async function OrderDetailPage({
     profile?.factoryType ?? 'woven',
   )
 
+  /*
+   * A viewer sees the operation, not the commercial terms (live-test finding, Phase 9:
+   * the redaction the role promises existed nowhere). Redacted server-side, so the price
+   * never reaches the browser — a ••• painted over a value in the payload is not hiding.
+   */
+  const seesPrices = ctx.roles.some((r) => r !== 'viewer' && r !== 'member')
+
   const po = order.poNumbers[0] ?? order.id.slice(0, 8)
   const late = order.milestones.filter((m) => m.status === 'late').length
 
@@ -96,14 +103,16 @@ export default async function OrderDetailPage({
             </FactPair>
             <FactPair label="Unit price">
               <span data-numeric data-mono>
-                {order.style?.unitPrice
-                  ? `${order.style.unitPrice} ${order.style.currency}`
-                  : '—'}
+                {!seesPrices
+                  ? '•••'
+                  : order.style?.unitPrice
+                    ? `${order.style.unitPrice} ${order.style.currency}`
+                    : '—'}
               </span>
             </FactPair>
             <FactPair label="Order value">
               <span data-numeric data-mono>
-                {order.totalValue ? `${order.totalValue} ${order.currency}` : '—'}
+                {!seesPrices ? '•••' : order.totalValue ? `${order.totalValue} ${order.currency}` : '—'}
               </span>
             </FactPair>
             <FactPair label="Status">

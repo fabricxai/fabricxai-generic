@@ -53,6 +53,8 @@ export default async function OrdersPage() {
     profile?.factoryType ?? 'woven',
   )
   const buyers = mayWrite ? await buyerAccounts(ctx) : []
+  // A viewer sees the operation, not the commercial terms (live-test finding, Phase 9).
+  const seesPrices = ctx.roles.some((r) => r !== 'viewer' && r !== 'member')
 
   return (
     <>
@@ -184,7 +186,7 @@ export default async function OrdersPage() {
                     textAlign: 'right',
                   }}
                 >
-                  {row.totalValue ? `${row.totalValue} ${row.currency}` : '—'}
+                  {!seesPrices ? '•••' : row.totalValue ? `${row.totalValue} ${row.currency}` : '—'}
                 </span>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                   <span
