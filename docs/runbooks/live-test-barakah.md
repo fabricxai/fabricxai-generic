@@ -318,6 +318,51 @@ payroll in the nav, prices masked. Start there.
     mid-session — a reload cures it, and live-deploying under an open tab is the
     operational reality it documents.
 
+31. **Phase 9, the doors: payroll had none at either end, compliance had none at all.**
+    The gazette actions existed with no screen while the page said "payroll cannot be
+    computed without one" (this tenant's gazette turned out to be seeded — the door was
+    still owed); attendance was deliberately not a pending target ("a drafted attendance
+    row is a drafted wage") and had no human door either, so the table held zero rows
+    and a run could never compute. Built (0d3418b): the gazette recorded-and-activated in
+    one gesture, and the device CSV parsed at the screen — punches verbatim, P-LATE and
+    P-MISS arriving as exceptions a person resolves, OT computed from the punches, an
+    unknown employee number refusing the whole file bilingually. Compliance's audit modal
+    and per-finding CAP button landed the same commit — and the audit door FAILED ON
+    FIRST USE: the action had always accepted a findings array that recordAudit's zod
+    silently stripped, so the success banner counted findings the server never kept
+    (ae1653a fixes it through commitFindingsBatch, the approve inbox's own path). The
+    payroll run then walked the kit's chain: import → exceptions named → computed against
+    the gazette → approve grey for hr, signed by the owner, "figures fixed from here."
+    Deviations recorded: the kit's export covers 10 employees so its BF-0023 OT outlier
+    cannot appear; a day with no attendance row is NOT-RECORDED rather than absent, so
+    one day of punches paid the full month to 40 people — silence does not dock pay, and
+    a factory should know that is the rule; the grade-3 net vector assumes a full month;
+    certificates and training still have no door (the 60/30-day expiry ladder could not
+    be staged).
+
+32. **Phase 9, the sweep: the walls held, and the one leak was the viewer's.** Every
+    direct-URL probe came back locked — the read wall lives in the shared layout,
+    checked against the same rule the nav uses, so hidden and locked cannot drift apart
+    (a better design than the tester's own prediction, which had the money book leaking).
+    Both admins got payroll's quiet card, exactly as 10.1 promises — including the copy
+    quirk of telling an admin to "ask an owner or admin". Production reading the store
+    shelf it cannot move is nav's own stated design. The viewer's MARBIM announced
+    "answers only, no draft tools" — and then the order detail showed the unit price in
+    clear: the ••• redaction the role promises existed NOWHERE in the product (the only
+    redaction in the codebase scrubs secrets from MARBIM prompts). 1c1d4ec redacts unit
+    price and order value server-side on the order desk for viewer/member-only accounts —
+    the figure never reaches the browser — with the sweep of other money fields recorded
+    as rollout.
+
+33. **Phase 9, the race: one signature won, and the loser heard about it in the wrong
+    language.** Two browsers as the same admin raced Approve on one pending tolerance
+    exception. The first committed; the second was refused with the typed 409 this inbox
+    exists to throw — pending_change_not_pending, the winning status attached — and the
+    refusal reached the screen as React #441. The approve and reject actions were the
+    LAST unsurfaced desk in the product (361e926): the second manager now reads "That
+    draft has already been decided." The exhibit stands as the kit wrote it: same item,
+    two hands, one decision.
+
 ## Honest status of the traps
 
 The gates the runbook pokes (PP blocks cutting, UD overdraw block, BTB headroom, EXP
