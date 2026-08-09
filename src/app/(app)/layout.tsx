@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { MarbimButton } from '@/components/shell/marbim-button'
 import { marbimEntryFor } from '@/components/shell/marbim-context'
 import { MarbimPanel } from '@/components/shell/marbim-panel'
+import { OutcomeToasts } from '@/components/shell/outcome-toasts'
 import { PageBody, TopBar } from '@/components/shell/page-shell'
 import { Sidebar } from '@/components/shell/sidebar'
 import { AccountMenu } from '@/components/shell/account-menu'
@@ -133,6 +134,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             trust={{ ...trust, pending: routed }}
           />
         ) : null}
+        {/* The shared outcome stack: every action's done/refused/failed lands here as a
+            small edge toast, fed by the two chokepoints every screen already uses
+            (live-test feedback, Phase 9). */}
+        <OutcomeToasts />
       </div>
     </LocaleProvider>
   )

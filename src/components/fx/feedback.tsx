@@ -1,7 +1,9 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
+
+import { notifyOutcome } from '@/lib/notify'
 
 import { useT } from './locale'
 import { Button } from './primitives'
@@ -270,8 +272,30 @@ export function InlineAlert({
   const colour = `var(--fx-${tone === 'info' ? 'info' : tone})`
   const outlined = tone === 'danger' || tone === 'warning'
 
+  /*
+   * A success banner announces itself to the shell's outcome stack on mount (live-test
+   * feedback, Phase 9): the inline banner is the one that scrolls out of view, and the
+   * edge toast is where a mid-task eye actually looks. Success only — danger and warning
+   * outcomes are announced by `actionErrorMessage` at the moment they are formatted, and
+   * a page's STATIC warnings (a gate explainer, a landing-page alert) must not toast on
+   * every visit. The toast host dedupes the rare double.
+   */
+  const announceRef = useRef<HTMLDivElement>(null)
+  const lastAnnounced = useRef('')
+  // No deps on purpose: the effect runs after every render and the guard below makes each
+  // distinct sentence announce exactly once, however React re-renders around it.
+  useEffect(() => {
+    if (tone !== 'success') return
+    const text = announceRef.current?.textContent?.trim() ?? ''
+    if (text && text !== lastAnnounced.current) {
+      lastAnnounced.current = text
+      notifyOutcome('done', text)
+    }
+  })
+
   return (
     <div
+      ref={announceRef}
       role={tone === 'danger' ? 'alert' : 'status'}
       style={{
         display: 'flex',

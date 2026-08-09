@@ -20,6 +20,7 @@
  */
 import { ActionRefused } from './action-failure'
 import { DEFAULT_LOCALE, MESSAGES, t, type Locale } from './i18n'
+import { notifyOutcome } from './notify'
 
 /** `conflict: maintenance.errors.serial_exists` → `maintenance.errors.serial_exists`. */
 const KEYED = /^[a-z_]+:\s*([a-z0-9_]+(?:\.[a-z0-9_]+)+)$/i
@@ -36,26 +37,38 @@ export function actionErrorMessage(
   fallback: string,
   locale: Locale = DEFAULT_LOCALE,
 ): string {
-  if (!(error instanceof Error)) return fallback
+  /*
+   * Announced to the shell's outcome stack as a side effect (live-test feedback, Phase 9:
+   * "people can't find out if it actually happened"). Every catch block in the product
+   * already calls this to get its sentence — announcing HERE gives every module the
+   * edge-of-screen notice without a single call site changing. A refusal (the server
+   * said no, in words) and a failure (something broke) show in different tones.
+   */
+  const announce = (message: string): string => {
+    notifyOutcome(error instanceof ActionRefused ? 'refused' : 'failed', message)
+    return message
+  }
+
+  if (!(error instanceof Error)) return announce(fallback)
 
   // A refusal that crossed the boundary as a VALUE (see action-failure.ts) — the only path
   // that still carries real copy in production, where thrown messages are masked.
   if (error instanceof ActionRefused) {
     // The service's own sentence wins over catalogue copy filed under the key — "an order
     // needs a requested ship date" beats "That does not fit what an RFQ accepts."
-    if (error.failure.reason) return error.failure.reason
+    if (error.failure.reason) return announce(error.failure.reason)
     const copy = t(locale, error.failure.messageKey)
-    if (copy !== error.failure.messageKey) return copy
-    return MESSAGES[DEFAULT_LOCALE][error.failure.messageKey] ?? fallback
+    if (copy !== error.failure.messageKey) return announce(copy)
+    return announce(MESSAGES[DEFAULT_LOCALE][error.failure.messageKey] ?? fallback)
   }
 
   const key = KEYED.exec(error.message)?.[1]
-  if (!key) return error.message || fallback
+  if (!key) return announce(error.message || fallback)
 
   // `t` returns the key itself when it has no entry — which is what was being rendered
   // before, so treat it as "no copy exists" rather than as a translation.
   const copy = t(locale, key)
-  if (copy !== key) return copy
+  if (copy !== key) return announce(copy)
 
-  return MESSAGES[DEFAULT_LOCALE][key] ?? error.message
+  return announce(MESSAGES[DEFAULT_LOCALE][key] ?? error.message)
 }
