@@ -215,6 +215,19 @@ payroll in the nav, prices masked. Start there.
     do not yet refuse an entry for a line outside the device user's scope, so the
     screens are the first wall, not the only one.
 
+25. **Phase 6 ran end to end, and found two bugs on one screen.** The hourly entry read
+    `new Date().getHours()` — the SERVER's hour, UTC — so on a Dhaka floor the screen
+    opened on 8:00 every evening and the 10:00 count would have silently corrected 8:00
+    (`factoryHour()` now reads the factory clock). And `downtimes.machine_id` had
+    existed since 6.1 with no picker in the stoppage dialog, so every machine stoppage
+    reached maintenance as "machine not identified" — the one fact the mechanic needed.
+    Both fixed mid-test. Everything else held: the auto-raised ticket ("a supervisor
+    with a dead line should not have to file paperwork twice"), Sabbir's claim
+    ("nobody else will walk to this machine"), the resolve closing the line's stoppage
+    with it, DHU 6.67 / pass 95% derived-never-stored, and the run-rate card reaching
+    397 sewn · 132.33/day with "one day of output only" stated rather than a
+    confident-looking projection from one morning.
+
 ## Honest status of the traps
 
 The gates the runbook pokes (PP blocks cutting, UD overdraw block, BTB headroom, EXP
