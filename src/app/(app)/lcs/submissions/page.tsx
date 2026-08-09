@@ -113,7 +113,19 @@ export default async function SubmissionsPage() {
         lcs={openLcs}
         submissions={rows.map((r) => ({
           ...r,
-          docs: Array.isArray(r.docs) ? (r.docs as unknown[]).map(String) : [],
+          /*
+           * Two shapes live in this column: the human door stores plain kind strings,
+           * the 8.1 worker stores `{ kind, status }` objects — and `map(String)` rendered
+           * the latter as "[object Object]" (live-test finding, Phase 8). Read the kind
+           * from either shape rather than assuming one writer.
+           */
+          docs: Array.isArray(r.docs)
+            ? (r.docs as unknown[])
+                .map((d) =>
+                  typeof d === 'string' ? d : String((d as { kind?: unknown }).kind ?? ''),
+                )
+                .filter(Boolean)
+            : [],
           // The service already knows which of these have aged past the threshold; matching
           // by id keeps one definition of "escalated" rather than two that drift.
           escalated: aging.some(

@@ -245,20 +245,24 @@ export async function createSubmission(input: {
   docs: string[]
   invoicedAmount?: string
   currency: string
-}): Promise<{ submissionId: string }> {
-  const ctx = await requireRole(await headers(), 'commercial')
-  const result = await openSubmission(ctx, {
-    lcId: input.lcId,
-    ...(input.shipmentId ? { shipmentId: input.shipmentId } : {}),
-    docs: input.docs,
-    ...(input.invoicedAmount ? { invoicedAmount: input.invoicedAmount } : {}),
-    currency: input.currency,
+}): Promise<{ submissionId: string } | ActionFailure> {
+  // Surfaced: the EXP gate inside `openSubmission` refuses a presentation against a
+  // shipment with no EXP number, and that refusal must arrive as its sentence.
+  return surfaced(async () => {
+    const ctx = await requireRole(await headers(), 'commercial', 'finance')
+    const result = await openSubmission(ctx, {
+      lcId: input.lcId,
+      ...(input.shipmentId ? { shipmentId: input.shipmentId } : {}),
+      docs: input.docs,
+      ...(input.invoicedAmount ? { invoicedAmount: input.invoicedAmount } : {}),
+      currency: input.currency,
+    })
+
+    revalidatePath('/lcs/submissions')
+    revalidatePath(`/lcs/${input.lcId}`)
+
+    return result
   })
-
-  revalidatePath('/lcs/submissions')
-  revalidatePath(`/lcs/${input.lcId}`)
-
-  return result
 }
 
 /**
@@ -275,22 +279,28 @@ export async function updateSubmissionStatus(input: {
   bankStatus: 'preparing' | 'submitted' | 'accepted' | 'discrepant'
   submittedAt?: string
   discrepancyNotes?: string
-}): Promise<void> {
-  const ctx = await requireRole(await headers(), 'commercial')
-  await setSubmissionStatus(ctx, {
-    submissionId: input.submissionId,
-    bankStatus: input.bankStatus,
-    ...(input.submittedAt ? { submittedAt: input.submittedAt } : {}),
-    ...(input.discrepancyNotes ? { discrepancyNotes: input.discrepancyNotes } : {}),
-    // A discrepancy starts ageing the day it is raised, and the escalation job counts from
-    // here. Defaulting it to today rather than leaving it null is what makes the clock real.
-    ...(input.bankStatus === 'discrepant'
-      ? { discrepantSince: factoryToday() }
-      : {}),
-  })
+}): Promise<void | ActionFailure> {
+  // Surfaced, with the role gate inside: an illegal transition and a role refusal are
+  // both sentences a person needs, and production masks anything thrown (live-test
+  // finding, Phase 8). `finance` may move these too — the same pairing the realization
+  // below has always had, because the person chasing the bank IS often the finance desk.
+  return surfaced(async () => {
+    const ctx = await requireRole(await headers(), 'commercial', 'finance')
+    await setSubmissionStatus(ctx, {
+      submissionId: input.submissionId,
+      bankStatus: input.bankStatus,
+      ...(input.submittedAt ? { submittedAt: input.submittedAt } : {}),
+      ...(input.discrepancyNotes ? { discrepancyNotes: input.discrepancyNotes } : {}),
+      // A discrepancy starts ageing the day it is raised, and the escalation job counts from
+      // here. Defaulting it to today rather than leaving it null is what makes the clock real.
+      ...(input.bankStatus === 'discrepant'
+        ? { discrepantSince: factoryToday() }
+        : {}),
+    })
 
-  revalidatePath('/lcs/submissions')
-  revalidatePath(`/lcs/${input.lcId}`)
+    revalidatePath('/lcs/submissions')
+    revalidatePath(`/lcs/${input.lcId}`)
+  })
 }
 
 /**
@@ -308,25 +318,30 @@ export async function postLcRealization(input: {
   realizedAmount: string
   realizedAt: string
   shortfallReason?: string
-}): Promise<RealizationResult> {
-  const ctx = await requireRole(await headers(), 'commercial', 'finance')
-  const policy = await getPolicy<BankDocsPolicy>(ctx, 'commercial')
+}): Promise<RealizationResult | ActionFailure> {
+  // Surfaced above all for the shortfall gate: "a deduction this size needs a written
+  // reason" is the sentence this whole flow exists to say, and it was reaching the
+  // browser as React #441.
+  return surfaced(async () => {
+    const ctx = await requireRole(await headers(), 'commercial', 'finance')
+    const policy = await getPolicy<BankDocsPolicy>(ctx, 'commercial')
 
-  const result = await postRealization(
-    ctx,
-    {
-      submissionId: input.submissionId,
-      realizedAmount: input.realizedAmount,
-      realizedAt: input.realizedAt,
-      ...(input.shortfallReason ? { shortfallReason: input.shortfallReason } : {}),
-    },
-    policy,
-  )
+    const result = await postRealization(
+      ctx,
+      {
+        submissionId: input.submissionId,
+        realizedAmount: input.realizedAmount,
+        realizedAt: input.realizedAt,
+        ...(input.shortfallReason ? { shortfallReason: input.shortfallReason } : {}),
+      },
+      policy,
+    )
 
-  revalidatePath('/lcs/submissions')
-  revalidatePath(`/lcs/${input.lcId}`)
-  // It posts to the receivable book.
-  revalidatePath('/finance')
+    revalidatePath('/lcs/submissions')
+    revalidatePath(`/lcs/${input.lcId}`)
+    // It posts to the receivable book.
+    revalidatePath('/finance')
 
-  return result
+    return result
+  })
 }

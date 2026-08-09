@@ -5,6 +5,7 @@ import { useState, useTransition } from 'react'
 
 import { InlineAlert, Modal } from '@/components/fx/feedback'
 import { actionErrorMessage } from '@/lib/action-error'
+import { unwrap } from '@/lib/action-failure'
 import { Badge, Button } from '@/components/fx/primitives'
 import { SectionHeading } from '@/components/fx/signature'
 import {
@@ -109,12 +110,14 @@ export function SubmissionsClient({
     setFailure(null)
     startTransition(async () => {
       try {
-        await createSubmission({
-          lcId: lc.id,
-          docs,
-          ...(invoiced.trim() ? { invoicedAmount: invoiced.trim() } : {}),
-          currency: lc.currency,
-        })
+        unwrap(
+          await createSubmission({
+            lcId: lc.id,
+            docs,
+            ...(invoiced.trim() ? { invoicedAmount: invoiced.trim() } : {}),
+            currency: lc.currency,
+          }),
+        )
         setNoted(`Presentation opened against ${lc.number}.`)
         setInvoiced('')
         router.refresh()
@@ -128,13 +131,15 @@ export function SubmissionsClient({
     setFailure(null)
     startTransition(async () => {
       try {
-        await updateSubmissionStatus({
-          submissionId: s.id,
-          lcId: s.lcId,
-          bankStatus: status,
-          ...(status === 'submitted' ? { submittedAt: today } : {}),
-          ...(status === 'discrepant' ? { discrepancyNotes: 'Raised by the bank.' } : {}),
-        })
+        unwrap(
+          await updateSubmissionStatus({
+            submissionId: s.id,
+            lcId: s.lcId,
+            bankStatus: status,
+            ...(status === 'submitted' ? { submittedAt: today } : {}),
+            ...(status === 'discrepant' ? { discrepancyNotes: 'Raised by the bank.' } : {}),
+          }),
+        )
         setNoted(`${s.lcNumber} · ${status}.`)
         router.refresh()
       } catch (error) {
@@ -148,13 +153,15 @@ export function SubmissionsClient({
     setFailure(null)
     startTransition(async () => {
       try {
-        const result = await postLcRealization({
-          submissionId: realizing.id,
-          lcId: realizing.lcId,
-          realizedAmount: amount.trim(),
-          realizedAt: today,
-          ...(reason.trim() ? { shortfallReason: reason.trim() } : {}),
-        })
+        const result = unwrap(
+          await postLcRealization({
+            submissionId: realizing.id,
+            lcId: realizing.lcId,
+            realizedAmount: amount.trim(),
+            realizedAt: today,
+            ...(reason.trim() ? { shortfallReason: reason.trim() } : {}),
+          }),
+        )
         setNoted(
           `Realized ${result.realizedAmount} — short by ${result.shortfall} (${result.shortfallPct}%).`,
         )
