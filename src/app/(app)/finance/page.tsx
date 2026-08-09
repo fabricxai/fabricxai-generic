@@ -19,6 +19,9 @@ import {
   type PayableRow,
   type ReceivableRow,
 } from '@/modules/finance/queries'
+import { shipmentBoard } from '@/modules/shipment/queries'
+
+import { RaiseInvoiceButton } from './raise-invoice'
 
 /**
  * 8.1 Commercial Finance.
@@ -88,6 +91,20 @@ export default async function FinancePage() {
     }
   })
 
+  /*
+   * The shipments an invoice can be raised against (live-test finding, Phase 8: `invoices`
+   * was a pending target nothing proposed). Read through shipment's own queries (rule 11).
+   */
+  const shipmentRows = await shipmentBoard(ctx)
+  const invoiceChoices = shipmentRows.map((s) => ({
+    id: s.id,
+    orderId: s.orderId,
+    label: `${s.poNumber ?? s.orderId.slice(0, 8)} · partial ${s.partialNo} · ${
+      s.packedQty.toLocaleString()
+    } pcs`,
+    suggestedNumber: `INV-${(s.poNumber ?? s.orderId.slice(0, 8)).replace(/^PO-/, '')}-${s.partialNo}`,
+  }))
+
   const overdueIn = receivables.filter((r) => r.daysToExpected !== null && r.daysToExpected < 0)
   const overdueOut = payables.filter((p) => p.daysToDue !== null && p.daysToDue < 0)
   const shortfalls = receivables.filter(
@@ -105,6 +122,7 @@ export default async function FinancePage() {
         }
         meta={overdueIn.length > 0 ? `${overdueIn.length} overdue in` : undefined}
         ownsAmber
+        actions={<RaiseInvoiceButton shipments={invoiceChoices} />}
       />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
