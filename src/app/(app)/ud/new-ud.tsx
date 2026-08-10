@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 
 import { InlineAlert, Modal } from '@/components/fx/feedback'
-import { TextInput } from '@/components/fx/forms'
+import { DateInput, TextInput } from '@/components/fx/forms'
 import { useLocale, useT } from '@/components/fx/locale'
 import { Button } from '@/components/fx/primitives'
 import { actionErrorMessage } from '@/lib/action-error'
@@ -106,19 +106,17 @@ export function NewUdButton() {
           <div className="fx-stack-tablet" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <span style={{ font: "500 13px/1.3 var(--fx-font-sans)" }}>{t('ui.ud.issue_date')}</span>
-              <input
-                type="date"
+              <DateInput
                 value={issueDate}
-                onChange={(e) => setIssueDate(e.target.value)}
+                onChange={setIssueDate}
                 style={fieldStyle}
               />
             </label>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <span style={{ font: "500 13px/1.3 var(--fx-font-sans)" }}>{t('ui.ud.valid_until')}</span>
-              <input
-                type="date"
+              <DateInput
                 value={validUntil}
-                onChange={(e) => setValidUntil(e.target.value)}
+                onChange={setValidUntil}
                 style={fieldStyle}
               />
             </label>

@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState, useTransition, type ReactNode } from 'react'
 
 import { InlineAlert, Modal, Toast } from '@/components/fx/feedback'
-import { TextInput } from '@/components/fx/forms'
+import { DateInput, TextInput } from '@/components/fx/forms'
 import { useLocale, useT } from '@/components/fx/locale'
 import { Badge, Button } from '@/components/fx/primitives'
 import { Eyebrow } from '@/components/fx/signature'
@@ -164,10 +164,9 @@ export function RfqDrawer({
                 <span style={{ font: "500 13px/1.3 var(--fx-font-sans)" }}>
                   {t('ui.rfq.valid_until')}
                 </span>
-                <input
-                  type="date"
+                <DateInput
                   value={validity}
-                  onChange={(e) => setValidity(e.target.value)}
+                  onChange={setValidity}
                   style={dateStyle}
                 />
               </label>
@@ -261,10 +260,9 @@ export function RfqDrawer({
                       <span style={{ font: "500 13px/1.3 var(--fx-font-sans)" }}>
                         {t('ui.rfq.won_ship_date')}
                       </span>
-                      <input
-                        type="date"
+                      <DateInput
                         value={wonShipDate}
-                        onChange={(e) => setWonShipDate(e.target.value)}
+                        onChange={setWonShipDate}
                         style={dateStyle}
                       />
                     </label>

@@ -7,6 +7,7 @@ import { InlineAlert } from '@/components/fx/feedback'
 import { actionErrorMessage } from '@/lib/action-error'
 import { Ident } from '@/components/fx/format'
 import { Badge, Button } from '@/components/fx/primitives'
+import { DateInput } from '@/components/fx/forms'
 import { addMachine, moveMachine } from '@/modules/maintenance/actions'
 import { factoryToday } from '@/lib/dates'
 
@@ -300,7 +301,7 @@ function MoveRow({
       </Field>
 
       <Field label="On">
-        <input type="date" value={on} onChange={(e) => setOn(e.target.value)} style={{ ...control, width: 160 }} />
+        <DateInput value={on} onChange={setOn} style={{ ...control, width: 160 }} />
       </Field>
 
       <Button

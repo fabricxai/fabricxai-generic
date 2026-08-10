@@ -16,7 +16,7 @@ import {
   previewMilestoneRipple,
   type RippleView,
 } from '@/modules/orders/actions'
-import { Select } from '@/components/fx/forms'
+import { DateInput, Select } from '@/components/fx/forms'
 
 /**
  * The TNA, moved rather than read (plan 5.1, audit FE-B2).
@@ -144,12 +144,11 @@ export function OrderTna({
             <span style={{ font: "500 13px/1.3 var(--fx-font-sans)" }}>
               {t('ui.orders.actual_date')}
             </span>
-            <input
-              type="date"
+            <DateInput
               value={actualDate}
-              onChange={(e) => {
-                setActualDate(e.target.value)
-                if (target && e.target.value) load(target, e.target.value)
+              onChange={(next) => {
+                setActualDate(next)
+                if (target && next) load(target, next)
               }}
               style={{
                 font: "400 15px/1.2 var(--fx-font-mono)",
@@ -326,10 +325,9 @@ function GenerateSchedule({
           <span style={{ font: "500 12px/1 var(--fx-font-mono)", letterSpacing: '.05em', textTransform: 'uppercase', color: 'var(--fx-text-tertiary)' }}>
             {t('ui.orders.tna_ex_factory')}
           </span>
-          <input
-            type="date"
+          <DateInput
             value={exFactory}
-            onChange={(e) => setExFactory(e.target.value)}
+            onChange={setExFactory}
             style={{
               font: "400 14px/1.2 var(--fx-font-sans)",
               padding: '10px 12px',

@@ -8,6 +8,7 @@ import { actionErrorMessage } from '@/lib/action-error'
 import { unwrap } from '@/lib/action-failure'
 import { Badge, Button } from '@/components/fx/primitives'
 import { SectionHeading } from '@/components/fx/signature'
+import { DateInput } from '@/components/fx/forms'
 import { linkLcToOrder, openBtbCredit, recordLcAmendment } from '@/modules/commercial/actions'
 import { factoryToday } from '@/lib/dates'
 
@@ -371,10 +372,9 @@ export function LcDetailClient({
 
           <label style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: '0 1 170px', minWidth: 0 }}>
             <span style={fieldLabel}>Advised on</span>
-            <input
-              type="date"
+            <DateInput
               value={receivedAt}
-              onChange={(e) => setReceivedAt(e.target.value)}
+              onChange={setReceivedAt}
               style={control}
             />
           </label>

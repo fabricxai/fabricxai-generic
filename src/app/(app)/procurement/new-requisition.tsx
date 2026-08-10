@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 
 import { InlineAlert, Modal } from '@/components/fx/feedback'
-import { TextInput } from '@/components/fx/forms'
+import { DateInput, TextInput } from '@/components/fx/forms'
 import { Button } from '@/components/fx/primitives'
 import { actionErrorMessage } from '@/lib/action-error'
 import { createPurchaseRequisition } from '@/modules/procurement/actions'
@@ -98,10 +98,9 @@ export function NewRequisitionButton({ items }: { items: readonly Item[] }) {
 
           <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <span style={{ font: "500 13px/1.3 var(--fx-font-sans)" }}>Needed by</span>
-            <input
-              type="date"
+            <DateInput
               value={neededBy}
-              onChange={(e) => setNeededBy(e.target.value)}
+              onChange={setNeededBy}
               style={control}
             />
             <span

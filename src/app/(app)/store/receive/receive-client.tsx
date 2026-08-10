@@ -8,6 +8,7 @@ import { SyncPill } from '@/components/fx/floor'
 import { useT } from '@/components/fx/locale'
 import { Button } from '@/components/fx/primitives'
 import { SectionHeading } from '@/components/fx/signature'
+import { DateInput } from '@/components/fx/forms'
 import { useOfflineQueue } from '@/lib/offline/use-offline-queue'
 import { compareQty, quantity, subtractQty, sumQty, zeroQty } from '@/lib/quantity'
 import {
@@ -349,10 +350,9 @@ export function ReceiveClient({
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <span style={label}>{t('ui.store.field_received_on')}</span>
-          <input
-            type="date"
+          <DateInput
             value={receivedAt}
-            onChange={(e) => setReceivedAt(e.target.value)}
+            onChange={setReceivedAt}
             style={field}
           />
         </label>

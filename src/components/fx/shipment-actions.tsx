@@ -9,6 +9,7 @@ import { actionErrorMessage } from '@/lib/action-error'
 import { unwrap } from '@/lib/action-failure'
 import { uploadDocument } from '@/lib/upload-document'
 import { Badge, Button } from '@/components/fx/primitives'
+import { DateInput } from '@/components/fx/forms'
 import {
   acceptLcDateBreach,
   buildShipmentDocChecklist,
@@ -168,10 +169,9 @@ export function ShipmentActions({ state }: { state: ShipmentActionState }) {
           <>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
               <span style={smallLabel}>Left the factory on</span>
-              <input
-                type="date"
+              <DateInput
                 value={leftOn}
-                onChange={(e) => setLeftOn(e.target.value)}
+                onChange={setLeftOn}
                 style={control}
               />
             </label>

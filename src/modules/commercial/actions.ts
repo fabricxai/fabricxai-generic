@@ -37,6 +37,10 @@ import { factoryToday } from '@/lib/dates'
  *
  * Commercial and the owner only. An LC is a promise to pay held at a bank, and its two dates
  * — latest shipment and expiry — are the ones every shipment crisis is about.
+ *
+ * Refusals come back as VALUES. A duplicate credit number and a mis-keyed pair of dates are
+ * both things a person can fix in the form in front of them, and production masks anything a
+ * server action throws — so both arrived as React error #441 until this was surfaced.
  */
 export async function createLc(input: {
   buyerId: string
@@ -50,14 +54,17 @@ export async function createLc(input: {
   /** `{ commercial_invoice: true, bl: true }` — a MAP, because 8.1 looks documents up by kind. */
   docsRequired?: Record<string, boolean>
   documentId?: string
-}): Promise<{ lcId: string; number: string }> {
-  const ctx = await requireRole(await headers(), 'commercial')
-  const result = await createLcIn(ctx, input)
+}): Promise<{ lcId: string; number: string } | ActionFailure> {
+  return surfaced(async () => {
+    // Inside the boundary, so "your role does not allow this" is a sentence too.
+    const ctx = await requireRole(await headers(), 'commercial')
+    const result = await createLcIn(ctx, input)
 
-  revalidatePath('/lcs')
-  // The shipment desk reads the credit's dates before it confirms a departure.
-  revalidatePath('/shipment')
-  return result
+    revalidatePath('/lcs')
+    // The shipment desk reads the credit's dates before it confirms a departure.
+    revalidatePath('/shipment')
+    return result
+  })
 }
 
 /**

@@ -155,3 +155,58 @@ export function formatFactoryDate(
     year: 'numeric',
   }).format(value)
 }
+
+/**
+ * ## Typing a date, as opposed to reading one
+ *
+ * `formatFactoryDate` fixed how dates are DISPLAYED. It did nothing for how they are
+ * ENTERED, and that is the half that corrupts data: `<input type="date">` renders in the
+ * BROWSER's locale, which no page can override, so on a machine configured for en-US the
+ * field asks for mm/dd/yyyy while its Bangladeshi operator types dd/mm.
+ *
+ * The failure is silent for every day ≤ 12. Live test, Phase 3: an LC expiry of 5 December
+ * was typed `05/12/2026`, stored as 12 May, and only surfaced because it landed before the
+ * latest-shipment date and a CHECK constraint caught it — as an unreadable React #441.
+ * A mis-keyed ex-factory date, CAP deadline or wage period has no constraint behind it and
+ * would simply have been wrong.
+ *
+ * These two functions are the boundary: everything above them speaks dd/mm/yyyy, everything
+ * below stays `YYYY-MM-DD`. Storage, APIs and zod are untouched.
+ */
+
+/** `2026-12-05` → `05/12/2026`. Anything that is not a calendar date → `''`. */
+export function toDateInputText(iso: string | null | undefined): string {
+  if (!iso) return ''
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : ''
+}
+
+/**
+ * `05/12/2026` → `2026-12-05`, or `null` when it is not yet a real date.
+ *
+ * Strict on purpose. A lenient parser is how `31/02` becomes 3 March: `Date` rolls overflow
+ * forward without complaint, so the round-trip comparison below is what rejects a day that
+ * does not exist in that month rather than quietly moving it.
+ */
+export function fromDateInputText(text: string): string | null {
+  const m = text.trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/)
+  if (!m) return null
+
+  const iso = `${m[3]}-${m[2]}-${m[1]}`
+  const parsed = new Date(`${iso}T00:00:00Z`)
+  if (Number.isNaN(parsed.getTime())) return null
+  return parsed.toISOString().slice(0, 10) === iso ? iso : null
+}
+
+/**
+ * What the field should show after this keystroke: digits, with the separators supplied.
+ *
+ * The trailing slash is added only once a digit follows it, or backspacing out of
+ * `05/` re-adds the slash the person just deleted and the field cannot be cleared.
+ */
+export function maskDateInput(raw: string): string {
+  const digits = raw.replace(/\D/g, '').slice(0, 8)
+  if (digits.length <= 2) return digits
+  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`
+}

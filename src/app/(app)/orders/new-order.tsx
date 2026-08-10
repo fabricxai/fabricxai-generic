@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 
 import { InlineAlert, Modal } from '@/components/fx/feedback'
-import { TextInput } from '@/components/fx/forms'
+import { DateInput, TextInput } from '@/components/fx/forms'
 import { useLocale, useT } from '@/components/fx/locale'
 import { Button } from '@/components/fx/primitives'
 import { actionErrorMessage } from '@/lib/action-error'
@@ -142,10 +142,9 @@ export function NewOrderButton({
             <span style={{ font: "500 13px/1.3 var(--fx-font-sans)" }}>
               {t('ui.orders.planned_ex_factory')}
             </span>
-            <input
-              type="date"
+            <DateInput
               value={exFactory}
-              onChange={(e) => setExFactory(e.target.value)}
+              onChange={setExFactory}
               style={{
                 font: "400 15px/1.2 var(--fx-font-mono)",
                 padding: '10px 12px',

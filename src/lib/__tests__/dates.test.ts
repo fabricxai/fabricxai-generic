@@ -13,8 +13,11 @@ import {
   factoryHour,
   factoryMonth,
   factoryToday,
+  fromDateInputText,
+  maskDateInput,
   nextFactoryDate,
   startOfFactoryDay,
+  toDateInputText,
   toFactoryDate,
 } from '@/lib/dates'
 
@@ -103,5 +106,54 @@ describe('factoryHour', () => {
   it('tracks the working day', () => {
     // 04:00 UTC is 10:00 on the floor — mid-morning, the hour a supervisor is entering.
     expect(factoryHour('Asia/Dhaka', new Date('2026-08-09T04:00:00Z'))).toBe(10)
+  })
+})
+
+describe('typed dates — dd/mm/yyyy in, ISO out', () => {
+  it('round-trips the date that caused this', () => {
+    // Live test, Phase 3: LC-4471's expiry is 5 December 2026. Typed dd/mm into a field
+    // the browser was reading as mm/dd, it was stored as 12 May and refused by the
+    // expiry-after-latest-shipment CHECK as an unreadable React #441.
+    expect(fromDateInputText('05/12/2026')).toBe('2026-12-05')
+    expect(toDateInputText('2026-12-05')).toBe('05/12/2026')
+  })
+
+  it('never lets an impossible day roll forward', () => {
+    // `new Date('2026-02-31')` is 3 March in a lenient parser. A silently moved date is
+    // worse than a refused one — this is an ex-factory commitment or a CAP deadline.
+    expect(fromDateInputText('31/02/2026')).toBeNull()
+    expect(fromDateInputText('31/04/2026')).toBeNull()
+    expect(fromDateInputText('29/02/2026')).toBeNull()
+    // 2028 is a leap year, so this one is real.
+    expect(fromDateInputText('29/02/2028')).toBe('2028-02-29')
+  })
+
+  it('refuses what is merely incomplete, without guessing', () => {
+    expect(fromDateInputText('')).toBeNull()
+    expect(fromDateInputText('05/12')).toBeNull()
+    expect(fromDateInputText('5/12/2026')).toBeNull()
+    expect(fromDateInputText('2026-12-05')).toBeNull()
+    expect(fromDateInputText('05/13/2026')).toBeNull()
+  })
+
+  it('shows nothing rather than a half-parsed date', () => {
+    expect(toDateInputText('')).toBe('')
+    expect(toDateInputText(null)).toBe('')
+    expect(toDateInputText('2026-12')).toBe('')
+  })
+
+  it('supplies separators while typing, and lets them be deleted', () => {
+    expect(maskDateInput('0')).toBe('0')
+    expect(maskDateInput('05')).toBe('05')
+    expect(maskDateInput('051')).toBe('05/1')
+    expect(maskDateInput('05122026')).toBe('05/12/2026')
+    // Backspacing over the separator must not immediately re-add it, or the field
+    // cannot be cleared: '05/' minus its slash is '05', and stays '05'.
+    expect(maskDateInput('05/')).toBe('05')
+    // Paste of an already-formatted date, and of one from elsewhere.
+    expect(maskDateInput('05/12/2026')).toBe('05/12/2026')
+    expect(maskDateInput('05-12-2026')).toBe('05/12/2026')
+    // Nothing beyond eight digits survives.
+    expect(maskDateInput('0512202699')).toBe('05/12/2026')
   })
 })

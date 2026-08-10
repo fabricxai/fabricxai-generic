@@ -1582,6 +1582,29 @@ export async function createLc(
 ): Promise<{ lcId: string; number: string }> {
   const payload = createLcPayload.parse(input)
 
+  /*
+   * The two dates, checked here rather than only by the CHECK constraint behind them.
+   *
+   * `lcs_expiry_after_latest_shipment` has forbidden this combination since 0008, and the
+   * register's own comment reasons that a screen handling it would be unreachable code. That
+   * was true of every path that READS an LC and false of the one that creates one: a driver
+   * error is not an `AppError`, so the constraint fired as a raw Postgres exception and the
+   * person saw React #441 with no clue which field to fix (live test, Phase 3 — an expiry of
+   * 5 December typed into a browser reading mm/dd, stored as 12 May).
+   *
+   * The database keeps the guarantee; this gives it a sentence.
+   */
+  if (
+    payload.expiryDate &&
+    payload.latestShipmentDate &&
+    payload.expiryDate < payload.latestShipmentDate
+  ) {
+    throw new AppError('validation_failed', 'commercial.errors.lc_expiry_before_shipment', {
+      expiry: payload.expiryDate,
+      latestShipment: payload.latestShipmentDate,
+    })
+  }
+
   return withTenantTx(ctx, async (tx) => {
     const [existing] = await tx.select({ id: lcs.id }).from(lcs).where(scoped(lcs, ctx, eq(lcs.number, payload.number)))
     if (existing) {

@@ -62,6 +62,12 @@ export const UI_MESSAGES: Catalogue = {
     'ui.common.read_only': 'Read only',
     'ui.common.read_only_body':
       'Your role can read {what} but not change it. Ask an owner or admin if you need to.',
+    /* Dates are typed day-first, everywhere, in both languages. The placeholder is the
+       instruction: a browser's own date field asks in whatever order its locale prefers,
+       which is how 5 December was entered and stored as 12 May (live test, Phase 3). */
+    'ui.common.date_placeholder': 'dd/mm/yyyy',
+    'ui.common.date_invalid': 'Enter the date as dd/mm/yyyy — day first, then month.',
+    'ui.common.date_pick': 'Pick from a calendar',
     'ui.common.search': 'Search',
     'ui.common.submit': 'Submit',
     'ui.common.total': 'Total',
@@ -160,6 +166,7 @@ export const UI_MESSAGES: Catalogue = {
     // sidebar. The department names a Bangladeshi factory already says in English stay in
     // English — MARBIM, LC, UD, RFQ, TNA, HR — because transliterating them would be a
     // worse screen, not a more Bangla one.
+    'ui.nav.home': 'Your work',
     'ui.nav.approve': 'Approve inbox',
     'ui.nav.marbim': 'MARBIM',
     'ui.nav.orders': 'Order desk & TNA',
@@ -211,6 +218,7 @@ export const UI_MESSAGES: Catalogue = {
     // from the sidebar label because a heading and a sentence want different words: "Owner
     // dashboard" reads as a heading, "the owner dashboard" reads as English. Bangla takes
     // no article, so its side is the plain name.
+    'ui.nav.locked_home': 'your work',
     'ui.nav.locked_approve': 'approve inbox',
     'ui.nav.locked_marbim': 'marbim',
     'ui.nav.locked_orders': 'order desk & tna',
@@ -1239,6 +1247,9 @@ export const UI_MESSAGES: Catalogue = {
     'ui.common.read_only': 'শুধু পড়া',
     'ui.common.read_only_body':
       'আপনার রোল {what} পড়তে পারে, বদলাতে পারে না। দরকার হলে ওনার বা অ্যাডমিনকে বলুন।',
+    'ui.common.date_placeholder': 'দিন/মাস/বছর',
+    'ui.common.date_invalid': 'তারিখ দিন/মাস/বছর হিসেবে লিখুন — আগে দিন, পরে মাস।',
+    'ui.common.date_pick': 'ক্যালেন্ডার থেকে বাছুন',
     'ui.common.search': 'খুঁজুন',
     'ui.common.submit': 'জমা দিন',
     'ui.common.total': 'মোট',
@@ -1318,6 +1329,7 @@ export const UI_MESSAGES: Catalogue = {
     'ui.auth.save_password': 'পাসওয়ার্ড সেভ করুন',
 
     // ── nav ──
+    'ui.nav.home': 'আপনার কাজ',
     'ui.nav.approve': 'অ্যাপ্রুভ ইনবক্স',
     'ui.nav.marbim': 'MARBIM',
     'ui.nav.orders': 'অর্ডার ডেস্ক ও TNA',
@@ -1365,6 +1377,7 @@ export const UI_MESSAGES: Catalogue = {
     'ui.role.finance': 'ফাইন্যান্স',
     'ui.role.member': 'মেম্বার',
     'ui.role.viewer': 'ভিউয়ার',
+    'ui.nav.locked_home': 'আপনার কাজ',
     'ui.nav.locked_approve': 'অ্যাপ্রুভ ইনবক্স',
     'ui.nav.locked_marbim': 'MARBIM',
     'ui.nav.locked_orders': 'অর্ডার ডেস্ক',

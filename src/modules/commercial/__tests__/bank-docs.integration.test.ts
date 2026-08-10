@@ -325,6 +325,39 @@ describe('2.1 · a credit and a presentation leave a trail', () => {
     expect((rows[0]!.after as Record<string, unknown>).value).toBe('250000.00')
   })
 
+  it('refuses a credit that expires before its goods may ship, in words', async () => {
+    // The CHECK constraint has forbidden this since 0008 — but a driver error is not an
+    // AppError, so it reached the person as React #441 with no field named (live test,
+    // Phase 3: 5 December typed into a browser reading mm/dd, stored as 12 May).
+    await expect(
+      createLc(ctx, {
+        buyerId,
+        number: `LC-BACKWARDS-${Date.now()}`,
+        value: '244800.00',
+        currency: 'USD',
+        latestShipmentDate: '2026-11-18',
+        expiryDate: '2026-05-12',
+        docsRequired: {},
+      }),
+    ).rejects.toThrow(/lc_expiry_before_shipment/)
+  })
+
+  it('allows the two dates to fall on the same day', async () => {
+    // Tight, but legal: documents presented the day the goods go on board. A `>` check
+    // instead of `>=` would refuse a real credit, which is the worse failure.
+    const { lcId } = await createLc(ctx, {
+      buyerId,
+      number: `LC-SAMEDAY-${Date.now()}`,
+      value: '1000.00',
+      currency: 'USD',
+      latestShipmentDate: '2026-11-18',
+      expiryDate: '2026-11-18',
+      docsRequired: {},
+    })
+
+    expect(lcId).toBeTruthy()
+  })
+
   it('audits a bank presentation when it is opened', async () => {
     const { submissionId } = await openSubmission(ctx, {
       lcId: await newLc(),

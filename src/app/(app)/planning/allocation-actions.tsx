@@ -6,6 +6,7 @@ import { useState, useTransition } from 'react'
 import { InlineAlert, Modal, Toast } from '@/components/fx/feedback'
 import { useLocale, useT } from '@/components/fx/locale'
 import { Button } from '@/components/fx/primitives'
+import { DateInput } from '@/components/fx/forms'
 import { actionErrorMessage } from '@/lib/action-error'
 import { moveAllocation, setAllocationStatus } from '@/modules/planning/actions'
 // From `capacity.ts`, which is pure. Importing the SERVICE here would pull the database
@@ -200,11 +201,10 @@ export function RunActions({ run, canWrite }: { run: RunSummary; canWrite: boole
               <span style={{ font: "500 13px/1.3 var(--fx-font-sans)" }}>
                 {t('ui.planning.from')}
               </span>
-              <input
-                type="date"
+              <DateInput
                 value={startDate}
-                onChange={(e) => {
-                  setStartDate(e.target.value)
+                onChange={(next) => {
+                  setStartDate(next)
                   setViolations(null)
                   setFits(null)
                 }}
@@ -215,11 +215,10 @@ export function RunActions({ run, canWrite }: { run: RunSummary; canWrite: boole
               <span style={{ font: "500 13px/1.3 var(--fx-font-sans)" }}>
                 {t('ui.planning.to')}
               </span>
-              <input
-                type="date"
+              <DateInput
                 value={endDate}
-                onChange={(e) => {
-                  setEndDate(e.target.value)
+                onChange={(next) => {
+                  setEndDate(next)
                   setViolations(null)
                   setFits(null)
                 }}

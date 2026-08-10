@@ -7,7 +7,7 @@ import { InlineAlert } from '@/components/fx/feedback'
 import { actionErrorMessage } from '@/lib/action-error'
 import { Badge, Button } from '@/components/fx/primitives'
 import { SectionHeading } from '@/components/fx/signature'
-import { TextInput } from '@/components/fx/forms'
+import { DateInput, TextInput } from '@/components/fx/forms'
 import { factoryToday } from '@/lib/dates'
 import { issuePurchaseOrder, recordQuote } from '@/modules/procurement/actions'
 import type { QuoteComparison } from '@/modules/procurement/procurement'
@@ -356,10 +356,9 @@ export function RequisitionClient({
             </label>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 5, flex: '0 1 170px' }}>
               <span style={fieldLabel}>Quoted on</span>
-              <input
-                type="date"
+              <DateInput
                 value={quotedOn}
-                onChange={(e) => setQuotedOn(e.target.value)}
+                onChange={setQuotedOn}
                 style={control}
               />
             </label>

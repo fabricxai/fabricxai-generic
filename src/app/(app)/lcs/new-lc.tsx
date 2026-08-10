@@ -4,10 +4,11 @@ import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 
 import { InlineAlert, Modal } from '@/components/fx/feedback'
-import { TextInput } from '@/components/fx/forms'
+import { DateInput, TextInput } from '@/components/fx/forms'
 import { useLocale, useT } from '@/components/fx/locale'
 import { Button } from '@/components/fx/primitives'
 import { actionErrorMessage } from '@/lib/action-error'
+import { unwrap } from '@/lib/action-failure'
 import { createLc } from '@/modules/commercial/actions'
 
 /**
@@ -72,7 +73,7 @@ export function NewLcButton({ buyers }: { buyers: readonly { id: string; name: s
 
     startTransition(async () => {
       try {
-        const result = await createLc({
+        const result = unwrap(await createLc({
           buyerId,
           number: number.trim(),
           value: value.trim(),
@@ -84,7 +85,7 @@ export function NewLcButton({ buyers }: { buyers: readonly { id: string; name: s
           // Only the kinds actually ticked. An empty map is legal and means the checklist
           // gets built from whatever the shipment desk supplies instead.
           docsRequired: Object.fromEntries(Object.entries(docs).filter(([, on]) => on)),
-        })
+        }))
 
         setOpen(false)
         router.push(`/lcs/${result.lcId}`)
@@ -213,10 +214,9 @@ function DateField({
   return (
     <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       <span style={{ font: "500 13px/1.3 var(--fx-font-sans)" }}>{label}</span>
-      <input
-        type="date"
+      <DateInput
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={onChange}
         style={fieldStyle}
       />
     </label>

@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 
 import { InlineAlert, Modal } from '@/components/fx/feedback'
-import { TextInput } from '@/components/fx/forms'
+import { DateInput, TextInput } from '@/components/fx/forms'
 import { Button } from '@/components/fx/primitives'
 import { actionErrorMessage } from '@/lib/action-error'
 import { unwrap } from '@/lib/action-failure'
@@ -133,10 +133,9 @@ export function NewSampleButton({ orders }: { orders: readonly OrderChoice[] }) 
             />
             <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <span style={{ font: "500 13px/1.3 var(--fx-font-sans)" }}>Due</span>
-              <input
-                type="date"
+              <DateInput
                 value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
+                onChange={setDueDate}
                 style={control}
               />
             </label>

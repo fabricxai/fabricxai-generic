@@ -245,6 +245,12 @@ export const MESSAGES: Catalogue = {
       'This credit was issued by a different buyer than that order — a credit cannot pay for goods it was never opened against.',
     'commercial.errors.lc_number_exists':
       'A letter of credit with that number is already recorded.',
+    /* The schema has forbidden this since 0008, but only as a CHECK — so the refusal
+       reached the person as an unreadable React #441 (live test, Phase 3). No placeholders:
+       `AppError.details` do not survive a server action, and both dates are on screen in
+       the form the reader is looking at anyway. */
+    'commercial.errors.lc_expiry_before_shipment':
+      'This credit would expire before its own latest shipment date — the documents would be due at the bank before the goods are allowed to leave. Check the expiry and the latest shipment date; one of them is a day and month the wrong way round.',
     'commercial.errors.no_btb_limit':
       'No back-to-back limit is set on the master LC, so there is no headroom to draw against.',
     'commercial.errors.no_invoiced_amount':
@@ -671,6 +677,8 @@ export const MESSAGES: Catalogue = {
     'commercial.notifications.lc_countdown_expiry.title':
       'LC {lcNumber}: মেয়াদ শেষের ({date}) বাকি {daysLeft} দিন',
     'commercial.errors.order_not_found': 'সেই অর্ডারটি আর নেই, তাই ক্রেডিট এটি কভার করতে পারবে না।',
+    'commercial.errors.lc_expiry_before_shipment':
+      'এই ক্রেডিটের মেয়াদ তার শেষ শিপমেন্ট তারিখের আগেই শেষ হয়ে যাচ্ছে — অর্থাৎ পণ্য বেরোনোর আগেই ব্যাংকে কাগজ জমা দিতে হবে। মেয়াদ ও শেষ শিপমেন্ট — দুটি তারিখ দেখুন; একটিতে দিন আর মাস উল্টে গেছে।',
     'commercial.errors.lc_order_buyer_mismatch':
       'এই ক্রেডিট অন্য বায়ারের খোলা — যে পণ্যের জন্য ক্রেডিট খোলা হয়নি তার দাম এটি দিতে পারে না।',
     'commercial.lc.conflict.expiry': 'LC {lcNumber}-এর মেয়াদ শিপমেন্টের আগেই শেষ হয়ে যাবে',
