@@ -1,0 +1,75 @@
+# Deploy on tag — the deliberate act between "CI is green" and "the factory runs it".
+#
+# Pushing to main builds, tests and publishes an image; it deploys NOTHING. Shipping to
+# the VPS happens only when somebody either pushes a `v*` tag or presses Run workflow —
+# so a merged mistake cannot reach a live factory by momentum alone (handover audit GL-10,
+# closed by choosing the gated option deliberately).
+#
+# The SSH key this uses is forced to a single command on the VPS (`/opt/fabricxai/
+# deploy.sh`) that accepts exactly one thing: a bare image digest. A leaked key can
+# re-deploy an already-published image and nothing else — no shell, no pty, no forwarding.
+#
+# The image must already exist: main CI publishes `ghcr.io/<repo>:<commit-sha>` for every
+# green push. Tagging a commit that never went through main CI fails here with a clear
+# sentence rather than building an untested image on the spot.
+name: deploy
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: 'Commit SHA to deploy (must have a published image; defaults to the ref you run from)'
+        required: false
+
+concurrency:
+  # One deploy at a time, and a newer one does NOT cancel a live pull/up mid-flight.
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: deploy · baraka VPS
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Resolve the commit to deploy
+        id: commit
+        run: |
+          sha="${{ github.event.inputs.sha || github.sha }}"
+          echo "sha=${sha}" >> "$GITHUB_OUTPUT"
+          echo "Deploying commit ${sha}"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve the published image digest
+        id: digest
+        run: |
+          image="ghcr.io/${{ github.repository }}:${{ steps.commit.outputs.sha }}"
+          if ! digest=$(docker buildx imagetools inspect "$image" --format '{{json .Manifest.Digest}}' 2>/dev/null | tr -d '"'); then
+            echo "::error::No published image for ${{ steps.commit.outputs.sha }} — it never went through main CI's publish job. Push it to main first; tags deploy already-tested images, they do not build."
+            exit 1
+          fi
+          echo "digest=${digest}" >> "$GITHUB_OUTPUT"
+          echo "Resolved ${image} -> ${digest}"
+
+      - name: Deploy over SSH (forced command — digest only)
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "${{ secrets.DEPLOY_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          ssh -i ~/.ssh/deploy_key \
+              -o IdentitiesOnly=yes \
+              -o UserKnownHostsFile=~/.ssh/known_hosts \
+              -o StrictHostKeyChecking=yes \
+              "${{ secrets.DEPLOY_HOST }}" \
+              "${{ steps.digest.outputs.digest }}"
