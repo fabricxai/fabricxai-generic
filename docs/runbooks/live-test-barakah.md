@@ -384,12 +384,36 @@ Two deliberate weakenings, made after Phase 9 so the tenant could be re-walked b
 people without fighting the login form. Neither is safe once real data arrives, and both
 are one command to undo.
 
-1. **One shared password for all 18 seeded accounts.** `seed-day0.ts --reset-passwords
-   --password=<shared>`. Eighteen random 18-character secrets is its own source of failure
-   during a role sweep: a mistyped paste and a genuine role refusal look identical, and two
-   of this test's re-inspections were lost to exactly that class of confusion. The cost is
-   real and not small — one password is now every role in the company, owner-adjacent ones
-   included.
+1. **Role-named logins, one shared password.** `seed-day0.ts --reset-passwords
+   --password=<shared>`. Every account now signs in as its ROLE —
+   `quality@barakah.test`, not `mitu@` — and all of them share one password. Eighteen
+   random 18-character secrets against eighteen person-names is two lookups per sign-in
+   during a role sweep, and a mistyped paste is indistinguishable from a genuine role
+   refusal; two of this test's re-inspections were lost to exactly that confusion.
+
+   The names are unchanged — the screens still say Mitu Rani — and so are the user ids, so
+   every order, GRN, inspection and approval in this tenant keeps its author. The seed
+   renames rather than re-creates, for that reason.
+
+   | login | who | login | who |
+   |---|---|---|---|
+   | `admin@` | Admin | `quality@` | Mitu Rani |
+   | `manager@` | Sultana (admin) | `shipment@` | Jahid Hasan |
+   | `merchandiser@` | Rashida (Bestseller) | `maintenance@` | Sabbir Khan |
+   | `merchandiser2@` | Imran (H&M) | `hr@` | Farzana Yasmin |
+   | `commercial@` | Tanvir Ahmed | `compliance@` | Rumi Chowdhury |
+   | `planner@` | Nazmul Karim | `finance@` | Salma Khatun |
+   | `store@` | Karim Uddin | `procurement@` | *new* |
+   | `cutting@` | Rafiq Islam | `member@` | *new* |
+   | `production@` | Shilpi (L1/L2) | `viewer@` | Guest Viewer |
+   | `production2@` | Rina (L7/L8) | | |
+
+   `procurement@` and `member@` are new: nobody held either role through the whole live
+   test, so the requisition desk had to be run as commercial (#18) and the bottom of the
+   permission ladder was never signed into. **Owner remains `arif007lotus@gmail.com`** —
+   the seed refuses to add a second owner to a tenant that already has a real one.
+
+   The cost is real and not small: one password is now every role in this company.
    **Revert:** re-run `seed-day0.ts --reset-passwords` with no `--password`, and hand each
    person their own.
 

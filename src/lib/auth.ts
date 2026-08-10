@@ -101,7 +101,11 @@ export const auth = betterAuth({
    * a factory's real people sign in. The precedence lives in `authRateLimitEnabled`.
    */
   rateLimit: {
-    enabled: authRateLimitEnabled(env.NODE_ENV),
+    enabled: authRateLimitEnabled({
+      nodeEnv: env.NODE_ENV,
+      disabled: env.RATE_LIMIT_DISABLED,
+      enforce: process.env.RATE_LIMIT_ENFORCE,
+    }),
     storage: 'secondary-storage',
     window: 60,
     max: 60,

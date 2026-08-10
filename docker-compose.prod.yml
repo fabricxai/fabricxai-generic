@@ -9,18 +9,25 @@
 #   app        Next.js — the HTTP surface
 #   worker     BullMQ — schedules, event consumers, notifications
 #   migrate    one-shot; runs migrations and provisions roles, then exits
-#   postgres   the database
+#   postgres   the database — built locally, because it must carry pgbackrest
 #   pgbouncer  transaction pooling, scram auth, no password on disk
 #   redis      queues; AOF on, noeviction, password-protected
 #   minio      object storage for documents
+#   backup     pgBackRest, on demand (profile: backup) — never runs as a daemon
+#   docs-sync  rclone MinIO→offsite, every 15 minutes (profile: backup)
 #
 # Bring up:      docker compose -f docker-compose.prod.yml --env-file .env.production up -d
 # Deploy a build: see docs/runbooks/deploy.md — migrate runs BEFORE app/worker start.
 #
-# WHAT IS NOT HERE, and must be, before real factory data (audit INFRA-B3):
-#   backups. `docker/backup/` and docs/runbooks/restore.md cover pgBackRest and MinIO
-#   mirroring; until a restore has been REHEARSED once against a scratch host, this
-#   deployment has an undefined RPO and should not hold a payroll.
+# BACKUPS ARE PART OF THIS FILE NOW (audit INFRA-B3). `.env.backup` supplies the
+# repository credentials to `postgres` (for archive_command), `backup` and `docs-sync`;
+# it is optional at compose level only so a scratch host can come up without it. A
+# deployment holding factory data with no `.env.backup` archives no WAL — postgres logs
+# the archive_command failure every 5 minutes, loudly, which is the intended behaviour.
+#
+# Restores stay REHEARSED, not assumed: docs/runbooks/RESTORE-RUNBOOK.md is the drill,
+# scripts/restore-verify.sh runs a real weekly restore, docs/runbooks/restore.md is the
+# incident procedure.
 
 name: fabricxai
 
@@ -70,6 +77,14 @@ x-app-env: &app-env
   # which is reconnaissance rather than a status page. Generate with `openssl rand -hex 24`.
   HEALTH_TOKEN: ${HEALTH_TOKEN:-}
   WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-4}
+  # Stands the auth rate limiter down, sign-in included — for a tenant holding TEST data
+  # being walked through by several people from one address. Empty means the limiter runs,
+  # which is what production wants; only an exact `1` disables it.
+  #
+  # Passed through here on purpose. Setting it in .env.production alone would have done
+  # nothing at all — the same trap MARBIM_MODEL_EXTRACT fell into below, and the deploy
+  # contract test now refuses any documented variable that no consumer reads.
+  RATE_LIMIT_DISABLED: ${RATE_LIMIT_DISABLED:-}
   # Off until a real provider is registered (audit AI-B1). With it on, env.ts requires
   # at least one of the three keys below — not all three, as it used to.
   # Enabling this requires ANTHROPIC_API_KEY specifically, not just any of the three: the
@@ -223,8 +238,20 @@ services:
 
   postgres:
     <<: *service
-    image: pgvector/pgvector:pg16
+    # BUILT, not pulled — the image must carry pgbackrest, because archive_command runs
+    # inside this container. docker/postgres/Dockerfile explains why no sidecar can do
+    # it. First bring-up and every base-image bump needs:
+    #   docker compose -f docker-compose.prod.yml --env-file .env.production build postgres
+    build:
+      context: .
+      dockerfile: docker/postgres/Dockerfile
+    image: ${POSTGRES_IMAGE:-fabricxai/postgres-pgbackrest:pg16}
     container_name: fxai-postgres
+    # Repository credentials for archive_command. Optional at compose level so a scratch
+    # host comes up without it; a production host without it archives nothing.
+    env_file:
+      - path: .env.backup
+        required: false
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-fabricxai}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
@@ -240,10 +267,22 @@ services:
       - wal_level=replica
       - -c
       - archive_mode=on
-      # Replaced by pgBackRest's own command when backups land; `true` until then, which
-      # archives nothing and blocks nothing.
+      # THE line that makes RPO 15min real. It used to be `true` — a command that
+      # succeeds without archiving anything, which meant WAL was generated, recycled and
+      # never shipped, and `archive_mode=on` above was decoration. Every backup taken in
+      # that state could only be restored to the instant the backup ended.
+      #
+      # Overridable so a scratch or staging host can go back to `true` deliberately,
+      # rather than by forgetting.
       - -c
-      - archive_command=true
+      - archive_command=${POSTGRES_ARCHIVE_COMMAND:-pgbackrest --stanza=fabricxai archive-push %p}
+      # A WAL segment is archived when it FILLS or when this timer expires. Without it,
+      # a quiet afternoon on the order desk leaves the current segment unarchived
+      # indefinitely and the real recovery point drifts hours past the promise. 5 minutes
+      # is a third of the RPO budget; the cost is one mostly-empty segment per idle
+      # period, which zstd compresses to a few kilobytes.
+      - -c
+      - archive_timeout=${POSTGRES_ARCHIVE_TIMEOUT:-300}
       - -c
       - max_wal_senders=3
       - -c
@@ -315,6 +354,15 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+      # Shared with the `backup` service. pgBackRest reaches Postgres over the unix
+      # socket — it has no TCP option for that connection — so the socket directory has
+      # to be a volume both containers see.
+      - pgsocket:/var/run/postgresql
+      - ./docker/backup/pgbackrest.conf:/etc/pgbackrest/pgbackrest.conf:ro
+      # Async archiving spools here before shipping. On a volume, not a tmpfs: a restart
+      # with a full spool must not discard WAL that has not reached the repository yet.
+      - pgbackrest-spool:/var/spool/pgbackrest
+      - pgbackrest-log:/var/log/pgbackrest
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-fabricxai} -d ${POSTGRES_DB:-fabricxai}']
       interval: 10s
@@ -423,9 +471,77 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?}
       S3_BUCKET: ${S3_BUCKET:-fabricxai}
 
+  # ── Backups ──────────────────────────────────────────────────────────────────────
+  #
+  # Both are `profiles: [backup]`, so `up -d` never starts them and nothing here runs as
+  # a daemon. They are invoked by scripts/ and by the systemd timers in ops/systemd/;
+  # `docker compose run` activates a service's profile automatically.
+
+  # pgBackRest, from the same image as postgres so the binary and the server agree on
+  # version. Runs as `postgres` because that is who owns the data directory it restores
+  # into and the spool it writes.
+  backup:
+    build:
+      context: .
+      dockerfile: docker/postgres/Dockerfile
+    image: ${POSTGRES_IMAGE:-fabricxai/postgres-pgbackrest:pg16}
+    container_name: fxai-backup
+    profiles: [backup]
+    restart: 'no'
+    entrypoint: ['pgbackrest']
+    user: postgres
+    env_file:
+      - path: .env.backup
+        required: false
+    environment:
+      # Tracks .env.production rather than being a second place to change the same name.
+      PGBACKREST_PG1_USER: ${POSTGRES_USER:-fabricxai}
+      PGBACKREST_PG1_DATABASE: ${POSTGRES_DB:-fabricxai}
+      # `--auth-local=scram-sha-256` means even the unix socket wants a password, and
+      # libpq reads it from here. archive-push does NOT need this (it copies a file and
+      # never connects); backup, check and stanza-create do.
+      PGPASSWORD: ${POSTGRES_PASSWORD:?}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - pgsocket:/var/run/postgresql
+      - ./docker/backup/pgbackrest.conf:/etc/pgbackrest/pgbackrest.conf:ro
+      - pgbackrest-spool:/var/spool/pgbackrest
+      - pgbackrest-log:/var/log/pgbackrest
+
+  # rclone, MinIO → offsite object storage, every 15 minutes (ops/systemd).
+  #
+  # This replaced a nightly `mc mirror`. The database's RPO was 15 minutes and the
+  # documents' was 24 hours, which means a restore could produce a GRN row whose challan
+  # photo did not exist — the row says a customs officer was shown a document and the
+  # bytes are gone. One RPO, both halves.
+  docs-sync:
+    image: rclone/rclone:1.71
+    container_name: fxai-docs-sync
+    profiles: [backup]
+    restart: 'no'
+    env_file:
+      - path: .env.backup
+        required: false
+    environment:
+      # rclone builds remotes straight from the environment — no config file on disk,
+      # no credentials in a mounted volume. `src` is this deployment's MinIO.
+      RCLONE_CONFIG_SRC_TYPE: s3
+      RCLONE_CONFIG_SRC_PROVIDER: Minio
+      RCLONE_CONFIG_SRC_ENDPOINT: http://minio:9000
+      RCLONE_CONFIG_SRC_ACCESS_KEY_ID: ${MINIO_ROOT_USER:?}
+      RCLONE_CONFIG_SRC_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:?}
+      RCLONE_CONFIG_SRC_FORCE_PATH_STYLE: 'true'
+      # `dst` comes entirely from .env.backup (RCLONE_CONFIG_DST_*), so the offsite
+      # provider can be changed without touching this file.
+      S3_BUCKET: ${S3_BUCKET:-fabricxai}
+
 volumes:
   pgdata:
   redisdata:
   miniodata:
   caddy-data:
   caddy-config:
+  # Shared between postgres and backup — see the postgres service.
+  pgsocket:
+  pgbackrest-spool:
+  pgbackrest-log:

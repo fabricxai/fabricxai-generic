@@ -120,6 +120,21 @@ const baseSchema = z.object({
 
   SENTRY_DSN: z.string().optional(),
 
+  /**
+   * `1` stands the auth rate limiter down — sign-in included — even in production.
+   *
+   * For a tenant holding TEST data walked through by several people at once: the sign-in
+   * limit is ten per five minutes per IP, an office shares one address, and the login form
+   * reports the resulting 429 in the same words it uses for a wrong password.
+   *
+   * Declared here rather than read as a bare `process.env` so it passes the compose ↔ env
+   * contract: a variable the compose file forwards and the schema has never heard of is
+   * indistinguishable from a typo, and one nothing forwards is documentation for a switch
+   * that does nothing. Only an exact `1` disables; `false`, `0` and blank all leave the
+   * limiter running, because those are what somebody types when they mean ON.
+   */
+  RATE_LIMIT_DISABLED: z.string().optional(),
+
   /** BullMQ default per-queue concurrency in the worker process. */
   WORKER_CONCURRENCY: z.coerce.number().int().positive().default(5),
 })

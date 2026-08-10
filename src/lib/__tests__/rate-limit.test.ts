@@ -17,28 +17,28 @@ import { authRateLimitEnabled } from '@/lib/rate-limit'
 
 describe('the auth limiter runs when it should', () => {
   it('is on in production and off everywhere else, by default', () => {
-    expect(authRateLimitEnabled('production', {})).toBe(true)
-    expect(authRateLimitEnabled('development', {})).toBe(false)
-    expect(authRateLimitEnabled('test', {})).toBe(false)
+    expect(authRateLimitEnabled({ nodeEnv: 'production' })).toBe(true)
+    expect(authRateLimitEnabled({ nodeEnv: 'development' })).toBe(false)
+    expect(authRateLimitEnabled({ nodeEnv: 'test' })).toBe(false)
   })
 
   it('can be turned on outside production, to exercise the limits', () => {
     // How the integration job proves the numbers refuse anything at all.
-    expect(authRateLimitEnabled('test', { RATE_LIMIT_ENFORCE: '1' })).toBe(true)
+    expect(authRateLimitEnabled({ nodeEnv: 'test', enforce: '1' })).toBe(true)
   })
 
   it('can be turned off inside production, for a tenant holding test data', () => {
-    expect(authRateLimitEnabled('production', { RATE_LIMIT_DISABLED: '1' })).toBe(false)
+    expect(authRateLimitEnabled({ nodeEnv: 'production', disabled: '1' })).toBe(false)
   })
 
   it('lets an explicit off beat an ambient on', () => {
     // The precedence that matters: a stale ENFORCE in the environment must not quietly
     // re-arm the limiter for somebody who has deliberately disabled it.
     expect(
-      authRateLimitEnabled('test', { RATE_LIMIT_ENFORCE: '1', RATE_LIMIT_DISABLED: '1' }),
+      authRateLimitEnabled({ nodeEnv: 'test', enforce: '1', disabled: '1' }),
     ).toBe(false)
     expect(
-      authRateLimitEnabled('production', { RATE_LIMIT_ENFORCE: '1', RATE_LIMIT_DISABLED: '1' }),
+      authRateLimitEnabled({ nodeEnv: 'production', enforce: '1', disabled: '1' }),
     ).toBe(false)
   })
 
@@ -46,7 +46,7 @@ describe('the auth limiter runs when it should', () => {
     // `RATE_LIMIT_DISABLED=false` and `=0` are what somebody types when they mean ON.
     // Truthiness on a string would read both as "disable", which is the opposite.
     for (const value of ['0', 'false', 'no', '', 'true']) {
-      expect(authRateLimitEnabled('production', { RATE_LIMIT_DISABLED: value })).toBe(true)
+      expect(authRateLimitEnabled({ nodeEnv: 'production', disabled: value })).toBe(true)
     }
   })
 })

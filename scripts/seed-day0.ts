@@ -166,7 +166,40 @@ const ROLE_MAP: Record<string, Role> = {
   packing: 'shipment',
   mechanic: 'maintenance',
   accounts: 'finance',
+  procurement: 'procurement',
+  member: 'member',
 }
+
+/**
+ * The addresses these people signed in with before the switch to role-based logins.
+ *
+ * Applied as a RENAME, not left to the upsert. Users are keyed by email, so shipping the new
+ * list alone would create seventeen fresh accounts beside the originals — and the originals
+ * are who cut the fabric: every order, GRN, inspection and approval in this tenant carries
+ * their user id in `created_by` and in `audit_log`. A duplicate set would leave that history
+ * attributed to accounts nobody can sign into, which is the one thing an audit trail may not
+ * do.
+ *
+ * Idempotent, and safe to run against a tenant that has already been converted: it moves an
+ * address only when the old one is still there and the new one is not.
+ */
+const RENAMED_LOGINS: ReadonlyArray<readonly [from: string, to: string]> = [
+  ['rashida@barakah.test', 'merchandiser@barakah.test'],
+  ['imran@barakah.test', 'merchandiser2@barakah.test'],
+  ['sultana@barakah.test', 'manager@barakah.test'],
+  ['tanvir@barakah.test', 'commercial@barakah.test'],
+  ['nazmul@barakah.test', 'planner@barakah.test'],
+  ['karim@barakah.test', 'store@barakah.test'],
+  ['rafiq@barakah.test', 'cutting@barakah.test'],
+  ['shilpi@barakah.test', 'production@barakah.test'],
+  ['rina@barakah.test', 'production2@barakah.test'],
+  ['mitu@barakah.test', 'quality@barakah.test'],
+  ['jahid@barakah.test', 'shipment@barakah.test'],
+  ['sabbir@barakah.test', 'maintenance@barakah.test'],
+  ['farzana@barakah.test', 'hr@barakah.test'],
+  ['rumi@barakah.test', 'compliance@barakah.test'],
+  ['salma@barakah.test', 'finance@barakah.test'],
+]
 
 interface KitUser {
   name: string
@@ -177,24 +210,46 @@ interface KitUser {
   dept?: string
 }
 
+/**
+ * Addresses are the ROLE, not the person — `quality@barakah.test`, not `mitu@`.
+ *
+ * The names stay: they are what the screens show, what the kit's cast sheet calls these
+ * people, and what makes a walkthrough read like a factory rather than a permissions matrix.
+ * Only the login changes, and it changes because of what a role sweep actually is — signing
+ * in as eighteen people in an afternoon, each time asking "which of these names holds the
+ * store role again?" and looking it up. The address should answer that question, since it is
+ * the one being tested. `seed-fabricxai-fashion.ts` settled on the same convention for the
+ * same reason; this brings Barakah into line with it.
+ *
+ * Two roles carry a second holder, because the scope is the point: two merchandisers so a
+ * buyer book can be narrowed to one of them, two supervisors so line scope has something to
+ * exclude. Those take a `2` — the alternative, inventing a distinct word for a role that has
+ * exactly one meaning, would be worse.
+ */
 const USERS: readonly KitUser[] = [
   { name: 'Owner (Mr. Rahman)', email: 'owner@barakah.test', role: 'owner' },
   { name: 'Admin', email: 'admin@barakah.test', role: 'admin' },
-  { name: 'Rashida Akter', email: 'rashida@barakah.test', role: 'merchandiser', scope: 'Bestseller' },
-  { name: 'Imran Hossain', email: 'imran@barakah.test', role: 'merchandiser', scope: 'H&M' },
-  { name: 'Merch Manager (Sultana)', email: 'sultana@barakah.test', role: 'manager', dept: 'merchandising' },
-  { name: 'Tanvir Ahmed', email: 'tanvir@barakah.test', role: 'commercial' },
-  { name: 'Nazmul Karim', email: 'nazmul@barakah.test', role: 'planner' },
-  { name: 'Karim Uddin', email: 'karim@barakah.test', role: 'storekeeper' },
-  { name: 'Rafiq Islam', email: 'rafiq@barakah.test', role: 'cutting' },
-  { name: 'Shilpi Begum', email: 'shilpi@barakah.test', role: 'supervisor', lines: ['L1', 'L2'] },
-  { name: 'Rina Das', email: 'rina@barakah.test', role: 'supervisor', lines: ['L7', 'L8'] },
-  { name: 'Mitu Rani', email: 'mitu@barakah.test', role: 'qc' },
-  { name: 'Jahid Hasan', email: 'jahid@barakah.test', role: 'packing' },
-  { name: 'Sabbir Khan', email: 'sabbir@barakah.test', role: 'mechanic' },
-  { name: 'Farzana Yasmin', email: 'farzana@barakah.test', role: 'hr' },
-  { name: 'Rumi Chowdhury', email: 'rumi@barakah.test', role: 'compliance' },
-  { name: 'Salma Khatun', email: 'salma@barakah.test', role: 'accounts' },
+  { name: 'Rashida Akter', email: 'merchandiser@barakah.test', role: 'merchandiser', scope: 'Bestseller' },
+  { name: 'Imran Hossain', email: 'merchandiser2@barakah.test', role: 'merchandiser', scope: 'H&M' },
+  { name: 'Merch Manager (Sultana)', email: 'manager@barakah.test', role: 'manager', dept: 'merchandising' },
+  { name: 'Tanvir Ahmed', email: 'commercial@barakah.test', role: 'commercial' },
+  { name: 'Nazmul Karim', email: 'planner@barakah.test', role: 'planner' },
+  { name: 'Karim Uddin', email: 'store@barakah.test', role: 'storekeeper' },
+  /* Nobody held `procurement` through the whole live test, so the requisition desk had to be
+     run as commercial (runbook #18). A role with no holder is a role nothing exercises. */
+  { name: 'Procurement Officer', email: 'procurement@barakah.test', role: 'procurement' },
+  { name: 'Rafiq Islam', email: 'cutting@barakah.test', role: 'cutting' },
+  { name: 'Shilpi Begum', email: 'production@barakah.test', role: 'supervisor', lines: ['L1', 'L2'] },
+  { name: 'Rina Das', email: 'production2@barakah.test', role: 'supervisor', lines: ['L7', 'L8'] },
+  { name: 'Mitu Rani', email: 'quality@barakah.test', role: 'qc' },
+  { name: 'Jahid Hasan', email: 'shipment@barakah.test', role: 'packing' },
+  { name: 'Sabbir Khan', email: 'maintenance@barakah.test', role: 'mechanic' },
+  { name: 'Farzana Yasmin', email: 'hr@barakah.test', role: 'hr' },
+  { name: 'Rumi Chowdhury', email: 'compliance@barakah.test', role: 'compliance' },
+  { name: 'Salma Khatun', email: 'finance@barakah.test', role: 'accounts' },
+  /* `member` is the floor of the permission ladder — signed in, no desk. The viewer's
+     redaction was found because somebody actually logged in as one (Phase 9). */
+  { name: 'General Member', email: 'member@barakah.test', role: 'member' },
   { name: 'Guest Viewer', email: 'viewer@barakah.test', role: 'viewer' },
 ]
 
@@ -508,6 +563,36 @@ async function main(): Promise<void> {
       )
     const kitEmails = new Set(USERS.map((u) => u.email))
     const externalOwner = realOwners.find((o) => !kitEmails.has(o.email))
+
+    // ── person-named logins → role-named ones, before anything is keyed by email ──
+    let renamed = 0
+    for (const [from, to] of RENAMED_LOGINS) {
+      const [old] = await db
+        .select({ id: schema.users.id })
+        .from(schema.users)
+        .where(eq(schema.users.email, from))
+      if (!old) continue
+
+      const [taken] = await db
+        .select({ id: schema.users.id })
+        .from(schema.users)
+        .where(eq(schema.users.email, to))
+      if (taken) {
+        // Both addresses exist: a previous run created the new one before this rename
+        // existed. Say so rather than merging two accounts by guesswork.
+        record('users (rename)', 0, 0, `${from} and ${to} BOTH exist — resolve by hand`)
+        continue
+      }
+
+      if (!DRY_RUN) {
+        await db
+          .update(schema.users)
+          .set({ email: to, updatedAt: new Date() })
+          .where(eq(schema.users.id, old.id))
+      }
+      renamed += 1
+    }
+    if (renamed > 0) record('users (rename)', 0, renamed, 'person-named logins → role@barakah.test')
 
     for (const person of USERS) {
       if (person.role === 'owner' && externalOwner) {

@@ -48,12 +48,15 @@ import { getRedis } from './redis'
  *     production instead of being discovered in it.
  *   · otherwise, on in production only.
  */
-export function authRateLimitEnabled(
-  nodeEnv: string,
-  processEnv: Record<string, string | undefined> = process.env,
-): boolean {
-  if (processEnv.RATE_LIMIT_DISABLED === '1') return false
-  return nodeEnv === 'production' || processEnv.RATE_LIMIT_ENFORCE === '1'
+export function authRateLimitEnabled(input: {
+  nodeEnv: string
+  /** `RATE_LIMIT_DISABLED`, validated by `env.ts` and forwarded by the compose file. */
+  disabled?: string | undefined
+  /** `RATE_LIMIT_ENFORCE` — a CI-only lever, so it stays a bare process variable. */
+  enforce?: string | undefined
+}): boolean {
+  if (input.disabled === '1') return false
+  return input.nodeEnv === 'production' || input.enforce === '1'
 }
 
 export interface RateLimit {
