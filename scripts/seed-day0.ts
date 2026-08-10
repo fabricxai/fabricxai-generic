@@ -1,7 +1,8 @@
 /**
- * Day-0 masters for Barakah Fashions Ltd.
+ * Day-0 masters for a garment factory — Barakah Fashions Ltd by default, any tenant by flag.
  *
- * `pnpm tsx scripts/seed-day0.ts [--company=<uuid>] [--reset-passwords] [--password=<shared>] [--dry-run]`
+ * `pnpm tsx scripts/seed-day0.ts [--company=<uuid>] [--reset-passwords] [--password=<shared>]`
+ * `                              [--name="Test Textile Ltd" --slug=test-textile --domain=testtextile.test]`
  *
  * The reference data a factory needs before anybody can do a day's work: who it is, how its
  * floor is laid out, who may sign in, who approves what, and the handful of tables the
@@ -71,15 +72,43 @@ import { createDirectClient, createDirectDb } from '@/db/direct'
 import * as schema from '@/db/schema'
 import type { Role } from '@/modules/core/ctx'
 
+const args = process.argv.slice(2)
+const flag = (name: string): string | undefined =>
+  args.find((a) => a.startsWith(`--${name}=`))?.split('=').slice(1).join('=')
+const has = (name: string): boolean => args.includes(`--${name}`)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Which tenant — Barakah unless told otherwise
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// The masters below describe A factory, not only Barakah's: a knit-composite plant with two
+// units, eight lines, a knitting section, wage grades, TNA templates and defect codes. That
+// is the day-0 shape any Bangladeshi garment exporter starts from, and the reason this file
+// can seed a second tenant at all.
+//
+// Three flags decide who it is for. The defaults reproduce Barakah exactly, so every command
+// written in the runbooks keeps working; anything else creates or updates its own tenant, in
+// its own company_id, sharing nothing.
+//
+//   --name="Test Textile Ltd" --slug=test-textile --domain=testtextile.test
+//
+const TENANT_NAME = flag('name') ?? 'Barakah Fashions Ltd'
+const TENANT_SLUG = flag('slug') ?? 'barakah-fashions'
+/** Logins are `<role>@<domain>`; the domain is per tenant so two of them cannot collide. */
+const DOMAIN = flag('domain') ?? 'barakah.test'
+
+/** A seeded person's address. The local part names the ROLE, which is what a sweep tests. */
+const emailOf = (person: { login: string }): string => `${person.login}@${DOMAIN}`
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Source data — transcribed from the live-test kit's structured-data/00-masters
 // ─────────────────────────────────────────────────────────────────────────────
 
 const COMPANY = {
-  name: 'Barakah Fashions Ltd',
-  slug: 'barakah-fashions',
+  name: TENANT_NAME,
+  slug: TENANT_SLUG,
   address: 'Plot 14, BSCIC Industrial Area, Tongi, Gazipur',
-  bondLicence: 'BL-2019-4471',
+  bondLicence: TENANT_SLUG === 'barakah-fashions' ? 'BL-2019-4471' : `BL-${TENANT_SLUG}`,
   /** company.json says "knit-composite (with woven unit)"; the enum's value is the prefix. */
   factoryType: 'knit-composite' as const,
 }
@@ -184,26 +213,27 @@ const ROLE_MAP: Record<string, Role> = {
  * address only when the old one is still there and the new one is not.
  */
 const RENAMED_LOGINS: ReadonlyArray<readonly [from: string, to: string]> = [
-  ['rashida@barakah.test', 'merchandiser@barakah.test'],
-  ['imran@barakah.test', 'merchandiser2@barakah.test'],
-  ['sultana@barakah.test', 'manager@barakah.test'],
-  ['tanvir@barakah.test', 'commercial@barakah.test'],
-  ['nazmul@barakah.test', 'planner@barakah.test'],
-  ['karim@barakah.test', 'store@barakah.test'],
-  ['rafiq@barakah.test', 'cutting@barakah.test'],
-  ['shilpi@barakah.test', 'production@barakah.test'],
-  ['rina@barakah.test', 'production2@barakah.test'],
-  ['mitu@barakah.test', 'quality@barakah.test'],
-  ['jahid@barakah.test', 'shipment@barakah.test'],
-  ['sabbir@barakah.test', 'maintenance@barakah.test'],
-  ['farzana@barakah.test', 'hr@barakah.test'],
-  ['rumi@barakah.test', 'compliance@barakah.test'],
-  ['salma@barakah.test', 'finance@barakah.test'],
+  ['rashida', 'merchandiser'],
+  ['imran', 'merchandiser2'],
+  ['sultana', 'manager'],
+  ['tanvir', 'commercial'],
+  ['nazmul', 'planner'],
+  ['karim', 'store'],
+  ['rafiq', 'cutting'],
+  ['shilpi', 'production'],
+  ['rina', 'production2'],
+  ['mitu', 'quality'],
+  ['jahid', 'shipment'],
+  ['sabbir', 'maintenance'],
+  ['farzana', 'hr'],
+  ['rumi', 'compliance'],
+  ['salma', 'finance'],
 ]
 
 interface KitUser {
   name: string
-  email: string
+  /** The local part. The domain comes from --domain, so this file can seed any tenant. */
+  login: string
   role: string
   scope?: string
   lines?: readonly string[]
@@ -227,30 +257,30 @@ interface KitUser {
  * exactly one meaning, would be worse.
  */
 const USERS: readonly KitUser[] = [
-  { name: 'Owner (Mr. Rahman)', email: 'owner@barakah.test', role: 'owner' },
-  { name: 'Admin', email: 'admin@barakah.test', role: 'admin' },
-  { name: 'Rashida Akter', email: 'merchandiser@barakah.test', role: 'merchandiser', scope: 'Bestseller' },
-  { name: 'Imran Hossain', email: 'merchandiser2@barakah.test', role: 'merchandiser', scope: 'H&M' },
-  { name: 'Merch Manager (Sultana)', email: 'manager@barakah.test', role: 'manager', dept: 'merchandising' },
-  { name: 'Tanvir Ahmed', email: 'commercial@barakah.test', role: 'commercial' },
-  { name: 'Nazmul Karim', email: 'planner@barakah.test', role: 'planner' },
-  { name: 'Karim Uddin', email: 'store@barakah.test', role: 'storekeeper' },
+  { name: 'Owner (Mr. Rahman)', login: 'owner', role: 'owner' },
+  { name: 'Admin', login: 'admin', role: 'admin' },
+  { name: 'Rashida Akter', login: 'merchandiser', role: 'merchandiser', scope: 'Bestseller' },
+  { name: 'Imran Hossain', login: 'merchandiser2', role: 'merchandiser', scope: 'H&M' },
+  { name: 'Merch Manager (Sultana)', login: 'manager', role: 'manager', dept: 'merchandising' },
+  { name: 'Tanvir Ahmed', login: 'commercial', role: 'commercial' },
+  { name: 'Nazmul Karim', login: 'planner', role: 'planner' },
+  { name: 'Karim Uddin', login: 'store', role: 'storekeeper' },
   /* Nobody held `procurement` through the whole live test, so the requisition desk had to be
      run as commercial (runbook #18). A role with no holder is a role nothing exercises. */
-  { name: 'Procurement Officer', email: 'procurement@barakah.test', role: 'procurement' },
-  { name: 'Rafiq Islam', email: 'cutting@barakah.test', role: 'cutting' },
-  { name: 'Shilpi Begum', email: 'production@barakah.test', role: 'supervisor', lines: ['L1', 'L2'] },
-  { name: 'Rina Das', email: 'production2@barakah.test', role: 'supervisor', lines: ['L7', 'L8'] },
-  { name: 'Mitu Rani', email: 'quality@barakah.test', role: 'qc' },
-  { name: 'Jahid Hasan', email: 'shipment@barakah.test', role: 'packing' },
-  { name: 'Sabbir Khan', email: 'maintenance@barakah.test', role: 'mechanic' },
-  { name: 'Farzana Yasmin', email: 'hr@barakah.test', role: 'hr' },
-  { name: 'Rumi Chowdhury', email: 'compliance@barakah.test', role: 'compliance' },
-  { name: 'Salma Khatun', email: 'finance@barakah.test', role: 'accounts' },
+  { name: 'Procurement Officer', login: 'procurement', role: 'procurement' },
+  { name: 'Rafiq Islam', login: 'cutting', role: 'cutting' },
+  { name: 'Shilpi Begum', login: 'production', role: 'supervisor', lines: ['L1', 'L2'] },
+  { name: 'Rina Das', login: 'production2', role: 'supervisor', lines: ['L7', 'L8'] },
+  { name: 'Mitu Rani', login: 'quality', role: 'qc' },
+  { name: 'Jahid Hasan', login: 'shipment', role: 'packing' },
+  { name: 'Sabbir Khan', login: 'maintenance', role: 'mechanic' },
+  { name: 'Farzana Yasmin', login: 'hr', role: 'hr' },
+  { name: 'Rumi Chowdhury', login: 'compliance', role: 'compliance' },
+  { name: 'Salma Khatun', login: 'finance', role: 'accounts' },
   /* `member` is the floor of the permission ladder — signed in, no desk. The viewer's
      redaction was found because somebody actually logged in as one (Phase 9). */
-  { name: 'General Member', email: 'member@barakah.test', role: 'member' },
-  { name: 'Guest Viewer', email: 'viewer@barakah.test', role: 'viewer' },
+  { name: 'General Member', login: 'member', role: 'member' },
+  { name: 'Guest Viewer', login: 'viewer', role: 'viewer' },
 ]
 
 /** `cutting` is already an enum value, so it needs no mapping entry — assert that stays true. */
@@ -352,11 +382,6 @@ const TNA_TEMPLATES = [
 // ─────────────────────────────────────────────────────────────────────────────
 // Runner
 // ─────────────────────────────────────────────────────────────────────────────
-
-const args = process.argv.slice(2)
-const flag = (name: string): string | undefined =>
-  args.find((a) => a.startsWith(`--${name}=`))?.split('=').slice(1).join('=')
-const has = (name: string): boolean => args.includes(`--${name}`)
 
 const RESET_PASSWORDS = has('reset-passwords')
 const DRY_RUN = has('dry-run')
@@ -561,33 +586,37 @@ async function main(): Promise<void> {
           sql`${schema.roles.revokedAt} is null`,
         ),
       )
-    const kitEmails = new Set(USERS.map((u) => u.email))
+    const kitEmails = new Set(USERS.map((u) => emailOf(u)))
     const externalOwner = realOwners.find((o) => !kitEmails.has(o.email))
 
     // ── person-named logins → role-named ones, before anything is keyed by email ──
+    //
+    // Barakah's own history, and nobody else's: it is the only tenant that ever had
+    // person-named addresses. A fresh tenant has nothing to rename and must not have this
+    // list applied to it — `rashida@testtextile.test` never existed.
     let renamed = 0
-    for (const [from, to] of RENAMED_LOGINS) {
+    for (const [from, to] of TENANT_SLUG === 'barakah-fashions' ? RENAMED_LOGINS : []) {
       const [old] = await db
         .select({ id: schema.users.id })
         .from(schema.users)
-        .where(eq(schema.users.email, from))
+        .where(eq(schema.users.email, `${from}@${DOMAIN}`))
       if (!old) continue
 
       const [taken] = await db
         .select({ id: schema.users.id })
         .from(schema.users)
-        .where(eq(schema.users.email, to))
+        .where(eq(schema.users.email, `${to}@${DOMAIN}`))
       if (taken) {
         // Both addresses exist: a previous run created the new one before this rename
         // existed. Say so rather than merging two accounts by guesswork.
-        record('users (rename)', 0, 0, `${from} and ${to} BOTH exist — resolve by hand`)
+        record('users (rename)', 0, 0, `${from}@ and ${to}@ BOTH exist — resolve by hand`)
         continue
       }
 
       if (!DRY_RUN) {
         await db
           .update(schema.users)
-          .set({ email: to, updatedAt: new Date() })
+          .set({ email: `${to}@${DOMAIN}`, updatedAt: new Date() })
           .where(eq(schema.users.id, old.id))
       }
       renamed += 1
@@ -596,18 +625,18 @@ async function main(): Promise<void> {
 
     for (const person of USERS) {
       if (person.role === 'owner' && externalOwner) {
-        record('users (owner)', 0, 0, `skipped ${person.email} — ${externalOwner.email} already owns this tenant`)
+        record('users (owner)', 0, 0, `skipped ${emailOf(person)} — ${externalOwner.email} already owns this tenant`)
         continue
       }
       const role = ROLE_MAP[person.role]
-      if (!role) throw new Error(`no role mapping for "${person.role}" (${person.email})`)
+      if (!role) throw new Error(`no role mapping for "${person.role}" (${emailOf(person)})`)
 
       const [existing] = await db
         .select({ id: schema.users.id })
         .from(schema.users)
-        .where(eq(schema.users.email, person.email))
+        .where(eq(schema.users.email, emailOf(person)))
 
-      const userId = existing?.id ?? `day0-${companyId.slice(0, 8)}-${person.email.split('@')[0]}`
+      const userId = existing?.id ?? `day0-${companyId.slice(0, 8)}-${person.login}`
 
       if (existing) {
         await db
@@ -618,7 +647,7 @@ async function main(): Promise<void> {
       } else {
         await db.insert(schema.users).values({
           id: userId,
-          email: person.email,
+          email: emailOf(person),
           name: person.name,
           emailVerified: true,
         })
@@ -673,7 +702,7 @@ async function main(): Promise<void> {
             password: hashed,
           })
         }
-        issued.push({ email: person.email, password })
+        issued.push({ email: emailOf(person), password })
       }
 
       // Scope narrows what the role can see. `{lines:[...]}` is the shape roles.scope
@@ -900,7 +929,7 @@ async function main(): Promise<void> {
 
 function report(companyId: string): void {
   const pad = (s: string, n: number): string => s.padEnd(n)
-  console.log(`\n[day0] Barakah Fashions Ltd · ${companyId}\n`)
+  console.log(`\n[day0] ${COMPANY.name} · ${companyId}\n`)
   console.log(`  ${pad('step', 24)} ${pad('new', 5)} ${pad('same', 5)} detail`)
   console.log(`  ${'─'.repeat(72)}`)
   for (const t of tally) {
@@ -914,7 +943,7 @@ function report(companyId: string): void {
     // somebody to copy the wrong row, and hides how few secrets are actually protecting
     // this tenant now.
     console.log(`\n[day0] CREDENTIALS — ONE SHARED PASSWORD for all ${issued.length} accounts:\n`)
-    console.log(`  every @barakah.test account   ${SHARED_PASSWORD}`)
+    console.log(`  every @${DOMAIN} account   ${SHARED_PASSWORD}`)
     console.log(`\n  ⚠ TEST TENANT ONLY. One password is every role in this company, owner`)
     console.log(`    included. Re-run WITHOUT --password before any real factory data arrives.`)
   } else if (issued.length > 0) {
