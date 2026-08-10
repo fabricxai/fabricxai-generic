@@ -377,3 +377,30 @@ Real candidates, in likelihood order: a screen missing a write path (the buyers 
 read-only until this week), a contract mismatch between modules, an i18n gap on floor
 screens (most are English; Bangla covers store/receive). Collect, don't debug live —
 bring the list back.
+
+## Testing convenience currently switched on — both must be reverted
+
+Two deliberate weakenings, made after Phase 9 so the tenant could be re-walked by several
+people without fighting the login form. Neither is safe once real data arrives, and both
+are one command to undo.
+
+1. **One shared password for all 18 seeded accounts.** `seed-day0.ts --reset-passwords
+   --password=<shared>`. Eighteen random 18-character secrets is its own source of failure
+   during a role sweep: a mistyped paste and a genuine role refusal look identical, and two
+   of this test's re-inspections were lost to exactly that class of confusion. The cost is
+   real and not small — one password is now every role in the company, owner-adjacent ones
+   included.
+   **Revert:** re-run `seed-day0.ts --reset-passwords` with no `--password`, and hand each
+   person their own.
+
+2. **The sign-in rate limiter is OFF in production** — `RATE_LIMIT_DISABLED=1` in
+   `/opt/fabricxai/.env.production`. The limit is ten attempts per five minutes per IP,
+   and an office of testers behind one address reaches it with a sweep half finished. The
+   login page reports that 429 as "That email and password did not match", so the limiter
+   presents as broken authentication rather than as a limit — which is a separate defect,
+   still owed: a rate-limited refusal deserves its own sentence, and the limit should key
+   on the account as well as the IP (HANDOVER-READINESS GL-8).
+   **Revert:** delete the line, `docker compose … up -d app worker`.
+
+Both are listed here rather than in the audit because they are states of THIS host, not
+properties of the code.

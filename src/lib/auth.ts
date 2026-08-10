@@ -30,7 +30,7 @@ import { membershipsForUser, withTenantTx } from '@/modules/core/tenancy'
 import { env } from './env'
 import { sendPasswordResetEmail, sendVerificationEmail } from './mailer'
 import { provisionCompany } from './provisioning'
-import { LIMITS } from './rate-limit'
+import { LIMITS, authRateLimitEnabled } from './rate-limit'
 import { getRedis } from './redis'
 
 export const auth = betterAuth({
@@ -88,9 +88,20 @@ export const auth = betterAuth({
    *
    * `RATE_LIMIT_ENFORCE=1` turns it on anywhere, which is how the limits get exercised
    * locally without leaving CI to discover them.
+   *
+   * ## And `RATE_LIMIT_DISABLED=1` turns it off anywhere, including production
+   *
+   * For a test tenant being walked through by several people at once. Eighteen role
+   * sign-ins in an afternoon, from one office behind one NAT address, hits ten-per-five-
+   * minutes long before the sweep is finished — and the login form reports a 429 in the
+   * same words it uses for a wrong password, so the limiter reads as "login is broken".
+   *
+   * It is a deliberate hole and it is named like one: with this set, nothing at all slows
+   * a password-guessing loop against a public host. Set it while testing, unset it before
+   * a factory's real people sign in. The precedence lives in `authRateLimitEnabled`.
    */
   rateLimit: {
-    enabled: env.NODE_ENV === 'production' || process.env.RATE_LIMIT_ENFORCE === '1',
+    enabled: authRateLimitEnabled(env.NODE_ENV),
     storage: 'secondary-storage',
     window: 60,
     max: 60,

@@ -1,7 +1,7 @@
 /**
  * Day-0 masters for Barakah Fashions Ltd.
  *
- * `pnpm tsx scripts/seed-day0.ts [--company=<uuid>] [--reset-passwords] [--dry-run]`
+ * `pnpm tsx scripts/seed-day0.ts [--company=<uuid>] [--reset-passwords] [--password=<shared>] [--dry-run]`
  *
  * The reference data a factory needs before anybody can do a day's work: who it is, how its
  * floor is laid out, who may sign in, who approves what, and the handful of tables the
@@ -20,6 +20,18 @@
  *   · a user's PASSWORD is set once, on creation. `--reset-passwords` is the explicit
  *     override, because silently reissuing credentials on a re-run would lock out anybody
  *     who had already changed theirs.
+ *
+ * ## `--password=<shared>` — for TESTING a tenant, never for running one
+ *
+ * Gives every seeded account the same password instead of eighteen separate random ones.
+ * A role sweep means signing in as eighteen people in an afternoon, and eighteen pasted
+ * 18-character secrets is its own source of failure — the tester cannot tell a mistyped
+ * password from a genuine refusal, which is exactly the confusion this exists to remove.
+ *
+ * What it costs is stated plainly because it is not small: one leaked password is then
+ * every role in the tenant, including owner-adjacent ones, and the per-account blast radius
+ * the separate passwords bought is gone. It is for a tenant holding test data. Before a
+ * factory's real people and real orders arrive, re-run WITHOUT this flag.
  *   · `policy_settings.overrides` is merged, not replaced. A factory that retuned a
  *     threshold keeps it.
  *
@@ -294,6 +306,19 @@ const has = (name: string): boolean => args.includes(`--${name}`)
 const RESET_PASSWORDS = has('reset-passwords')
 const DRY_RUN = has('dry-run')
 
+/**
+ * One password for everybody, when testing. See the header for what this gives up.
+ *
+ * Better Auth's `minPasswordLength` is 10 and it is checked at SIGN-IN as well as at
+ * signup — a shorter one hashes fine here and then refuses every login, which would look
+ * like the seed working and the product being broken.
+ */
+const SHARED_PASSWORD = flag('password')
+if (SHARED_PASSWORD !== undefined && SHARED_PASSWORD.length < 10) {
+  console.error('[day0] --password must be at least 10 characters, or nobody can sign in.')
+  process.exit(1)
+}
+
 const tally: { step: string; created: number; updated: number; note?: string }[] = []
 const record = (step: string, created: number, updated: number, note?: string): void => {
   tally.push(note === undefined ? { step, created, updated } : { step, created, updated, note })
@@ -303,6 +328,7 @@ const record = (step: string, created: number, updated: number, note?: string): 
 const issued: { email: string; password: string }[] = []
 
 function tempPassword(): string {
+  if (SHARED_PASSWORD !== undefined) return SHARED_PASSWORD
   // 18 url-safe chars — comfortably over Better Auth's minPasswordLength of 10.
   return randomBytes(14).toString('base64url')
 }
@@ -798,7 +824,15 @@ function report(companyId: string): void {
     )
   }
 
-  if (issued.length > 0) {
+  if (issued.length > 0 && SHARED_PASSWORD !== undefined) {
+    // One line, not eighteen identical ones — a wall of the same secret repeated invites
+    // somebody to copy the wrong row, and hides how few secrets are actually protecting
+    // this tenant now.
+    console.log(`\n[day0] CREDENTIALS — ONE SHARED PASSWORD for all ${issued.length} accounts:\n`)
+    console.log(`  every @barakah.test account   ${SHARED_PASSWORD}`)
+    console.log(`\n  ⚠ TEST TENANT ONLY. One password is every role in this company, owner`)
+    console.log(`    included. Re-run WITHOUT --password before any real factory data arrives.`)
+  } else if (issued.length > 0) {
     console.log(`\n[day0] CREDENTIALS — shown once, not stored anywhere. Copy them now.\n`)
     for (const c of issued) console.log(`  ${pad(c.email, 30)} ${c.password}`)
     console.log(`\n  Re-running does NOT reissue these. Use --reset-passwords to force new ones.`)

@@ -34,6 +34,28 @@
  */
 import { getRedis } from './redis'
 
+/**
+ * Whether Better Auth's limiter runs at all, as a function so it can be read and tested
+ * rather than inferred from a boolean expression inside a config object.
+ *
+ * Three states, in precedence order:
+ *   · `RATE_LIMIT_DISABLED=1` — off, even in production. A test tenant being walked
+ *     through by several people from one office trips ten-per-five-minutes long before a
+ *     role sweep is done, and the login form reports that 429 in the same words it uses
+ *     for a wrong password. Explicit off must beat everything, or it is not an escape
+ *     hatch; it is a suggestion.
+ *   · `RATE_LIMIT_ENFORCE=1` — on anywhere, so the limits can be exercised outside
+ *     production instead of being discovered in it.
+ *   · otherwise, on in production only.
+ */
+export function authRateLimitEnabled(
+  nodeEnv: string,
+  processEnv: Record<string, string | undefined> = process.env,
+): boolean {
+  if (processEnv.RATE_LIMIT_DISABLED === '1') return false
+  return nodeEnv === 'production' || processEnv.RATE_LIMIT_ENFORCE === '1'
+}
+
 export interface RateLimit {
   /** Requests allowed per window. */
   limit: number
