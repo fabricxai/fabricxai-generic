@@ -61,7 +61,7 @@ Legend: 🅗 high · 🅜 medium · S/M/L = hours / day / multi-day
   storekeeper meets the balance only as a refusal. Show remaining balance when a bonded
   roll is picked.
   *Verify:* picking a bonded roll shows the declaration's remaining quantity before Issue.
-- [ ] **2.4 🅜 S Maintenance "claimed" ping.** The resolve loop already closes the line's
+- [x] **2.4 🅜 S Maintenance "claimed" ping.** `bf82d44` — The resolve loop already closes the line's
   stoppage; the missing half is the moment between — one notification to the reporting
   line when a ticket is claimed ("Sabbir is coming").
   *Verify:* claiming a ticket notifies the stoppage's line role.
