@@ -243,6 +243,8 @@ export const MESSAGES: Catalogue = {
       'That order no longer exists, so the credit cannot cover it.',
     'commercial.errors.lc_order_buyer_mismatch':
       'This credit was issued by a different buyer than that order — a credit cannot pay for goods it was never opened against.',
+    'maintenance.notifications.ticket_claimed.title':
+      'A mechanic has taken your ticket and is on the way.',
     'commercial.errors.lc_number_exists':
       'A letter of credit with that number is already recorded.',
     /* The schema has forbidden this since 0008, but only as a CHECK — so the refusal
@@ -700,6 +702,8 @@ export const MESSAGES: Catalogue = {
       'এই রেফারেন্সের সঙ্গে মিলে এমন কিছু পাওয়া যায়নি। যে স্ক্রিন থেকে কোডটি নিয়েছেন সেটির সঙ্গে মিলিয়ে দেখুন — হুবহু মেলানো হয়, কাছাকাছি কিছু ধরে নেওয়া হয় না।',
     'costing.errors.bom_line_no_consumption':
       'কিছু লাইনে consumption নেই, অথচ material লাইনে কিছু না কিছু লাগবেই। টেক প্যাকে সেলাই সুতার পরিমাণ সাধারণত লেখা থাকে না — অনুমোদনের আগে ওই লাইনগুলোতে পরিমাণ বসান।',
+    'maintenance.notifications.ticket_claimed.title':
+      'একজন মেকানিক আপনার টিকিট নিয়েছেন, আসছেন।',
     'commercial.errors.lc_expiry_before_shipment':
       'এই ক্রেডিটের মেয়াদ তার শেষ শিপমেন্ট তারিখের আগেই শেষ হয়ে যাচ্ছে — অর্থাৎ পণ্য বেরোনোর আগেই ব্যাংকে কাগজ জমা দিতে হবে। মেয়াদ ও শেষ শিপমেন্ট — দুটি তারিখ দেখুন; একটিতে দিন আর মাস উল্টে গেছে।',
     'commercial.errors.lc_order_buyer_mismatch':

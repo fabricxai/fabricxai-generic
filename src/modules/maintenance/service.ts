@@ -22,6 +22,7 @@ import { money, type Money } from '@/lib/money'
 import { recordChange, registerAuditedTables } from '../core/audit'
 import type { AnyCtx, RequestCtx } from '../core/ctx'
 import { AppError, conflict, notFound } from '../core/errors'
+import { notify } from '../core/notifications'
 import { emit } from '../core/outbox'
 import { defineStateMachine } from '../core/state-machine'
 import { scoped } from '../core/scoped'
@@ -350,6 +351,29 @@ export async function claimTicket(ctx: RequestCtx, input: unknown): Promise<Tick
       .update(tickets)
       .set({ status: 'claimed', claimedBy: ctx.userId, claimedAt: new Date(), updatedAt: new Date() })
       .where(scoped(tickets, ctx, eq(tickets.id, ticket.id)))
+
+    /*
+     * Tell the reporter somebody is coming (adoption plan 2.4).
+     *
+     * The auto-raised ticket meant a supervisor with a dead line did not file paperwork
+     * twice — and then heard nothing until the machine ran. The moment between "reported"
+     * and "resolved" is exactly when a line is standing and its supervisor is deciding
+     * whether to walk to maintenance themselves. Addressed to the person who raised it
+     * when one is recorded, else to the production desk; a ticket raised by the mechanic
+     * about their own work notifies nobody.
+     */
+    if (ticket.createdBy && ticket.createdBy !== ctx.userId) {
+      await notify(ctx, {
+        userId: ticket.createdBy,
+        kind: 'maintenance.ticket.claimed',
+        titleKey: 'maintenance.notifications.ticket_claimed.title',
+        params: {},
+        moduleId: 'maintenance',
+        entityTable: 'tickets',
+        entityId: ticket.id,
+        href: '/maintenance',
+      })
+    }
 
     return { ticketId: ticket.id, status: 'claimed' as const, created: false }
   })
