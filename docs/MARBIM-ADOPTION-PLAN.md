@@ -47,7 +47,7 @@ Legend: 🅗 high · 🅜 medium · S/M/L = hours / day / multi-day
 
 ## Phase 2 — Trust and visibility
 
-- [ ] **2.1 🅗 M Draft-fate strip.** Cutting, maintenance and store raise drafts but hold
+- [x] **2.1 🅗 M Draft-fate strip.** `fc2fa9b` — Cutting, maintenance and store raise drafts but hold
   no approve nav — their work vanishes into silence. "My raised drafts" (status, age, who
   it waits on) on those homes; reads `pending_changes` by `created_by`, no new tables.
   *Verify:* a cutting correction shows as pending on the cutting home, then committed.
