@@ -28,7 +28,7 @@ Legend: 🅗 high · 🅜 medium · S/M/L = hours / day / multi-day
   audits, finance → finance, commercial → LC register, planner → planning board;
   owner/admin/merchandiser keep `/home`. One resolver, tested as a function.
   *Verify:* a test walks every role and asserts its landing; no role lands on `/approve`.
-- [ ] **1.2 🅗 M Screen-scoped prompt chips.** Replace the generic per-role suggestions
+- [x] **1.2 🅗 M Screen-scoped prompt chips.** `fe3347c` — Replace the generic per-role suggestions
   with per-screen ones from `MARBIM-ADOPTION-BY-ROLE.md` (the specific questions each desk
   computes by hand today). Bangla-first on store/cutting/production/quality screens.
   *Verify:* chips differ between two screens for one role; floor chips render Bangla under
@@ -92,7 +92,9 @@ Legend: 🅗 high · 🅜 medium · S/M/L = hours / day / multi-day
   written without the storekeeper's save.
 - [ ] **4.2 🅗 M Supplier-quote intake via context pickers.** The kind was removed because
   quote payloads demand UUIDs no paper carries; the findings kind proved the fix — pickers
-  for requisition and supplier at intake. Re-add `supplier_quote` with both.
+  for requisition and supplier at intake. Re-add `supplier_quote` with both. *Note
+  2026-08-12: `procurement.propose_supplier_quote` exists as a CHAT draft tool; this ticket
+  is the intake kind for the PDF-drop path.*
   *Verify:* a pasted quote drafts against the picked requisition; the extractor never
   invents an id.
 - [ ] **4.3 🅗 M "Summarise this draft" in the approve inbox.** One ask per draft: what
@@ -108,11 +110,12 @@ Legend: 🅗 high · 🅜 medium · S/M/L = hours / day / multi-day
 
 - [ ] **5.1 🅗 M Shipment readiness checklist.** EXP · LC dates · qty-vs-tolerance · docs
   against the credit's own list, as one panel from day one — not discoveries at the door.
-  MARBIM narrates it ("what's missing before the bank?").
+  *Corrected 2026-08-12: `shipment.latest_shipment_alerts` and the board tools EXIST; what
+  is owed is the composed readiness panel on the screen, not the tools.*
   *Verify:* a shipment with no EXP shows the checklist red on that row before any submit.
-- [ ] **5.2 🅗 L Quality pre-final readiness.** The four inspection screens composed into
-  "will this order fail final?" — fabric points, DHU trend, measurement flags, AQL
-  posture. New read tool + order-page strip.
+- [ ] **5.2 🅜 M Quality pre-final readiness strip.** *Corrected 2026-08-12: the tool
+  `quality.pre_final_readiness` already EXISTS (my review said Cursor invented it — wrong).*
+  What is owed is the order-page strip that renders it, and 1.2's chip already asks it.
   *Verify:* the order that failed the live test's final would have shown red here first.
 - [ ] **5.3 🅜 M Discrepancy work-queue.** `agingDiscrepancies` exists (the escalation
   job reads it); give it a screen — age, owner, whose turn.
