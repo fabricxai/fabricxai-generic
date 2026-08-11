@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { Badge } from '@/components/fx/primitives'
 import { EmptyState } from '@/components/fx/feedback'
 import { Eyebrow, SectionHeading } from '@/components/fx/signature'
+import { AskAboutRow } from '@/components/shell/ask-about-row'
 import { PageHeader } from '@/components/shell/page-shell'
 import { WorkCue } from '@/components/shell/work-cue'
 import { canWrite, NAV } from '@/components/shell/nav'
@@ -346,8 +347,11 @@ export default async function BuyersPage() {
                     minHeight: 'var(--fx-row-height)',
                   }}
                 >
-                  <span data-mono style={{ font: "500 13px/1.3 var(--fx-font-mono)" }}>
-                    {b.code}
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <span data-mono style={{ font: "500 13px/1.3 var(--fx-font-mono)" }}>
+                      {b.code}
+                    </span>
+                    <AskAboutRow code={b.code} />
                   </span>
                   <span style={{ font: "400 14px/1.3 var(--fx-font-sans)" }}>{b.name}</span>
                   <span style={{ font: "400 13px/1.3 var(--fx-font-sans)", color: 'var(--fx-text-secondary)' }}>

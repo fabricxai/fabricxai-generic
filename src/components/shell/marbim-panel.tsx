@@ -209,10 +209,17 @@ export function MarbimPanel({ entry, trust }: { entry: MarbimEntry; trust: Marbi
     return () => document.removeEventListener('keydown', onKey)
   }, [open, close, openPanel, historyOpen])
 
-  // Any "Ask MARBIM" button anywhere — the top bar's, or a future in-context one on a
-  // screen — asks through this rather than reaching into the panel's state.
+  // Any "Ask MARBIM" button anywhere — the top bar's, or a row's "ask about this" —
+  // asks through this rather than reaching into the panel's state. A prefill rides the
+  // event into the composer; it is a seed, never a send.
+  const [prefill, setPrefill] = useState<{ text: string; at: number } | null>(null)
   useEffect(() => {
-    const onRequest = () => openPanel()
+    const onRequest = (e: Event) => {
+      const text = (e as CustomEvent<{ prefill?: string } | undefined>).detail?.prefill
+      // Stamped so the SAME text asked twice still re-seeds — object identity is the key.
+      if (text) setPrefill({ text, at: Date.now() })
+      openPanel()
+    }
     window.addEventListener(MARBIM_OPEN_EVENT, onRequest)
     return () => window.removeEventListener(MARBIM_OPEN_EVENT, onRequest)
   }, [openPanel])
@@ -516,6 +523,7 @@ export function MarbimPanel({ entry, trust }: { entry: MarbimEntry; trust: Marbi
               initialTier={tierFromSurfaceLabel(entry.model)}
               floatingMark={false}
               autoFocus={open && !historyOpen}
+              prefill={prefill}
             />
           </div>
           {historyOpen ? (

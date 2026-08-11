@@ -7,6 +7,7 @@ import { EmptyState, InlineAlert } from '@/components/fx/feedback'
 import { Badge } from '@/components/fx/primitives'
 import { Eyebrow, SectionHeading } from '@/components/fx/signature'
 import { Ident } from '@/components/fx/format'
+import { AskAboutRow } from '@/components/shell/ask-about-row'
 import { PageHeader } from '@/components/shell/page-shell'
 import { WorkCue } from '@/components/shell/work-cue'
 import { canWrite, NAV } from '@/components/shell/nav'
@@ -234,13 +235,16 @@ export default async function LcsPage() {
                       minHeight: 'var(--fx-row-height)',
                     }}
                   >
-                    <Link
-                      href={`/lcs/${lc.id}`}
-                      style={{ textDecoration: 'none', color: 'inherit' }}
-                      aria-label={`Open ${lc.number}`}
-                    >
-                      <Ident>{lc.number}</Ident>
-                    </Link>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                      <Link
+                        href={`/lcs/${lc.id}`}
+                        style={{ textDecoration: 'none', color: 'inherit' }}
+                        aria-label={`Open ${lc.number}`}
+                      >
+                        <Ident>{lc.number}</Ident>
+                      </Link>
+                      <AskAboutRow code={lc.number} />
+                    </span>
                     <span style={{ font: "400 13.5px/1.3 var(--fx-font-sans)" }}>
                       {lc.buyerName ?? '—'}
                     </span>

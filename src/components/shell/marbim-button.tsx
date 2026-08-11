@@ -15,7 +15,7 @@ import { requestMarbimOpen } from './marbim-open'
 export function MarbimButton() {
   return (
     <button
-      onClick={requestMarbimOpen}
+      onClick={() => requestMarbimOpen()}
       aria-haspopup="dialog"
       title="Ask MARBIM (⌘K)"
       style={{

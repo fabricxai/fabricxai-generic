@@ -6,6 +6,7 @@ import { Badge } from '@/components/fx/primitives'
 import { EmptyState } from '@/components/fx/feedback'
 import { Ident } from '@/components/fx/format'
 import { StatusLabel } from '@/components/fx/signature'
+import { AskAboutRow } from '@/components/shell/ask-about-row'
 import { PageHeader } from '@/components/shell/page-shell'
 import { WorkCue } from '@/components/shell/work-cue'
 import { canWrite, NAV } from '@/components/shell/nav'
@@ -170,7 +171,11 @@ export default async function OrdersPage() {
                   minHeight: 'var(--fx-row-height)',
                 }}
               >
-                <Ident>{row.poNumbers[0] ?? '—'}</Ident>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                  <Ident>{row.poNumbers[0] ?? '—'}</Ident>
+                  {/* The code travels, not the uuid — the resolvers read what the row prints. */}
+                  {row.poNumbers[0] ? <AskAboutRow code={row.poNumbers[0]} /> : null}
+                </span>
                 <span style={{ font: "400 14px/1.3 var(--fx-font-sans)" }}>
                   {row.buyerName ?? '—'}
                 </span>

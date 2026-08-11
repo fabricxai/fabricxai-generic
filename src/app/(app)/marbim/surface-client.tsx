@@ -133,6 +133,7 @@ function StripFooter({ receipt, toolsRun }: { receipt?: string | null; toolsRun:
 export function MarbimSurface({
   conversationId,
   suggestions,
+  prefill = null,
   packLabel,
   readOnly,
   fromModule,
@@ -142,6 +143,9 @@ export function MarbimSurface({
 }: {
   conversationId: string
   suggestions: readonly string[]
+  /** Seed for the composer from an "ask about this row" affordance. Stamped so the same
+      text re-seeds; consumed by adjusting state during render, never by an effect. */
+  prefill?: { text: string; at: number } | null
   packLabel: string
   readOnly: boolean
   /**
@@ -162,6 +166,13 @@ export function MarbimSurface({
   const [turns, setTurns] = useState<Turn[]>([])
   const [hydrating, setHydrating] = useState(true)
   const [draft, setDraft] = useState('')
+  // The adjust-during-render pattern (same as the tier): when a NEW prefill arrives, it
+  // replaces the draft once; typing afterwards is the person's own.
+  const [seenPrefill, setSeenPrefill] = useState<number | null>(null)
+  if (prefill && prefill.at !== seenPrefill) {
+    setSeenPrefill(prefill.at)
+    setDraft(prefill.text)
+  }
   const [tier, setTier] = useState<MarbimTier>(initialTier)
   const [focused, setFocused] = useState(false)
   const [mark, setMark] = useState<MarkState>('rest')
