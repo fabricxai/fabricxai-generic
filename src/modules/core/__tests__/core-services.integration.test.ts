@@ -8,7 +8,7 @@
  */
 import { randomUUID } from 'node:crypto'
 
-import { eq, sql } from 'drizzle-orm'
+import { eq, inArray, sql } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { createDirectClient, createDirectDb } from '@/db/direct'
@@ -16,7 +16,7 @@ import { companies, notifications, offlineKeys, outbox, users } from '@/db/schem
 import type { RequestCtx } from '@/modules/core/ctx'
 import { AppError } from '@/modules/core/errors'
 import { createDownloadUrl, createUploadUrl, confirmUpload } from '@/modules/core/documents'
-import { notify, listUnread, markRead } from '@/modules/core/notifications'
+import { dismiss, notify, listUnread, markRead } from '@/modules/core/notifications'
 import {
   __resetSyncHandlers,
   registerSyncHandler,
@@ -36,6 +36,8 @@ const COMPANY = randomUUID()
 const OTHER = randomUUID()
 const USER = `svc-user-${randomUUID().slice(0, 8)}`
 const ctx: RequestCtx = { companyId: COMPANY, userId: USER, roles: ['owner'] }
+/** A second person in the same company, for the alerts that are addressed by name. */
+const OTHER_USER = `svc-other-${randomUUID().slice(0, 8)}`
 
 beforeAll(async () => {
   await db
@@ -47,7 +49,10 @@ beforeAll(async () => {
     .onConflictDoNothing()
   await db
     .insert(users)
-    .values({ id: USER, email: `${USER}@fabricxai.test`, name: 'Service Tester' })
+    .values([
+      { id: USER, email: `${USER}@fabricxai.test`, name: 'Service Tester' },
+      { id: OTHER_USER, email: `${OTHER_USER}@fabricxai.test`, name: 'Somebody Else' },
+    ])
     .onConflictDoNothing()
 
   await db.execute(sql`
@@ -70,7 +75,7 @@ afterAll(async () => {
   await db.execute(sql`delete from audit_log where company_id = ${COMPANY}`)
   await db.delete(companies).where(eq(companies.id, COMPANY))
   await db.delete(companies).where(eq(companies.id, OTHER))
-  await db.delete(users).where(eq(users.id, USER))
+  await db.delete(users).where(inArray(users.id, [USER, OTHER_USER]))
   await db.execute(sql`drop table if exists demo_sync_rows`)
   __resetSyncHandlers()
   await client.end()
@@ -179,6 +184,58 @@ describe('notifications · dedupe makes jobs re-runnable', () => {
     expect(marked).toBe(unread.length)
     // Marking again is a no-op — the first read time is the one that matters.
     expect(await markRead(ctx, unread.map((n) => n.id))).toBe(0)
+  })
+
+  it('will not let one person clear another person’s alert', async () => {
+    /*
+     * `listUnread` scoped to the recipient and `markRead` scoped only to the company, so any
+     * signed-in person could mark any alert in the factory read — including one addressed to
+     * somebody else BY NAME. Hard to reach (ids are uuids and you only receive your own) and
+     * still the wrong wall: an alert somebody else cleared is one its owner never sees, and
+     * the LC countdown and the UD expiry both arrive this way.
+     */
+    const [addressed] = await db
+      .insert(notifications)
+      .values({
+        companyId: COMPANY,
+        userId: OTHER_USER,
+        kind: 'system.private',
+        titleKey: 'notifications.system.test.title',
+        severity: 'info',
+      })
+      .returning({ id: notifications.id })
+
+    // A colleague in the same company, holding a role the alert was not sent to.
+    const colleague: RequestCtx = { companyId: COMPANY, userId: USER, roles: ['store'] }
+
+    expect(await markRead(colleague, [addressed!.id])).toBe(0)
+    expect(await dismiss(colleague, [addressed!.id])).toBe(0)
+
+    const [row] = await db.select().from(notifications).where(eq(notifications.id, addressed!.id))
+    expect(row?.readAt, 'still unread for the person it was for').toBeNull()
+    expect(row?.dismissedAt).toBeNull()
+
+    // And its owner can still clear it.
+    const owner: RequestCtx = { companyId: COMPANY, userId: OTHER_USER, roles: ['store'] }
+    expect(await markRead(owner, [addressed!.id])).toBe(1)
+  })
+
+  it('lets a role-addressed alert be cleared by anyone holding that role', async () => {
+    // The other half: a notification sent to `role: 'store'` belongs to whoever is on that
+    // desk today, and clearing it is the whole point of addressing a role rather than a name.
+    const [toRole] = await db
+      .insert(notifications)
+      .values({
+        companyId: COMPANY,
+        role: 'store',
+        kind: 'system.desk',
+        titleKey: 'notifications.system.test.title',
+        severity: 'info',
+      })
+      .returning({ id: notifications.id })
+
+    const storekeeper: RequestCtx = { companyId: COMPANY, userId: USER, roles: ['store'] }
+    expect(await markRead(storekeeper, [toRole!.id])).toBe(1)
   })
 })
 

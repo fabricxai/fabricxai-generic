@@ -78,6 +78,29 @@ export async function notify(ctx: AnyCtx, input: NotifyInput): Promise<{ id: str
 }
 
 /**
+ * Addressed to this caller: to them by name, or to a role they hold.
+ *
+ * Extracted so the READ and the two WRITES cannot disagree. They did: `listUnread` scoped to
+ * the recipient and `markRead`/`dismiss` scoped only to the company, so any signed-in person
+ * could mark any alert in the factory read — including one addressed to somebody else by
+ * name, or to a role they do not hold. `markAlertsRead`'s own comment said "alerts addressed
+ * to them (or their roles)", which is what it meant to do and not what it did.
+ *
+ * Hard to reach on purpose rather than by luck: ids are uuids and you only ever receive your
+ * own, so this was a latent scoping gap rather than a live exploit. It still defeats the
+ * channel it protects — an alert somebody else silently cleared is an alert the person it
+ * was for never sees, and the LC countdown and the UD expiry both ride on it.
+ */
+function addressedTo(ctx: AnyCtx) {
+  return ctx.userId
+    ? or(
+        eq(notifications.userId, ctx.userId),
+        ctx.roles.length ? inArray(notifications.role, [...ctx.roles]) : undefined,
+      )
+    : undefined
+}
+
+/**
  * The bell: unread notifications for this user, including ones addressed to any role
  * they hold. Newest first.
  */
@@ -93,12 +116,7 @@ export async function listUnread(
         and(
           isNull(notifications.readAt),
           isNull(notifications.dismissedAt),
-          ctx.userId
-            ? or(
-                eq(notifications.userId, ctx.userId),
-                ctx.roles.length ? inArray(notifications.role, [...ctx.roles]) : undefined,
-              )
-            : undefined,
+          addressedTo(ctx),
         ),
       ))
       .orderBy(desc(notifications.createdAt))
@@ -106,6 +124,14 @@ export async function listUnread(
   )
 }
 
+/**
+ * Mark alerts read — only ones addressed to this caller.
+ *
+ * Returns how many actually moved, which is the honest answer when some of the ids were
+ * somebody else's: the caller is told what happened rather than refused outright, because a
+ * stale browser tab holding an id that has since been re-addressed is an ordinary event and
+ * not an attack.
+ */
 export async function markRead(ctx: AnyCtx, ids: readonly string[]): Promise<number> {
   if (ids.length === 0) return 0
 
@@ -113,8 +139,15 @@ export async function markRead(ctx: AnyCtx, ids: readonly string[]): Promise<num
     tx
       .update(notifications)
       .set({ readAt: new Date() })
-      // RLS already bounds this to the company; the isNull keeps the first read time.
-      .where(scoped(notifications, ctx, and(inArray(notifications.id, [...ids]), isNull(notifications.readAt))))
+      // RLS bounds this to the company; `addressedTo` bounds it to the person; the isNull
+      // keeps the first read time.
+      .where(
+        scoped(
+          notifications,
+          ctx,
+          and(inArray(notifications.id, [...ids]), isNull(notifications.readAt), addressedTo(ctx)),
+        ),
+      )
       .returning({ id: notifications.id }),
   )
 
@@ -128,7 +161,19 @@ export async function dismiss(ctx: AnyCtx, ids: readonly string[]): Promise<numb
     tx
       .update(notifications)
       .set({ dismissedAt: new Date() })
-      .where(scoped(notifications, ctx, and(inArray(notifications.id, [...ids]), isNull(notifications.dismissedAt))))
+      // Same wall as `markRead` — dismissing another person's alert hides it from them for
+      // good, which is the more destructive half of the pair.
+      .where(
+        scoped(
+          notifications,
+          ctx,
+          and(
+            inArray(notifications.id, [...ids]),
+            isNull(notifications.dismissedAt),
+            addressedTo(ctx),
+          ),
+        ),
+      )
       .returning({ id: notifications.id }),
   )
 
