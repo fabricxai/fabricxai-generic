@@ -401,3 +401,150 @@ describe('a reviewer can correct a field before signing', () => {
     expect(screen.queryByText(/typed by a person/i)).not.toBeInTheDocument()
   })
 })
+
+/**
+ * A wrong number inside a drafted LIST.
+ *
+ * The scalar editor above shipped with an explicit carve-out: "a BOM's line array … stays
+ * read-only, because a text box holding JSON is a way to corrupt a payload". True of a JSON
+ * box, and it left the common case with no remedy at all — a tech pack states no consumption
+ * for sew thread (derived from stitch length, not printed), the extractor honestly returns
+ * zero, `bom_lines_consumption_positive` refuses the row, and a twelve-line BOM with eleven
+ * good lines could only be rejected whole and asked for again.
+ *
+ * Reported from the live tenant as a Postgres INSERT statement quoted at a manager.
+ */
+describe('a reviewer can correct one cell of a drafted list', () => {
+  const bomDraft = {
+    id: 'pc-bom',
+    moduleId: 'costing',
+    targetTable: 'boms',
+    targetId: null,
+    operation: 'insert',
+    source: 'ai_extraction',
+    sourceDocumentId: null,
+    extractorVersion: 'techpack-v4',
+    model: 'gpt-4o-mini',
+    createdAt: new Date('2026-08-01T09:00:00Z'),
+    payload: {},
+    fields: [
+      {
+        field: 'lines',
+        before: undefined,
+        confidence: 0.71,
+        changed: true,
+        after: [
+          { lineGroup: 'fabric', itemRef: 'Body fabric', consumption: 0.255, uom: 'kg' },
+          { lineGroup: 'trims', itemRef: 'Sew thread', consumption: 0, uom: '—' },
+        ],
+      },
+    ],
+    provenance: { draftedBy: { id: 'u-1', name: 'Rashida Akter' }, approvals: [] },
+  }
+
+  beforeEach(() => draftFields.mockResolvedValue(bomDraft))
+
+  async function openBom(user: ReturnType<typeof userEvent.setup>) {
+    render(<ApproveInbox rows={[row({ id: 'pc-bom', title: 'BOM ST-2610' })]} escalateAfterHours={24} />)
+    await user.click(screen.getByRole('button', { name: /BOM ST-2610/i }))
+    await waitFor(() =>
+      expect(screen.getByLabelText('lines row 2 consumption')).toBeInTheDocument(),
+    )
+  }
+
+  it('sends the WHOLE list back, with the one cell fixed', async () => {
+    const user = userEvent.setup()
+    await openBom(user)
+
+    const cell = screen.getByLabelText('lines row 2 consumption')
+    await user.clear(cell)
+    await user.type(cell, '0.02')
+    await user.click(screen.getByRole('button', { name: /^approve$/i }))
+
+    await waitFor(() => expect(approveDraft).toHaveBeenCalledOnce())
+    expect(approveDraft).toHaveBeenCalledWith({
+      pendingChangeId: 'pc-bom',
+      corrections: {
+        lines: [
+          // Untouched, and still present — `approve` merges corrections over the payload by
+          // TOP-LEVEL field, so a partial list would delete the fabric line.
+          { lineGroup: 'fabric', itemRef: 'Body fabric', consumption: 0.255, uom: 'kg' },
+          { lineGroup: 'trims', itemRef: 'Sew thread', consumption: 0.02, uom: '—' },
+        ],
+      },
+    })
+  })
+
+  it('keeps the drafted TYPE, so zod does not refuse it three layers later', async () => {
+    const user = userEvent.setup()
+    await openBom(user)
+
+    const cell = screen.getByLabelText('lines row 2 consumption')
+    await user.clear(cell)
+    await user.type(cell, '0.02')
+    await user.click(screen.getByRole('button', { name: /^approve$/i }))
+
+    await waitFor(() => expect(approveDraft).toHaveBeenCalledOnce())
+    const sent = approveDraft.mock.calls[0]?.[0]?.corrections?.lines as Record<string, unknown>[]
+    // A number, not the string "0.02" a text input yields.
+    expect(typeof sent[1]?.consumption).toBe('number')
+  })
+
+  it('sends nothing when a cell is typed back to what was drafted', async () => {
+    // Same rule the scalar editor holds to: a reviewer clicking through every cell must not
+    // be recorded as having fixed them, or the extractor is scored for mistakes it did not
+    // make.
+    const user = userEvent.setup()
+    await openBom(user)
+
+    const cell = screen.getByLabelText('lines row 1 consumption')
+    await user.clear(cell)
+    await user.type(cell, '0.255')
+    await user.click(screen.getByRole('button', { name: /^approve$/i }))
+
+    await waitFor(() => expect(approveDraft).toHaveBeenCalledOnce())
+    expect(approveDraft).toHaveBeenCalledWith({ pendingChangeId: 'pc-bom' })
+  })
+})
+
+/**
+ * The decimal point, which both editors used to eat.
+ *
+ * A numeric field emits a NUMBER, and rendering that number back into the box mid-keystroke
+ * destroys what is being typed: "16." parses to 16, the box redraws as "16", and the next
+ * character lands on it — so 16.50 became 1650 and a BOM's 0.02 became 2. Silent, plausible,
+ * and it lands in a price or a bill of materials.
+ */
+describe('typing a decimal', () => {
+  const priced = {
+    id: 'pc-1',
+    moduleId: 'rfq',
+    targetTable: 'rfqs',
+    targetId: null,
+    operation: 'insert',
+    source: 'ai_extraction',
+    sourceDocumentId: null,
+    extractorVersion: 'v1',
+    model: 'gpt-4o-mini',
+    createdAt: new Date('2026-08-01T09:00:00Z'),
+    payload: {},
+    fields: [{ field: 'unitPrice', before: undefined, after: 16, confidence: 0.6, changed: true }],
+    provenance: { draftedBy: { id: 'u-1', name: 'Rashida Akter' }, approvals: [] },
+  }
+
+  it('survives it on a scalar field', async () => {
+    draftFields.mockResolvedValue(priced)
+    const user = userEvent.setup()
+    render(<ApproveInbox rows={[row({ id: 'pc-1' })]} escalateAfterHours={24} />)
+    await user.click(screen.getByRole('button', { name: /Order SHRT-4410/i }))
+    await waitFor(() => expect(screen.getByLabelText('unitPrice')).toBeInTheDocument())
+
+    const price = screen.getByLabelText('unitPrice')
+    await user.clear(price)
+    await user.type(price, '16.50')
+    await user.click(screen.getByRole('button', { name: /^approve$/i }))
+
+    await waitFor(() => expect(approveDraft).toHaveBeenCalledOnce())
+    expect(approveDraft.mock.calls[0]?.[0]?.corrections).toEqual({ unitPrice: 16.5 })
+  })
+})

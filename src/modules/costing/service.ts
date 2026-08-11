@@ -396,6 +396,26 @@ export async function commitBom(
     ? bomSeededFromOrderDraft.parse(input.payload)
     : bomFromTechPackDraft.parse(input.payload)
 
+  /*
+   * A material line has to consume something.
+   *
+   * `bom_lines_consumption_positive` has said so since 0021, and the extractor is allowed to
+   * return zero on purpose: a tech pack routinely states no consumption for sew thread,
+   * which is derived from stitch length rather than printed. The draft carrying that zero is
+   * honest. COMMITTING it is not — and the constraint refused it as a raw Postgres error, at
+   * the moment a manager pressed Approve, quoting an INSERT statement at them (live test).
+   *
+   * So the refusal happens here, in words, naming the lines that need a number. What the
+   * reviewer does about it is supply one: the draft can be edited before it is approved,
+   * which is the door that made this refusal actionable rather than a dead end.
+   */
+  const unquantified = payload.lines.filter((line) => Number(line.consumption) <= 0)
+  if (unquantified.length > 0) {
+    throw new AppError('validation_failed', 'costing.errors.bom_line_no_consumption', {
+      lines: unquantified.map((line) => line.itemRef ?? line.spec ?? line.lineGroup),
+    })
+  }
+
   const bomId = await insertBomIn(ctx, tx, {
     styleCode: payload.styleCode,
     source: seeded ? 'seeded' : 'tech_pack_extract',

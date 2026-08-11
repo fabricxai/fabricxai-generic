@@ -288,6 +288,10 @@ export const MESSAGES: Catalogue = {
     'costing.errors.sheet_not_found': 'That cost sheet no longer exists.',
     'costing.errors.sheet_stale':
       'This sheet has changed since it was opened. Reload it before approving — you would be signing a different set of numbers.',
+    /* No placeholders: AppError.details do not survive a server action, and the offending
+       lines are on screen in front of the reviewer anyway. */
+    'costing.errors.bom_line_no_consumption':
+      'Some lines have no consumption, and a material line has to consume something. A tech pack often leaves sew thread blank because it is derived from stitch length rather than printed — edit those lines and enter the quantity before approving.',
     'costing.errors.sheet_uncomputable':
       'This sheet cannot be computed as it stands. Something it needs is missing rather than wrong.',
     'costing.errors.template_not_found': 'That consumption template no longer exists.',
@@ -682,6 +686,8 @@ export const MESSAGES: Catalogue = {
     'commercial.notifications.lc_countdown_expiry.title':
       'LC {lcNumber}: মেয়াদ শেষের ({date}) বাকি {daysLeft} দিন',
     'commercial.errors.order_not_found': 'সেই অর্ডারটি আর নেই, তাই ক্রেডিট এটি কভার করতে পারবে না।',
+    'costing.errors.bom_line_no_consumption':
+      'কিছু লাইনে consumption নেই, অথচ material লাইনে কিছু না কিছু লাগবেই। টেক প্যাকে সেলাই সুতার পরিমাণ সাধারণত লেখা থাকে না — অনুমোদনের আগে ওই লাইনগুলোতে পরিমাণ বসান।',
     'commercial.errors.lc_expiry_before_shipment':
       'এই ক্রেডিটের মেয়াদ তার শেষ শিপমেন্ট তারিখের আগেই শেষ হয়ে যাচ্ছে — অর্থাৎ পণ্য বেরোনোর আগেই ব্যাংকে কাগজ জমা দিতে হবে। মেয়াদ ও শেষ শিপমেন্ট — দুটি তারিখ দেখুন; একটিতে দিন আর মাস উল্টে গেছে।',
     'commercial.errors.lc_order_buyer_mismatch':

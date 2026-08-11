@@ -162,7 +162,7 @@ export function ApproveInbox({
     return (
       <EmptyState
         title="Nothing routed to you"
-        body="Drafts appear here when a rule sends them to a role you hold. Your own work stays in its own module until then."
+        body="Drafts appear here when a rule sends them to a role you hold. Your own work stays in its own module until then. Alerts from jobs live in the Alerts control up top — not here."
       />
     )
   }
@@ -842,13 +842,21 @@ const TRAIL_ROW: React.CSSProperties = {
  * `corrections` map the entire time — the extractor's own scoring depends on it — and
  * nothing ever sent one.
  *
- * ## Only scalars are editable
+ * ## Scalars, and rows of scalars
  *
- * A string, number, boolean or date gets an input. A grid of breakdown cells, a BOM's line
- * array, a requirements list — those stay read-only, because a text box holding JSON is a
- * way to corrupt a payload with a misplaced brace, and the reviewer's remedy for a wrong
- * grid is to reject it and say why. `FieldValue` already renders those readably; editing
- * them is a structured-editor problem, not an input.
+ * A string, number, boolean or date gets an input. So does every cell of a list of flat
+ * objects — a BOM's lines, a requirements list — through `EditableRows`, which is the
+ * structured editor this comment used to say was somebody else's problem.
+ *
+ * It was not an academic gap. A tech pack states no consumption for sew thread (it is
+ * derived from stitch length, not printed), the extractor honestly returns zero, and
+ * `bom_lines_consumption_positive` refuses the row — so a twelve-line BOM with eleven good
+ * lines could only be rejected whole and asked for again. The reviewer's remedy for one
+ * wrong number should be to type the number.
+ *
+ * What stays read-only is anything NOT a flat list of scalars: a nested grid of breakdown
+ * cells keyed by colour and size is a shape a row editor would misrepresent, and a text box
+ * holding JSON is a way to corrupt a payload with a misplaced brace.
  *
  * ## Typing is preserved
  *
@@ -868,6 +876,28 @@ function EditableValue({
   corrected: unknown
   onCorrect: (field: string, value: unknown) => void
 }) {
+  /*
+   * Above the early returns, because a hook must run in the same order on every render.
+   *
+   * What the person typed, kept apart from what will be sent: a numeric field emits a
+   * NUMBER, and rendering it back eats a decimal point mid-keystroke — "16." parses to 16,
+   * the box redraws as "16", and 16.50 arrives as 1650.
+   */
+  const [typed, setTyped] = useState<string | null>(null)
+
+  // A flat list of objects — the shape a BOM, a requirements list and a findings batch all
+  // take — gets the row editor rather than being read-only.
+  if (isRowList(drafted)) {
+    return (
+      <EditableRows
+        field={field}
+        drafted={drafted}
+        corrected={Array.isArray(corrected) ? (corrected as RowList) : undefined}
+        onCorrect={onCorrect}
+      />
+    )
+  }
+
   const editable =
     drafted === null ||
     drafted === undefined ||
@@ -876,8 +906,8 @@ function EditableValue({
   if (!editable) return <FieldValue value={drafted} />
 
   const shown = corrected !== undefined ? corrected : drafted
-  const text = shown === null || shown === undefined ? '' : String(shown)
   const dirty = corrected !== undefined
+  const text = typed ?? (shown === null || shown === undefined ? '' : String(shown))
 
   /** Back to the drafted TYPE, so zod sees what it expects at approve. */
   const retype = (raw: string): unknown => {
@@ -896,6 +926,7 @@ function EditableValue({
         aria-label={field}
         value={text}
         onChange={(e) => {
+          setTyped(e.target.value)
           const next = retype(e.target.value)
           // Typing it back to the drafted value is not a correction. Without this, a
           // reviewer who clicked in and out would be recorded as having fixed the field,
@@ -916,7 +947,10 @@ function EditableValue({
       {dirty ? (
         <button
           type="button"
-          onClick={() => onCorrect(field, undefined)}
+          onClick={() => {
+            setTyped(null)
+            onCorrect(field, undefined)
+          }}
           style={{
             font: "400 11px/1.3 var(--fx-font-mono)",
             textTransform: 'uppercase',
@@ -929,6 +963,184 @@ function EditableValue({
           }}
         >
           corrected · undo
+        </button>
+      ) : null}
+    </span>
+  )
+}
+
+type Row = Record<string, unknown>
+type RowList = readonly Row[]
+
+/** A leaf a text box can hold without lying about it. */
+const isScalar = (v: unknown): boolean =>
+  v === null || v === undefined || ['string', 'number', 'boolean'].includes(typeof v)
+
+/**
+ * A list of flat objects — every row an object, every cell a scalar.
+ *
+ * Deliberately narrow. A breakdown grid keyed by colour and size is also "an array of
+ * objects" and is NOT this: a row editor would flatten a two-dimensional thing into a
+ * one-dimensional one, and a reviewer correcting it would be correcting a shape the payload
+ * does not have.
+ */
+function isRowList(value: unknown): value is RowList {
+  return (
+    Array.isArray(value) &&
+    value.length > 0 &&
+    value.every(
+      (row) =>
+        row !== null &&
+        typeof row === 'object' &&
+        !Array.isArray(row) &&
+        Object.values(row as Row).every(isScalar),
+    )
+  )
+}
+
+/**
+ * The rows of a drafted list, each cell editable.
+ *
+ * ## Why the whole array is the correction
+ *
+ * `approve` merges corrections into the payload with a shallow spread, so the unit of
+ * correction is a TOP-LEVEL field. Editing one cell therefore sends the entire list back —
+ * eleven untouched rows and one fixed one — which is also what makes the change legible in
+ * the correction telemetry: the extractor is scored on the field it got wrong, not on a
+ * path expression nobody can read six months later.
+ *
+ * ## Why the type is taken from the cell, not the input
+ *
+ * `consumption: 0.02` must go back as a NUMBER. A text input yields strings, zod re-validates
+ * at approve, and a string where a number belongs is refused three layers from the box that
+ * was typed in — which is exactly the class of error this editor exists to end.
+ */
+function EditableRows({
+  field,
+  drafted,
+  corrected,
+  onCorrect,
+}: {
+  field: string
+  drafted: RowList
+  corrected: RowList | undefined
+  onCorrect: (field: string, value: unknown) => void
+}) {
+  const rows = corrected ?? drafted
+
+  /*
+   * What the person typed, per cell, kept apart from what will be sent.
+   *
+   * The field emits a NUMBER for a numeric cell, and rendering that number back into the box
+   * eats a decimal point mid-keystroke: "0." parses to 0, the box redraws as "0", and the
+   * next character lands on it — so 0.02 became 2 and 0.255 became 255. Silent, and it lands
+   * in a bill of materials.
+   */
+  const [typed, setTyped] = useState<Record<string, string>>({})
+  // Every key any row carries, first-seen order — a row that omits an optional field must
+  // not shift the columns under the rows around it.
+  const columns = [...new Set(drafted.flatMap((row) => Object.keys(row)))]
+
+  const retype = (raw: string, was: unknown): unknown => {
+    if (raw === '') return null
+    if (typeof was === 'number') {
+      const n = Number(raw)
+      return Number.isFinite(n) ? n : raw
+    }
+    if (typeof was === 'boolean') return raw === 'true'
+    return raw
+  }
+
+  function edit(rowIndex: number, key: string, raw: string) {
+    setTyped((prev) => ({ ...prev, [`${rowIndex}:${key}`]: raw }))
+
+    const next = rows.map((row, i) =>
+      i === rowIndex ? { ...row, [key]: retype(raw, drafted[rowIndex]?.[key]) } : { ...row },
+    )
+    // Back to what was drafted is not a correction — same rule the scalar editor holds to,
+    // so a reviewer who clicks through every cell is not recorded as having fixed them.
+    onCorrect(field, JSON.stringify(next) === JSON.stringify(drafted) ? undefined : next)
+  }
+
+  const dirty = corrected !== undefined
+
+  return (
+    <span style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <span className="fx-scroll-x" tabIndex={0} style={{ display: 'block', maxWidth: '100%' }}>
+        <table style={{ borderCollapse: 'collapse', font: "400 12px/1.4 var(--fx-font-mono)" }}>
+          <thead>
+            <tr>
+              {columns.map((key) => (
+                <th
+                  key={key}
+                  scope="col"
+                  style={{
+                    textAlign: 'left',
+                    padding: '2px 6px 4px 0',
+                    color: 'var(--fx-text-tertiary)',
+                    fontWeight: 500,
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {key}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, i) => (
+              <tr key={i}>
+                {columns.map((key) => {
+                  const value = row[key]
+                  const changed =
+                    dirty && JSON.stringify(value) !== JSON.stringify(drafted[i]?.[key])
+                  return (
+                    <td key={key} style={{ padding: '2px 6px 2px 0' }}>
+                      <input
+                        aria-label={`${field} row ${i + 1} ${key}`}
+                        value={
+                          typed[`${i}:${key}`] ??
+                          (value === null || value === undefined ? '' : String(value))
+                        }
+                        onChange={(e) => edit(i, key, e.target.value)}
+                        style={{
+                          font: "400 12px/1.4 var(--fx-font-mono)",
+                          padding: '3px 6px',
+                          width: Math.min(Math.max(String(value ?? '').length + 3, 8), 34) + 'ch',
+                          borderRadius: 'var(--fx-radius-sm)',
+                          border: `1px solid ${changed ? 'var(--fx-accent)' : 'var(--fx-border-default)'}`,
+                          background: 'var(--fx-bg-surface)',
+                          color: 'var(--fx-text-primary)',
+                        }}
+                      />
+                    </td>
+                  )
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </span>
+      {dirty ? (
+        <button
+          type="button"
+          onClick={() => {
+            setTyped({})
+            onCorrect(field, undefined)
+          }}
+          style={{
+            alignSelf: 'flex-start',
+            font: "400 11px/1.3 var(--fx-font-mono)",
+            textTransform: 'uppercase',
+            letterSpacing: '.06em',
+            color: 'var(--fx-text-tertiary)',
+            background: 'transparent',
+            border: 'none',
+            cursor: 'pointer',
+            padding: 0,
+          }}
+        >
+          corrected · undo all
         </button>
       ) : null}
     </span>
