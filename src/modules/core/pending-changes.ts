@@ -23,7 +23,7 @@ import type { ZodType } from 'zod'
 
 import { approvalRules, pendingChangeApprovals, pendingChanges } from '@/db/schema/core'
 
-import { recordChange } from './audit'
+import { isAudited, recordChange } from './audit'
 import { isSystemCtx, type AnyCtx, type RequestCtx, type Role } from './ctx'
 import { AppError, conflict, notFound } from './errors'
 import { emit } from './outbox'
@@ -324,6 +324,28 @@ export async function approve(ctx: AnyCtx, input: ApproveInput): Promise<Approve
       }
     } else if (!rule.requiredRoles.some((role) => ctx.roles.includes(role))) {
       throw new AppError('forbidden', 'errors.not_an_approver', { required: rule.requiredRoles })
+    }
+
+    /*
+     * Dual control on the ⚖ tables (adoption plan 3.1, HANDOVER DL-8).
+     *
+     * One person could draft and sign the same single-approval change. For most targets
+     * that is the designed intake flow — whoever uploaded the tech pack reviews the
+     * extraction and signs it, and banning that would break the door it walked in through.
+     * For the tables a bank, customs or an auditor will ask about, it is the control the
+     * audit trail exists to prove: a credit, a customs draw, an invoice or a wage table
+     * signed into existence by its own author has one name where the ⚖ mark promises two.
+     *
+     * The line is each module's own `registerAuditedTables` declaration rather than a list
+     * here — the module that marked its table compliance-bearing has already made this
+     * decision, and a second list would drift from the first.
+     *
+     * Sits after the role gate on purpose: "not an approver" is the more fundamental
+     * refusal, and this one should only ever name people who could otherwise sign.
+     * Rejection stays open to the proposer — withdrawing your own draft is not approval.
+     */
+    if (!isSystemCtx(ctx) && draft.createdBy === ctx.userId && isAudited(draft.targetTable)) {
+      throw new AppError('forbidden', 'errors.self_approval', { targetTable: draft.targetTable })
     }
 
     // ── Multi-approver ──

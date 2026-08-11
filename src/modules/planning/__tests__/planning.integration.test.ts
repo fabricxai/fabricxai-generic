@@ -48,8 +48,10 @@ const db = createDirectDb(client)
 const COMPANY = randomUUID()
 const OTHER = randomUUID()
 const USER = `plan-${randomUUID().slice(0, 8)}`
+/** A second person for the ⚖ approvals — the author's own signature now refuses (3.1). */
+const SIGNER = `plan-sign-${randomUUID().slice(0, 8)}`
 const ctx: RequestCtx = { companyId: COMPANY, userId: USER, roles: ['planner'] }
-const approverCtx: RequestCtx = { companyId: COMPANY, userId: USER, roles: ['owner'] }
+const approverCtx: RequestCtx = { companyId: COMPANY, userId: SIGNER, roles: ['owner'] }
 const otherCtx: RequestCtx = { companyId: OTHER, userId: USER, roles: ['planner'] }
 
 /** (480 − 30) × 40 = 18,000 available; at 60% → 10,800 earnable minutes a day. */
@@ -67,7 +69,10 @@ beforeAll(async () => {
     { id: COMPANY, name: 'Plan Co', slug: `plan-${COMPANY.slice(0, 8)}` },
     { id: OTHER, name: 'Other Co', slug: `oth-${OTHER.slice(0, 8)}` },
   ])
-  await db.insert(users).values({ id: USER, email: `${USER}@fabricxai.test`, name: 'Planner' })
+  await db.insert(users).values([
+    { id: USER, email: `${USER}@fabricxai.test`, name: 'Planner' },
+    { id: SIGNER, email: `${SIGNER}@fabricxai.test`, name: 'Second Signer' },
+  ])
 
   const [buyer] = await db
     .insert(buyers)

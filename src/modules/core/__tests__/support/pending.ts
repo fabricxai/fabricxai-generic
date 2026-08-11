@@ -61,6 +61,13 @@ export interface TripResult {
 export async function proposeApproveCommit(
   ctx: AnyCtx,
   trip: PendingTargetTrip,
+  /**
+   * Who signs. Defaults to the proposer — which the ⚖ tables now REFUSE (adoption plan
+   * 3.1), so any case touching an audited target must hand in a second person, exactly as
+   * the product demands of a real reviewer. The default stays for the non-⚖ targets whose
+   * review-your-own-upload flow is the designed path.
+   */
+  approveAs: AnyCtx = ctx,
 ): Promise<TripResult> {
   const label = `${trip.moduleId}/${trip.targetTable}`
 
@@ -79,7 +86,7 @@ export async function proposeApproveCommit(
   // another case — and the rest of this trip would then be asserting nothing.
   expect(draft.status, `${label} was auto-approved at propose`).toBe('pending')
 
-  const result = await approve(ctx, { pendingChangeId: draft.id })
+  const result = await approve(approveAs, { pendingChangeId: draft.id })
 
   expect(result.status, `${label} did not commit`).toBe('committed')
   expect(result.committedRowId, `${label} committed with no row id`).toBeTruthy()

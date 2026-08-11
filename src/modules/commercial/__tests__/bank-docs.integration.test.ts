@@ -13,7 +13,7 @@
  */
 import { randomUUID } from 'node:crypto'
 
-import { and, eq, sql } from 'drizzle-orm'
+import { and, eq, inArray, sql } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { createDirectClient, createDirectDb } from '@/db/direct'
@@ -45,6 +45,8 @@ const db = createDirectDb(client)
 const COMPANY = randomUUID()
 const OTHER = randomUUID()
 const USER = `lc-${randomUUID().slice(0, 8)}`
+/** Second signer — an LC draft is ⚖ and refuses its author's own signature (3.1). */
+const SIGNER = `lc-sign-${randomUUID().slice(0, 8)}`
 const ctx: RequestCtx = { companyId: COMPANY, userId: USER, roles: ['commercial'] }
 const otherCtx: RequestCtx = { companyId: OTHER, userId: USER, roles: ['commercial'] }
 
@@ -62,7 +64,10 @@ beforeAll(async () => {
     { id: COMPANY, name: 'LC Co', slug: `lc-${COMPANY.slice(0, 8)}` },
     { id: OTHER, name: 'Other Co', slug: `oth-${OTHER.slice(0, 8)}` },
   ])
-  await db.insert(users).values({ id: USER, email: `${USER}@fabricxai.test`, name: 'Commercial' })
+  await db.insert(users).values([
+    { id: USER, email: `${USER}@fabricxai.test`, name: 'Commercial' },
+    { id: SIGNER, email: `${SIGNER}@fabricxai.test`, name: 'Second Signer' },
+  ])
 
   const [buyer] = await db
     .insert(buyers)
@@ -88,7 +93,7 @@ afterAll(async () => {
   await db.execute(sql`delete from audit_log where company_id in (${COMPANY}, ${OTHER})`)
   await db.delete(companies).where(eq(companies.id, COMPANY))
   await db.delete(companies).where(eq(companies.id, OTHER))
-  await db.delete(users).where(eq(users.id, USER))
+  await db.delete(users).where(inArray(users.id, [USER, SIGNER]))
   await client.end()
 })
 
@@ -761,7 +766,7 @@ describe('2.1 · covering an order (the join everything else runs through)', () 
  * them at the moment somebody signs it — not at the moment a model proposed it.
  */
 describe('2.1 · a credit drafted from a SWIFT message', () => {
-  const OWNER: RequestCtx = { companyId: COMPANY, userId: USER, roles: ['owner'] }
+  const OWNER: RequestCtx = { companyId: COMPANY, userId: SIGNER, roles: ['owner'] }
 
   const swiftDraft = (over: Record<string, unknown> = {}) => ({
     buyerId,

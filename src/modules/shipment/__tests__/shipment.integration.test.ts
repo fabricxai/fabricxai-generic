@@ -64,8 +64,10 @@ const db = createDirectDb(client)
 const COMPANY = randomUUID()
 const OTHER = randomUUID()
 const USER = `shp-${randomUUID().slice(0, 8)}`
+/** A second person for the ⚖ approvals — the author's own signature now refuses (3.1). */
+const SIGNER = `shp-sign-${randomUUID().slice(0, 8)}`
 const ctx: RequestCtx = { companyId: COMPANY, userId: USER, roles: ['shipment'] }
-const approverCtx: RequestCtx = { companyId: COMPANY, userId: USER, roles: ['owner'] }
+const approverCtx: RequestCtx = { companyId: COMPANY, userId: SIGNER, roles: ['owner'] }
 const otherCtx: RequestCtx = { companyId: OTHER, userId: USER, roles: ['shipment'] }
 
 let orderId: string
@@ -82,7 +84,10 @@ beforeAll(async () => {
     { id: COMPANY, name: 'Ship Co', slug: `shp-${COMPANY.slice(0, 8)}` },
     { id: OTHER, name: 'Other Co', slug: `oth-${OTHER.slice(0, 8)}` },
   ])
-  await db.insert(users).values({ id: USER, email: `${USER}@fabricxai.test`, name: 'Shipper' })
+  await db.insert(users).values([
+    { id: USER, email: `${USER}@fabricxai.test`, name: 'Shipper' },
+    { id: SIGNER, email: `${SIGNER}@fabricxai.test`, name: 'Second Signer' },
+  ])
 
   const [buyer] = await db
     .insert(buyers)
@@ -605,7 +610,9 @@ describe('8.1 · ex-factory', () => {
     expect(result.lcConflicts.length).toBeGreaterThan(0)
     const [row] = await db.select().from(shipments).where(eq(shipments.id, shipmentId))
     expect(row!.portStatus).toBe('ex_factory')
-    expect((row!.lcWaiver as Record<string, unknown>).waivedBy).toBe(ctx.userId)
+    // The waiver is stamped by whoever APPROVED it — since 3.1 that is necessarily a
+    // second person, which is the point of recording the name at all.
+    expect((row!.lcWaiver as Record<string, unknown>).waivedBy).toBe(SIGNER)
   })
 
   it('refuses a waiver without a role, a reason, or a shipment still at the factory', async () => {
@@ -655,7 +662,7 @@ describe('8.1 · ex-factory', () => {
     const override = row!.toleranceOverride as Record<string, unknown>
     expect(override.direction).toBe('short')
     expect(override.varianceQty).toBe(80)
-    expect(override.acceptedBy).toBe(USER)
+    expect(override.acceptedBy).toBe(SIGNER)
   })
 
   it('refuses an override when nothing is actually breached', async () => {

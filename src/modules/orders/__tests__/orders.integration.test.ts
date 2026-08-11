@@ -39,11 +39,14 @@ const COMPANY_A = randomUUID()
 const COMPANY_B = randomUUID()
 const USER_A = `ord-a-${randomUUID().slice(0, 8)}`
 const USER_B = `ord-b-${randomUUID().slice(0, 8)}`
+/** Second signer in company A — order revisions are ⚖, the author cannot sign (3.1). */
+const SIGNER_A = `ord-sign-${randomUUID().slice(0, 8)}`
 const BUYER_A = randomUUID()
 const TEMPLATE_A = randomUUID()
 
 const ctxA: RequestCtx = { companyId: COMPANY_A, userId: USER_A, roles: ['merchandiser'] }
 const ctxB: RequestCtx = { companyId: COMPANY_B, userId: USER_B, roles: ['merchandiser'] }
+const signerCtxA: RequestCtx = { companyId: COMPANY_A, userId: SIGNER_A, roles: ['merchandiser'] }
 const systemA: SystemCtx = { companyId: COMPANY_A, userId: null, roles: ['owner'], system: true }
 
 const EX_FACTORY = '2026-06-30'
@@ -65,6 +68,7 @@ beforeAll(async () => {
     .values([
       { id: USER_A, email: `${USER_A}@fabricxai.test`, name: 'Alpha Merch' },
       { id: USER_B, email: `${USER_B}@fabricxai.test`, name: 'Beta Merch' },
+      { id: SIGNER_A, email: `${SIGNER_A}@fabricxai.test`, name: 'Alpha Signer' },
     ])
     .onConflictDoNothing()
 
@@ -455,7 +459,7 @@ describe('1.3 · the desk originates as well as advances (plan 5.1)', () => {
     })
 
     expect(draft.status).toBe('pending')
-    await approve(ctxA, { pendingChangeId: draft.id })
+    await approve(signerCtxA, { pendingChangeId: draft.id })
 
     const [after] = await db.select().from(orderStyles).where(eq(orderStyles.id, styleId))
     // The floor cuts to `activeRevision`; an amendment that did not move it would leave
@@ -530,7 +534,7 @@ describe('1.3 · applyRevision — the AI → approve → commit loop', () => {
 
     expect(draft.status).toBe('pending')
 
-    const approved = await approve(ctxA, { pendingChangeId: draft.id })
+    const approved = await approve(signerCtxA, { pendingChangeId: draft.id })
 
     // The handler returns the ORDER id — a revision is a change to the order, not to one
     // breakdown row, and the audit trail should point where a human would look.
@@ -591,7 +595,7 @@ describe('1.3 · applyRevision — the AI → approve → commit loop', () => {
 
     // The gate is server-side and applies to approved AI writes exactly as it applies to
     // a merchandiser typing — approval is not a bypass.
-    await expect(approve(ctxA, { pendingChangeId: draft.id })).rejects.toMatchObject({
+    await expect(approve(signerCtxA, { pendingChangeId: draft.id })).rejects.toMatchObject({
       messageKey: 'orders.errors.breakdown_outside_tolerance',
     })
 

@@ -63,6 +63,8 @@ const db = createDirectDb(client)
 
 const COMPANY = randomUUID()
 const OWNER = `tgt-owner-${randomUUID().slice(0, 8)}`
+/** The second pair of hands the ⚖ tables demand at approve (adoption plan 3.1). */
+const COSIGNER = `tgt-cosign-${randomUUID().slice(0, 8)}`
 
 /**
  * One actor, holding every role.
@@ -76,6 +78,8 @@ const ctx: RequestCtx = {
   userId: OWNER,
   roles: ['owner', 'admin', 'hr', 'commercial', 'merchandiser', 'quality', 'store'],
 }
+/** Same roles, different person — the shape every ⚖ approve now requires. */
+const cosignerCtx: RequestCtx = { ...ctx, userId: COSIGNER }
 
 /** Prerequisite ids, filled in `beforeAll` and read by the payload builders. */
 const world = {
@@ -790,7 +794,10 @@ beforeAll(async () => {
     name: 'Target Co',
     slug: `tgt-${COMPANY.slice(0, 8)}`,
   })
-  await db.insert(users).values({ id: OWNER, email: `${OWNER}@fabricxai.test`, name: 'Owner' })
+  await db.insert(users).values([
+    { id: OWNER, email: `${OWNER}@fabricxai.test`, name: 'Owner' },
+    { id: COSIGNER, email: `${COSIGNER}@fabricxai.test`, name: 'Cosigner' },
+  ])
   // Without a role row this user is invisible to any join on `users` under a tenant scope
   // (migration 0073) — see the note in approvals.integration.test.ts.
   await db.insert(rolesTable).values({ companyId: COMPANY, userId: OWNER, role: 'owner' })
@@ -1080,7 +1087,7 @@ describe('every registered pending target commits', () => {
         operation: target.operation ?? 'insert',
         targetId: target.targetId?.(),
         payload: target.payload(),
-      })
+      }, cosignerCtx)
 
       await target.verify(rowId)
     },
@@ -1114,5 +1121,63 @@ describe('the coverage itself', () => {
     )
 
     expect(orphans).toEqual([])
+  })
+})
+
+/**
+ * Dual control on the ⚖ tables (adoption plan 3.1, HANDOVER DL-8).
+ *
+ * The main loop above now proves every audited target commits under a SECOND person's
+ * signature. These pin the other three edges: the author's own signature refuses on an
+ * audited target, still works on an unaudited one (the intake flow's designed path), and
+ * the refusal is the named sentence rather than a generic forbidden.
+ */
+describe('a ⚖ draft is not signed by its own author', () => {
+  it('refuses the author on an audited target, in words', async () => {
+    const { propose, approve } = await import('@/modules/core/pending-changes')
+    const draft = await propose(ctx, {
+      moduleId: 'commercial',
+      targetTable: 'lcs',
+      operation: 'insert',
+      payload: {
+        buyerId: world.buyerId,
+        number: `LC-SELF-${randomUUID().slice(0, 6)}`,
+        value: '1000.00',
+        currency: 'USD',
+        tolerancePct: '0',
+        docsRequired: {},
+      },
+      zodSchemaKey: 'lc_from_swift_v1',
+      source: 'user_draft',
+    })
+
+    await expect(approve(ctx, { pendingChangeId: draft.id })).rejects.toThrow(/self_approval/)
+
+    // Refused, not consumed: the draft stays pending for the person who may sign it.
+    const second = await approve(cosignerCtx, { pendingChangeId: draft.id })
+    expect(second.status).toBe('committed')
+  })
+
+  it('keeps review-your-own-upload alive on an unaudited target', async () => {
+    const { propose, approve } = await import('@/modules/core/pending-changes')
+    // rfqs is deliberately NOT in registerAuditedTables — the enquiry intake flow is
+    // "whoever uploaded it reviews the extraction and signs it".
+    const draft = await propose(ctx, {
+      moduleId: 'rfq',
+      targetTable: 'rfqs',
+      operation: 'insert',
+      payload: {
+        buyerId: world.buyerId,
+        title: 'Self-reviewed enquiry',
+        productType: 'knit',
+        quantity: 1000,
+        currency: 'USD',
+      },
+      zodSchemaKey: 'rfq',
+      source: 'user_draft',
+    })
+
+    const result = await approve(ctx, { pendingChangeId: draft.id })
+    expect(result.status).toBe('committed')
   })
 })
