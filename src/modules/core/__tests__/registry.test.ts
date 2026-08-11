@@ -14,9 +14,20 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { registerModule, type ModuleDefinition } from '@/modules/core/registry'
 
-/** The smallest thing the registry accepts. */
+/**
+ * The smallest REAL module — every required field present, none of the optional ones.
+ *
+ * Spelled out rather than cast through `unknown`: a cast would let this file keep compiling
+ * after somebody adds a required field to `ModuleDefinition`, and these tests would then be
+ * registering something the registry could never be handed in production.
+ */
 function moduleNamed(id: string, pendingTargets: string[] = []): ModuleDefinition {
-  return { id, pendingTargets } as ModuleDefinition
+  return {
+    id,
+    pendingTargets,
+    zodMap: {},
+    approvalDefaults: { requiredRoles: ['owner'] },
+  }
 }
 
 /** Ids are unique per test so one case cannot poison the next through the shared map. */
