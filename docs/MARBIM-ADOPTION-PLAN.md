@@ -51,7 +51,7 @@ Legend: 🅗 high · 🅜 medium · S/M/L = hours / day / multi-day
   no approve nav — their work vanishes into silence. "My raised drafts" (status, age, who
   it waits on) on those homes; reads `pending_changes` by `created_by`, no new tables.
   *Verify:* a cutting correction shows as pending on the cutting home, then committed.
-- [ ] **2.2 🅗 M–L Per-role "Your work."** The composed queue exists for
+- [x] **2.2 🅗 M–L Per-role "Your work."** `060c430` — store/quality/shipment/commercial compose on /home; floor trio deliberately excluded (their queue is their landing). — The composed queue exists for
   owner/admin/merchandiser only. Compose per-role versions from existing queries: store
   (requisitions to issue, GRNs awaiting inspection, low UD balances), quality, shipment,
   commercial. Depends on nothing; 2.1 folds into it.
