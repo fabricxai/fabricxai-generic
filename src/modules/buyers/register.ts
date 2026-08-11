@@ -18,6 +18,14 @@ import { BUYERS_ZOD_MAP } from './zod'
 export const buyersModule = registerModule({
   id: 'buyers',
 
+  refResolvers: {
+    /* `B-04501` — the code on every buyer row, and the only buyer identifier this product
+       ever shows anybody. See core/refs.ts. */
+    buyer: async (ctx, ref) => {
+      const { buyerIdByCode } = await import('./queries')
+      return buyerIdByCode(ctx, ref)
+    },
+  },
   pendingTargets: ['buyer_terms', 'buyer_requirements'],
   zodMap: BUYERS_ZOD_MAP,
 

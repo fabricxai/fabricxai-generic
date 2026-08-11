@@ -19,6 +19,13 @@ export const ordersModule = registerModule({
   // tna_milestones (dates are computed by the engine, never drafted), order_revisions
   // (written by the service as evidence, so a draft could forge a paper trail).
   pendingTargets: ['orders', 'order_breakdowns'],
+  refResolvers: {
+    /* `PO-BF-2044` — the buyer's own number, or the supplier reference beside it. */
+    order: async (ctx, ref) => {
+      const { orderIdByPoNumber } = await import('./queries')
+      return orderIdByPoNumber(ctx, ref)
+    },
+  },
 
   zodMap: ORDERS_ZOD_MAP,
 

@@ -7,7 +7,7 @@
  * shows an accepted overload as a decision somebody made rather than as a
  * problem to fix — and shows an unaccepted one as exactly the opposite.
  */
-import { and, asc, eq, gte, inArray, lte } from 'drizzle-orm'
+import { and, asc, eq, gte, inArray, lte, sql } from 'drizzle-orm'
 import { z } from 'zod'
 
 import type { AnyCtx } from '@/modules/core/ctx'
@@ -232,4 +232,21 @@ export async function openScenarios(
       .where(scoped(scenarios, ctx, eq(scenarios.status, 'draft')))
       .orderBy(asc(scenarios.createdAt)),
   )
+}
+
+/**
+ * The id behind a line code — `L1`, the way the floor says it.
+ *
+ * Unique per company by `lines_company_code_key`, and case-insensitive: the board prints
+ * `L1`, a supervisor types `l1`, and they are the same sewing line.
+ */
+export async function lineIdByCode(ctx: AnyCtx, code: string): Promise<string | null> {
+  return withTenantRead(ctx, async (tx) => {
+    const [row] = await tx
+      .select({ id: lines.id })
+      .from(lines)
+      .where(scoped(lines, ctx, sql`lower(${lines.code}) = lower(${code})`))
+      .limit(1)
+    return row?.id ?? null
+  })
 }

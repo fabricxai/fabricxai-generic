@@ -21,6 +21,7 @@
 import { z } from 'zod'
 
 import type { AnyCtx } from '../core/ctx'
+import { ENTITY_REF_MAX, resolveRef } from '../core/refs'
 import type { DraftTool, ReadTool, ToolPack } from '../marbim/tools'
 
 import { orderDetail, orderList, ordersInProduction } from './queries'
@@ -28,8 +29,14 @@ import { previewRipple } from './service'
 
 const noArgs = z.object({}).passthrough()
 
+/**
+ * An order, named the way a person can name one: its PO number as the buyer wrote it
+ * (`PO-BF-2044`), or its id when a screen already has one. See core/refs.ts.
+ */
+const orderRef = z.string().min(1).max(ENTITY_REF_MAX)
+
 const orderInput = z.object({
-  orderId: z.string().uuid(),
+  order: orderRef,
 })
 
 const rippleInput = z.object({
@@ -57,7 +64,8 @@ const detail: ReadTool = {
     'the at-risk ones.',
   input: orderInput,
   execute: async (ctx: AnyCtx, args: unknown) => {
-    const { orderId } = orderInput.parse(args)
+    const { order } = orderInput.parse(args)
+    const orderId = await resolveRef(ctx, 'order', order)
     return orderDetail(ctx, orderId)
   },
 }

@@ -20,6 +20,7 @@
 import { z } from 'zod'
 
 import type { AnyCtx } from '../core/ctx'
+import { ENTITY_REF_MAX, resolveRef } from '../core/refs'
 import type { ReadTool, ToolPack } from '../marbim/tools'
 
 import { activeLines, board, orderRunRate, sewnAgainstOrder, trailingOutput } from './queries'
@@ -38,19 +39,25 @@ const dayInput = z.object({
   shiftHours: z.number().int().min(1).max(24).default(10),
 })
 
+/**
+ * An order, named the way a person can name one: its PO number as the buyer wrote it
+ * (`PO-BF-2044`), or its id when a screen already has one. See core/refs.ts.
+ */
+const orderRef = z.string().min(1).max(ENTITY_REF_MAX)
+
 const orderInput = z.object({
-  orderId: z.string().uuid(),
+  order: orderRef,
 })
 
 const runRateInput = z.object({
-  orderId: z.string().uuid(),
+  order: orderRef,
   contractedQty: z.number().int().positive(),
   asOf: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   trailingDays: z.number().int().min(1).max(30).default(3),
 })
 
 const trailingInput = z.object({
-  orderId: z.string().uuid(),
+  order: orderRef,
   asOf: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   days: z.number().int().min(1).max(30).default(7),
 })
@@ -88,8 +95,8 @@ const sewn: ReadTool = {
     '— do not use it to answer whether an order is complete.',
   input: orderInput,
   execute: async (ctx: AnyCtx, args: unknown) => {
-    const { orderId } = orderInput.parse(args)
-    return sewnAgainstOrder(ctx, orderId)
+    const { order } = orderInput.parse(args)
+    return sewnAgainstOrder(ctx, await resolveRef(ctx, 'order', order))
   },
 }
 
@@ -102,8 +109,8 @@ const trailing: ReadTool = {
     'which days are present rather than averaging over the window as though it were full.',
   input: trailingInput,
   execute: async (ctx: AnyCtx, args: unknown) => {
-    const input = trailingInput.parse(args)
-    return trailingOutput(ctx, input)
+    const { order, ...rest } = trailingInput.parse(args)
+    return trailingOutput(ctx, { ...rest, orderId: await resolveRef(ctx, 'order', order) })
   },
 }
 
@@ -117,8 +124,8 @@ const rate: ReadTool = {
     'give the completion date on its own.',
   input: runRateInput,
   execute: async (ctx: AnyCtx, args: unknown) => {
-    const input = runRateInput.parse(args)
-    return orderRunRate(ctx, input)
+    const { order, ...rest } = runRateInput.parse(args)
+    return orderRunRate(ctx, { ...rest, orderId: await resolveRef(ctx, 'order', order) })
   },
 }
 

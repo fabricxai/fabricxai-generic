@@ -220,3 +220,25 @@ export async function searchLeads(
       .limit(input.limit),
   )
 }
+
+/**
+ * The id behind a buyer code — `B-04501`, exactly as it is printed on the row.
+ *
+ * Exact, and only the code. `searchBuyers` above exists for "find me something like this"
+ * and returns a list a person chooses from; this answers a tool that is about to ACT, and
+ * the nearest match is how a shipment ends up against the wrong buyer. `buyers_company_code_key`
+ * makes the answer unique within the company, which is what lets there be one at all.
+ *
+ * Case-insensitive because a code is read off paper and typed back by hand, and `b-04501`
+ * is not a different buyer.
+ */
+export async function buyerIdByCode(ctx: AnyCtx, code: string): Promise<string | null> {
+  return withTenantRead(ctx, async (tx) => {
+    const [row] = await tx
+      .select({ id: buyers.id })
+      .from(buyers)
+      .where(scoped(buyers, ctx, sql`lower(${buyers.code}) = lower(${code})`))
+      .limit(1)
+    return row?.id ?? null
+  })
+}

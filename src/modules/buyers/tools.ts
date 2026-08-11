@@ -16,6 +16,7 @@
 import { z } from 'zod'
 
 import type { AnyCtx } from '../core/ctx'
+import { ENTITY_REF_MAX, resolveRef } from '../core/refs'
 import type { ReadTool, ToolPack } from '../marbim/tools'
 
 import { buyerAccounts, pipeline } from './queries'
@@ -39,13 +40,23 @@ const quietInput = z.object({
   today: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'a calendar date, YYYY-MM-DD'),
 })
 
+/**
+ * A buyer, named the way a person can name one.
+ *
+ * `B-04501` — the code on the row — or the uuid, when a screen already has it. It was a uuid
+ * only, which is an identifier this product prints nowhere: asked about the code beside the
+ * chat panel, the model could see the question, hold the tool, and still have no way to run
+ * it. `resolveRef` turns one into the other, exactly, refusing rather than guessing.
+ */
+const buyerRef = z.string().min(1).max(ENTITY_REF_MAX)
+
 const termsInput = z.object({
-  buyerId: z.string().uuid(),
+  buyer: buyerRef,
   /** The date to ask about. For an existing order this is the date it was TAKEN. */
   on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'a calendar date, YYYY-MM-DD'),
 })
 
-const buyerInput = z.object({ buyerId: z.string().uuid() })
+const buyerInput = z.object({ buyer: buyerRef })
 
 const accounts: ReadTool = {
   kind: 'read',
@@ -86,11 +97,12 @@ const terms: ReadTool = {
   description:
     'The terms that governed a buyer on a given date: payment, incoterm, quantity tolerance, ' +
     'AQL levels and any nominated banks, forwarders or labs. Ask with the date the ORDER was ' +
-    'taken, not today — terms are versioned precisely so the answer does not move.',
+    'taken, not today — terms are versioned precisely so the answer does not move. ' +
+    'The buyer is their code as printed (B-04501) or their id.',
   input: termsInput,
   execute: async (ctx: AnyCtx, args: unknown) => {
-    const { buyerId, on } = termsInput.parse(args)
-    return termsFor(ctx, { buyerId, onDate: on })
+    const { buyer, on } = termsInput.parse(args)
+    return termsFor(ctx, { buyerId: await resolveRef(ctx, 'buyer', buyer), onDate: on })
   },
 }
 
@@ -99,11 +111,12 @@ const contact: ReadTool = {
   name: 'buyers.primary_contact',
   description:
     'The named contact at a buyer, with their role and email — who a clarification, a ' +
-    'shipping document or a short-shipment conversation should actually go to.',
+    'shipping document or a short-shipment conversation should actually go to. ' +
+    'The buyer is their code as printed (B-04501) or their id.',
   input: buyerInput,
   execute: async (ctx: AnyCtx, args: unknown) => {
-    const { buyerId } = buyerInput.parse(args)
-    return primaryContact(ctx, { buyerId })
+    const { buyer } = buyerInput.parse(args)
+    return primaryContact(ctx, { buyerId: await resolveRef(ctx, 'buyer', buyer) })
   },
 }
 

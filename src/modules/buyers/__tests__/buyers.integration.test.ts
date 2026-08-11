@@ -37,6 +37,7 @@ import {
   termsFor,
   upsertTerms,
 } from '@/modules/buyers/service'
+import { buyerIdByCode } from '@/modules/buyers/queries'
 import type { RequestCtx } from '@/modules/core/ctx'
 import { approve, propose } from '@/modules/core/pending-changes'
 import { withTenantRead } from '@/modules/core/tenancy'
@@ -474,5 +475,42 @@ describe('1.1 · tenancy', () => {
         aqlLevel: '4.0',
       }),
     ).rejects.toThrow(/buyer_not_found/)
+  })
+})
+
+/**
+ * The code a person can see, resolved to the id everything joins on.
+ *
+ * `B-04501` is printed on the buyer row, said out loud, and written on the buyer's own
+ * paperwork. The uuid beside it appears in no screen, no document and no export — and it was
+ * the only thing MARBIM's buyer tools would accept, so the copilot could not answer a
+ * question about the code sitting in the table next to it.
+ */
+describe('1.1 · a buyer answers to its code', () => {
+  it('resolves the code exactly, whatever case it is typed in', async () => {
+    await reset()
+    const id = await newBuyer({ code: 'B-04501' })
+
+    await expect(buyerIdByCode(ctx, 'B-04501')).resolves.toBe(id)
+    // Read off paper and typed back by hand; `b-04501` is not a different buyer.
+    await expect(buyerIdByCode(ctx, 'b-04501')).resolves.toBe(id)
+  })
+
+  it('answers nothing for a code this company does not have', async () => {
+    await reset()
+    await newBuyer({ code: 'B-04501' })
+
+    // NOT the nearest row. A tool acts on this answer immediately, and "did you mean
+    // B-04502" is how a shipment ends up against the wrong buyer.
+    await expect(buyerIdByCode(ctx, 'B-04502')).resolves.toBeNull()
+  })
+
+  it('does not reach across companies', async () => {
+    await reset()
+    await newBuyer({ code: 'B-04501' })
+
+    const stranger: RequestCtx = { companyId: randomUUID(), userId: USER, roles: ['merchandiser'] }
+    // A code is unique WITHIN a company — two factories may both have a B-04501.
+    await expect(buyerIdByCode(stranger, 'B-04501')).resolves.toBeNull()
   })
 })

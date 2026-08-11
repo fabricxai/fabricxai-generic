@@ -20,6 +20,13 @@ import { PLANNING_ZOD_MAP } from './zod'
 export const planningModule = registerModule({
   id: 'planning',
 
+  refResolvers: {
+    /* `L1` — what the floor calls a sewing line, and what the board prints. */
+    line: async (ctx, ref) => {
+      const { lineIdByCode } = await import('./queries')
+      return lineIdByCode(ctx, ref)
+    },
+  },
   pendingTargets: ['allocations', 'smv_records'],
   zodMap: PLANNING_ZOD_MAP,
 

@@ -537,3 +537,29 @@ export async function tnaTemplateChoices(
       .orderBy(asc(tnaTemplates.name)),
   )
 }
+
+/**
+ * The id behind a PO number — `PO-BF-2044`, as the buyer wrote it.
+ *
+ * `po_numbers` is an array because one order routinely answers to several: the buyer's own
+ * number and the supplier reference their system issues. Any of them identifies the order,
+ * which is exactly why a person asking about "PO-BF-2044" expects an answer whichever of the
+ * two they happened to be handed.
+ *
+ * Exact containment, not a pattern — the GIN index makes it cheap, and a `LIKE` here would
+ * make `PO-BF-204` match the wrong year's order.
+ *
+ * Ambiguity resolves to nothing rather than to the first row. Two orders sharing a PO number
+ * should not exist, no constraint forbids it, and picking one silently is how the wrong
+ * order gets shipped.
+ */
+export async function orderIdByPoNumber(ctx: AnyCtx, poNumber: string): Promise<string | null> {
+  return withTenantRead(ctx, async (tx) => {
+    const rows = await tx
+      .select({ id: orders.id })
+      .from(orders)
+      .where(scoped(orders, ctx, sql`${orders.poNumbers} @> ARRAY[${poNumber}]::text[]`))
+      .limit(2)
+    return rows.length === 1 ? rows[0]!.id : null
+  })
+}
