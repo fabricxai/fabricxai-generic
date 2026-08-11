@@ -34,7 +34,7 @@ import { createDirectClient, createDirectDb } from '@/db/direct'
 import { companies, roles as rolesTable, users } from '@/db/schema/core'
 import '@/modules/registry'
 import { buyers } from '@/modules/buyers/schema'
-import { uds, udConsumptions } from '@/modules/commercial/schema'
+import { lcs, uds, udConsumptions } from '@/modules/commercial/schema'
 import { audits, findings } from '@/modules/compliance/schema'
 import { bomLines, boms } from '@/modules/costing/schema'
 import { cutReports, lays, markers } from '@/modules/cutting/schema'
@@ -180,6 +180,34 @@ const CASES: TargetCase[] = [
       expect(row?.authorizedItems).toHaveLength(1)
       expect(row?.validUntil).toBe('2027-08-06')
       expect(row?.status).toBe('active')
+    },
+  },
+  {
+    moduleId: 'commercial',
+    targetTable: 'lcs',
+    zodSchemaKey: 'lc_from_swift_v1',
+    payload: () => ({
+      buyerId: world.buyerId,
+      number: `LC-${randomUUID().slice(0, 8)}`,
+      value: '244800.00',
+      currency: 'USD',
+      tolerancePct: '3',
+      issueDate: TODAY,
+      // 44C then 31D. The order matters: the module refuses a credit whose documents fall
+      // due at the bank before its goods may leave, and it refuses it HERE, at approve.
+      latestShipmentDate: '2026-11-18',
+      expiryDate: '2026-12-05',
+      docsRequired: { commercial_invoice: true, bl: true },
+    }),
+    verify: async (rowId) => {
+      const [row] = await db.select().from(lcs).where(eq(lcs.id, rowId))
+      expect(row?.value).toBe('244800.00')
+      expect(row?.expiryDate).toBe('2026-12-05')
+      // A credit arrives live, not as a draft status somebody has to promote afterwards.
+      expect(row?.status).toBe('active')
+      // The checklist a bank presentation is assembled from, kept as a map so 8.1 can look
+      // a kind up rather than scan a list.
+      expect(row?.docsRequired).toMatchObject({ commercial_invoice: true, bl: true })
     },
   },
   {
