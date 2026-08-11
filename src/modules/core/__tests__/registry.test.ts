@@ -12,6 +12,7 @@
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { registerSyncHandler, type SyncHandler } from '@/modules/core/offline-sync'
 import { registerModule, type ModuleDefinition } from '@/modules/core/registry'
 
 /**
@@ -97,5 +98,44 @@ describe('one writer per pending target (rule 11)', () => {
         /not a valid table name/,
       )
     }
+  })
+})
+
+/**
+ * The sync-handler registry — same guard, same hazard, and it was missed the first time.
+ *
+ * `registerModule` was made hot-reload-safe and this was not, so the next edit produced
+ * `sync handler "cutting:create_lay" is already registered` over the screen instead. Both now
+ * read the same decision from `dev-reload.ts`; these cases are here so a third registry that
+ * grows the guard has an example to copy rather than a bug to rediscover.
+ */
+describe('one sync handler per floor operation', () => {
+  const noop: SyncHandler = async () => ({ rowId: 'r' })
+
+  it('refuses a second handler for the same operation', () => {
+    const op = `op_${(n += 1)}`
+    registerSyncHandler('cutting', op, { roles: ['cutting'] }, noop)
+
+    expect(() => registerSyncHandler('cutting', op, { roles: ['cutting'] }, noop)).toThrow(
+      /already registered/,
+    )
+  })
+
+  it('lets a dev server re-register after a hot reload', () => {
+    const op = `op_${(n += 1)}`
+    registerSyncHandler('cutting', op, { roles: ['cutting'] }, noop)
+
+    vi.stubEnv('NODE_ENV', 'development')
+    expect(() => registerSyncHandler('cutting', op, { roles: ['cutting'] }, noop)).not.toThrow()
+  })
+
+  it('still refuses a door with no keyholder, reload or not', () => {
+    // /api/sync is the single door every floor write comes through, and `roles` is what
+    // decides who may use it. An empty list is a door anyone in the company can open —
+    // refused in every environment, because that one is never a reload artifact.
+    vi.stubEnv('NODE_ENV', 'development')
+    expect(() => registerSyncHandler('cutting', `op_${(n += 1)}`, { roles: [] }, noop)).toThrow(
+      /no roles/,
+    )
   })
 })

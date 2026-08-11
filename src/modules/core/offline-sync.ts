@@ -23,6 +23,7 @@ import { FACTORY_TIMEZONE } from '@/lib/dates'
 import { offlineKeys } from '@/db/schema/core'
 
 import { isSystemCtx, type AnyCtx, type Role } from './ctx'
+import { isDevReload } from './dev-reload'
 import { AppError, isAppError } from './errors'
 import { scoped } from './scoped'
 import { withTenantRead, withTenantTx } from './tenancy'
@@ -86,7 +87,12 @@ export function registerSyncHandler(
   handler: SyncHandler,
 ): void {
   const key = handlerKey(moduleId, operation)
-  if (handlers.has(key)) throw new Error(`sync handler "${key}" is already registered`)
+  // Two modules claiming one floor operation is a permanent bug — /api/sync is the single
+  // door every offline write comes through, and the handler decides which roles may use it.
+  // A dev server re-evaluating one `register.ts` is not that; see `dev-reload.ts`.
+  if (handlers.has(key) && !isDevReload()) {
+    throw new Error(`sync handler "${key}" is already registered`)
+  }
   if (opts.roles.length === 0) {
     throw new Error(`sync handler "${key}" registered with no roles — every door needs a keyholder`)
   }

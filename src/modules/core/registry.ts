@@ -10,6 +10,7 @@
 import type { ZodType } from 'zod'
 
 import type { AnyCtx, Role } from './ctx'
+import { isDevReload } from './dev-reload'
 import { AppError } from './errors'
 import type { TenantDb } from './tenancy'
 
@@ -74,22 +75,9 @@ const registry = new Map<string, ModuleDefinition>()
 export function registerModule(definition: ModuleDefinition): ModuleDefinition {
   const existing = registry.get(definition.id)
   if (existing && existing !== definition) {
-    /*
-     * Two different modules claiming one id is a permanent bug, and refusing it is the whole
-     * point of this check. A DEV SERVER re-evaluating one module is not that.
-     *
-     * Hot reload replaces a module's evaluated instance while this map — living in a chunk
-     * that did not change — keeps the previous definition object. Same module, same id, new
-     * object identity, and nothing here can tell that apart from a genuine collision. The
-     * result was a `module "marbim" is already registered` overlay after an ordinary edit,
-     * cured only by restarting the server: the exact loop the UI runbook asks somebody to
-     * spend their day in.
-     *
-     * So development replaces and continues. Production boots once and has no hot reload, so
-     * a duplicate there is real; tests run under NODE_ENV=test and keep the throw, which is
-     * what keeps this guard honest rather than merely quiet.
-     */
-    if (process.env.NODE_ENV !== 'development') {
+    // Two different modules claiming one id is a permanent bug. A dev server re-evaluating
+    // one module is not — see `dev-reload.ts` for why this carve-out exists at all.
+    if (!isDevReload()) {
       throw new Error(`module "${definition.id}" is already registered`)
     }
     // Dropped BEFORE the ownership scan below, or the module's own previous entry is found
