@@ -1,6 +1,6 @@
 'use client'
 
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 
 import { parseAnswerProse, type Block, type Inline } from './answer-prose'
 import { MarbimMark } from './mark'
@@ -320,6 +320,200 @@ export function UserBubble({ children }: { children: ReactNode }) {
         {children}
       </div>
     </div>
+  )
+}
+
+/**
+ * Quiet actions under a finished answer: copy, vote, ask again.
+ *
+ * One fixed-height row — no wrap — so the glyphs sit on a shared baseline. Stroke
+ * language matches the sidebar; amber stays on the send button. Vote is local until
+ * a feedback write path exists.
+ */
+export function AnswerActions({
+  vote,
+  copied,
+  onCopy,
+  onGood,
+  onBad,
+  onRetry,
+}: {
+  vote?: 'up' | 'down' | null
+  copied?: boolean
+  onCopy: () => void
+  onGood: () => void
+  onBad: () => void
+  onRetry: () => void
+}) {
+  return (
+    <div
+      role="group"
+      aria-label="Answer actions"
+      style={{
+        display: 'flex',
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 2,
+        height: 28,
+        marginTop: 2,
+      }}
+    >
+      <ActionIcon label={copied ? 'Copied' : 'Copy answer'} onClick={onCopy} active={copied}>
+        <IconCopy />
+      </ActionIcon>
+
+      <ActionDivider />
+
+      <ActionIcon
+        label="Helpful"
+        onClick={onGood}
+        active={vote === 'up'}
+        activeColor="var(--fx-success)"
+      >
+        <IconThumbUp />
+      </ActionIcon>
+      <ActionIcon
+        label="Not helpful"
+        onClick={onBad}
+        active={vote === 'down'}
+        activeColor="var(--fx-danger)"
+      >
+        <IconThumbDown />
+      </ActionIcon>
+
+      <ActionDivider />
+
+      <ActionIcon label="Ask again" onClick={onRetry}>
+        <IconRetry />
+      </ActionIcon>
+    </div>
+  )
+}
+
+function ActionDivider() {
+  return (
+    <span
+      aria-hidden="true"
+      style={{
+        width: 1,
+        height: 14,
+        marginInline: 4,
+        background: 'var(--fx-border-default)',
+        flexShrink: 0,
+      }}
+    />
+  )
+}
+
+function ActionGlyph({ children }: { children: ReactNode }) {
+  return (
+    <svg
+      width={15}
+      height={15}
+      viewBox="0 0 16 16"
+      fill="none"
+      aria-hidden="true"
+      style={{ display: 'block', flexShrink: 0 }}
+    >
+      <g stroke="currentColor" strokeWidth={1.4} strokeLinecap="square" strokeLinejoin="miter">
+        {children}
+      </g>
+    </svg>
+  )
+}
+
+/** Two stacked sheets — optically centered in the 16 box. */
+function IconCopy() {
+  return (
+    <ActionGlyph>
+      <path d="M6 2.5h6.5V11H6z" />
+      <path d="M3.5 5H10v8.5H3.5z" />
+    </ActionGlyph>
+  )
+}
+
+/** Thumb up — palm + base, weight balanced left-of-center like the down sibling. */
+function IconThumbUp() {
+  return (
+    <ActionGlyph>
+      <path d="M4 7.5h2.5v5.5H4z" />
+      <path d="M6.5 13h5.75V8.25H9.25V5L6.5 7.5" />
+    </ActionGlyph>
+  )
+}
+
+function IconThumbDown() {
+  return (
+    <ActionGlyph>
+      <path d="M4 3h2.5v5.5H4z" />
+      <path d="M6.5 3h5.75v4.75H9.25V11L6.5 8.5" />
+    </ActionGlyph>
+  )
+}
+
+/** Partial arc + corner arrow. */
+function IconRetry() {
+  return (
+    <ActionGlyph>
+      <path d="M12.5 5.75A4.5 4.5 0 1 0 12.25 11" />
+      <path d="M12.5 3v3.25H9.25" />
+    </ActionGlyph>
+  )
+}
+
+function ActionIcon({
+  label,
+  onClick,
+  children,
+  active,
+  activeColor,
+}: {
+  label: string
+  onClick: () => void
+  children: ReactNode
+  active?: boolean
+  activeColor?: string
+}) {
+  const [hovered, setHovered] = useState(false)
+  const color =
+    active && activeColor
+      ? activeColor
+      : hovered
+        ? 'var(--fx-text-primary)'
+        : 'var(--fx-text-tertiary)'
+
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      aria-pressed={active ?? false}
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        boxSizing: 'border-box',
+        width: 28,
+        height: 28,
+        minWidth: 28,
+        minHeight: 28,
+        margin: 0,
+        padding: 0,
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+        border: 'none',
+        borderRadius: 'var(--fx-radius-md)',
+        background: active || hovered ? 'var(--fx-bg-sunken)' : 'transparent',
+        color,
+        cursor: 'pointer',
+        lineHeight: 0,
+        transition: 'background 120ms ease, color 120ms ease',
+      }}
+    >
+      {children}
+    </button>
   )
 }
 
