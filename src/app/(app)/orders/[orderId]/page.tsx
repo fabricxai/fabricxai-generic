@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation'
 
 import { Card } from '@/components/fx/data'
 import { Badge } from '@/components/fx/primitives'
+import { FinalReadinessStrip } from '@/components/fx/final-readiness'
 import { RunRateCard } from '@/components/fx/run-rate'
 import { SectionHeading } from '@/components/fx/signature'
 import { FactPair } from '@/components/fx/tna'
@@ -13,6 +14,8 @@ import { companyProfile } from '@/modules/settings/service'
 import { orderDetail, tnaTemplateChoices } from '@/modules/orders/queries'
 import { orderStatusMachine, type OrderStatus } from '@/modules/orders/service'
 import { orderRunRate } from '@/modules/production/queries'
+import { preFinalReadiness, type QualityPolicy } from '@/modules/quality/service'
+import { getPolicy } from '@/modules/settings/service'
 import { factoryToday, FACTORY_TIMEZONE } from '@/lib/dates'
 
 import { OrderBreakdown } from './breakdown-client'
@@ -74,6 +77,18 @@ export default async function OrderDetailPage({
       })
     : null
 
+  /*
+   * Will this order fail its final? (adoption plan 5.2). `preFinalReadiness` reached only a
+   * MARBIM tool — a question neither the merchandiser nor the QC desk knew to ask. Read for
+   * THIS order out of the window's list; null when its final is outside the horizon.
+   */
+  const today = factoryToday()
+  const qualityPolicy = await getPolicy<QualityPolicy>(ctx, 'quality')
+  const readiness =
+    (await preFinalReadiness(ctx, { today, windowDays: 21 }, qualityPolicy)).find(
+      (row) => row.orderId === order.id,
+    ) ?? null
+
   return (
     <>
       <PageHeader
@@ -87,6 +102,8 @@ export default async function OrderDetailPage({
       />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 36 }}>
+        <FinalReadinessStrip readiness={readiness} />
+
         <Card>
           <div style={{ display: 'flex', gap: 40, flexWrap: 'wrap' }}>
             <FactPair label="Style">

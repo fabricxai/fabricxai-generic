@@ -108,7 +108,10 @@ Legend: 🅗 high · 🅜 medium · S/M/L = hours / day / multi-day
 
 ## Phase 5 — Composites (build the tool honestly, then give it a chip)
 
-- [ ] **5.1 🅗 M Shipment readiness checklist.** EXP · LC dates · qty-vs-tolerance · docs
+- [x] **5.1 🅗 M Shipment readiness checklist.** *Already built — verified 2026-08-12.* The
+  shipment card renders "Blocking the bank" from `shipmentBoard`'s computed blockers, with
+  the EXP number in danger colour and the completeness blockers below it, ordered so the
+  legal one is fixed first. Nothing owed. — EXP · LC dates · qty-vs-tolerance · docs
   against the credit's own list, as one panel from day one — not discoveries at the door.
   *Corrected 2026-08-12: `shipment.latest_shipment_alerts` and the board tools EXIST; what
   is owed is the composed readiness panel on the screen, not the tools.*
