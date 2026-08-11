@@ -56,7 +56,7 @@ Legend: 🅗 high · 🅜 medium · S/M/L = hours / day / multi-day
   (requisitions to issue, GRNs awaiting inspection, low UD balances), quality, shipment,
   commercial. Depends on nothing; 2.1 folds into it.
   *Verify:* `store@` sees a non-empty composed queue naming its own work.
-- [ ] **2.3 🅜 S Wire `checkUdBalance` into the issue screen.** The read-only preview was
+- [x] **2.3 🅜 S Wire `checkUdBalance` into the issue screen.** `6ed2629` — via udBalancePreview (whole ledger, alias-safe). — The read-only preview was
   built for exactly this and has **no screen caller** (validated 2026-08-12) — the
   storekeeper meets the balance only as a refusal. Show remaining balance when a bonded
   roll is picked.
