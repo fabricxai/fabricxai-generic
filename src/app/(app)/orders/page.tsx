@@ -42,6 +42,24 @@ const WORD: Record<OrderHealth, string> = {
   done: 'closed',
 }
 
+/**
+ * The order's own status, in words.
+ *
+ * It was rendered raw, so a desk with a healthy order book printed `shipped_partial` and
+ * `in_production` at people — the same defect as the milestone key one line below, found
+ * the same way: by looking at a tenant that had actually reached those states. An unmapped
+ * status falls through to the identifier rather than to an empty badge, because a missing
+ * word should look like one.
+ */
+const STATUS_WORD: Record<string, string> = {
+  confirmed: 'confirmed',
+  in_production: 'in production',
+  shipped_partial: 'part shipped',
+  shipped_full: 'shipped',
+  closed: 'closed',
+  cancelled: 'cancelled',
+}
+
 export default async function OrdersPage() {
   const ctx = await getCtx(await headers())
   if (!ctx) redirect('/login')
@@ -259,7 +277,7 @@ export default async function OrdersPage() {
                       {milestoneLabel(row.headline, locale)}
                     </span>
                   ) : (
-                    <Badge>{row.status}</Badge>
+                    <Badge>{STATUS_WORD[row.status] ?? row.status}</Badge>
                   )}
                 </div>
               </div>

@@ -8,8 +8,49 @@ MARBIM ran on the mock provider, so no model spend and no extraction-quality noi
 
 **What this is not.** A code read. Every line below is something that happened in a browser.
 
-**Status: Phase A (walk) complete. Nothing has been fixed yet** — findings first, by
-agreement, so the list is complete before the batches start.
+**Status: walked twice, and fixed.** The first walk (below) was against an empty tenant and
+found the day-one wall. The tenant was then seeded into a **running factory** —
+`pnpm seed:running`, three buyers and three orders caught in sampling, production and
+shipping — and every role walked again: **201 screens, 20 roles, zero errors.**
+
+| Finding | State |
+|---|---|
+| D1 · no creation door for items/locations/workers/lines | **fixed** — `7242686`, `/setup` |
+| D2 · an admin told to ask an admin | **fixed** — `912f9b7` |
+| D3 · MARBIM chips citing a fake PO | **fixed** — `912f9b7` |
+| D4 · no day-one first step | **fixed** — `912f9b7` |
+| D5 · read-only policy values as buttons | **fixed** — `912f9b7` |
+| D6 · sub-page landings not highlighted | **not a defect** — see below |
+| D7 · `/approve` a dead end for eleven roles | **left** — see below |
+
+## What only the second walk could find
+
+Both of these are the same defect wearing different clothes, and neither was visible on an
+empty tenant — a screen with no rows cannot print a bad row.
+
+- **The order desk printed raw identifiers at people.** `order_confirmed` where "PO
+  received" belongs, and `shipped_partial` where "part shipped" does. For the milestone a
+  translator (`milestoneLabel`) already existed, one import away and uncalled.
+- **A factory mid-flight read as three late orders.** Not a product bug — a seed one. A TNA
+  template dates "PO received" 120 days before ex-factory, so an order shipping this
+  quarter is born with a milestone already overdue. The seeder now actualises the
+  milestones each order has genuinely passed, and only those: JKT-2210 is still waiting on
+  its PP verdict, so its cutting milestones stay open and it reads LATE on
+  *Hardware in-house* — which is true, and specific enough to act on.
+
+## The two that were not fixed, and why
+
+**D6 · sub-page landings.** Verified against the code rather than the screenshot: the
+sidebar already matches `pathname.startsWith(item.href + '/')`, so a storekeeper landing on
+`/store/receive` *does* light up **Store**. The finding described the module root being
+highlighted as a fault; it is the intended behaviour and the alternative — a nav entry per
+sub-page — costs more than it returns.
+
+**D7 · `/approve` for non-approvers.** Left deliberately. Its empty state does not
+apologise, it teaches: *"Drafts appear here when a rule sends them to a role you hold. Your
+own work stays in its own module until then. Alerts from jobs live in the Alerts control up
+top — not here."* That is three things a new user needs to know, in the one place they will
+look for them. Hiding the entry would save a row of sidebar and cost the lesson.
 
 ---
 

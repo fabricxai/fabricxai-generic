@@ -426,6 +426,59 @@ async function shippingPhase(ctx: RequestCtx, order: OrderRef, allLines: LineRef
 }
 
 /**
+ * Tick off the milestones each order has genuinely passed.
+ *
+ * `limit` names the only milestones allowed to be actualised for that PO; `null` means
+ * every milestone already due. The distinction matters: an order still waiting on its PP
+ * verdict has NOT hit its cutting milestones, and a seed that ticked them anyway would
+ * show a green calendar over a blocked gate — the exact contradiction this data exists to
+ * let somebody see.
+ *
+ * Actualised a few days after plan, not on it. A calendar where every milestone landed
+ * exactly on its planned date is not a factory anybody has worked in, and the variance
+ * columns would have nothing to show.
+ */
+async function actualizePastMilestones(
+  ctx: RequestCtx,
+  limits: Record<string, readonly string[] | null>,
+): Promise<void> {
+  const { actualizeMilestone } = await import('@/modules/orders/service')
+  const { tnaMilestones } = await import('@/modules/orders/schema')
+
+  let done = 0
+  for (const [po, limit] of Object.entries(limits)) {
+    const [order] = await withTenantRead(ctx, (tx) =>
+      tx
+        .select({ id: orders.id })
+        .from(orders)
+        .where(sql`${orders.poNumbers} @> ARRAY[${po}]::text[]`),
+    )
+    if (!order) continue
+
+    const due = await withTenantRead(ctx, (tx) =>
+      tx
+        .select({ id: tnaMilestones.id, name: tnaMilestones.name, planned: tnaMilestones.plannedDate })
+        .from(tnaMilestones)
+        .where(and(eq(tnaMilestones.orderId, order.id), sql`${tnaMilestones.actualDate} is null`)),
+    )
+
+    for (const [i, m] of due.entries()) {
+      if (m.planned >= T) continue
+      if (limit && !limit.includes(m.name)) continue
+      // A day or two after plan, varying by position — deterministic, so two runs of this
+      // seed tell the same story.
+      const actual = shiftFactoryDate(m.planned, i % 3)
+      await actualizeMilestone(ctx, {
+        milestoneId: m.id,
+        actualDate: actual > T ? T : actual,
+      })
+      done += 1
+    }
+  }
+  console.log(`[running] ${done} milestones actualised`)
+}
+
+/**
  * Has this phase already run?
  *
  * Each floor phase is keyed on its own sample request number, because the request is the
@@ -640,6 +693,22 @@ async function main(): Promise<void> {
         `[running] ${p.po} · ${p.style} · ${p.qty.toLocaleString()} pcs · ${p.status} · ships ${p.ship}`,
       )
     }
+
+    // ── the calendar these orders have actually walked ────────────────────────
+    //
+    // Without this every order reads LATE on its very first milestone, because a TNA
+    // template dates "PO received" 120–150 days before ex-factory — a date already in the
+    // past for anything shipping this quarter. A factory mid-flight has HIT those
+    // milestones; leaving them unactualised produced a desk claiming three late orders on
+    // a floor that is visibly working, which is the seed lying about the state it built.
+    //
+    // Only milestones whose planned date has passed, and only up to the phase each order
+    // has actually reached: JKT is still in sampling, so its cutting milestones stay open.
+    await actualizePastMilestones(ctx, {
+      'JKT-2210': ['order_confirmed', 'yarn_booking', 'fabric_booking', 'yarn_in_house'],
+      'POLO-2244': null, // everything already due
+      'DENIM-2251': null,
+    })
 
     await refreshMilestoneStatuses(ctx, { today: T })
 
