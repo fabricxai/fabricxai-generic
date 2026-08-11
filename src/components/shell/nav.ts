@@ -524,6 +524,65 @@ export function visibleNav(
   )
 }
 
+/**
+ * Where a role's day starts (adoption plan 1.1).
+ *
+ * The root used to send owner/admin/merchandiser to "Your work" and EVERYBODY ELSE to the
+ * first screen their sidebar happened to order — which, with the approve inbox near the
+ * top, greeted a storekeeper with an empty approval queue instead of the receiving bay.
+ * The old code's own comment promised "a storekeeper is not greeted by an office feed",
+ * and sidebar order delivered exactly that anyway.
+ *
+ * Each entry is (role → the screen that person walks to first in the morning). Order is
+ * precedence for multi-role holders: the FLOOR desk wins over the office one, because a
+ * person holding store+finance goes to the warehouse first and reads reports second —
+ * office landings are one click away, a floor landing mis-set is a whole wrong screen on
+ * a shared tablet.
+ *
+ * `landingFor` verifies the target's module is actually visible to the caller before
+ * using it (factory type can hide modules), so the old guarantee still holds: a landing
+ * is by definition a screen they can open.
+ */
+const ROLE_LANDINGS: readonly { role: Role; moduleId: string; href: string }[] = [
+  { role: 'store', moduleId: 'store', href: '/store/receive' },
+  { role: 'cutting', moduleId: 'cutting', href: '/cutting' },
+  { role: 'production', moduleId: 'lines', href: '/lines/hourly' },
+  { role: 'quality', moduleId: 'quality', href: '/quality/inline' },
+  { role: 'shipment', moduleId: 'shipment', href: '/shipment' },
+  { role: 'maintenance', moduleId: 'maintenance', href: '/maintenance' },
+  { role: 'hr', moduleId: 'workforce', href: '/workforce' },
+  { role: 'compliance', moduleId: 'compliance', href: '/compliance' },
+  { role: 'finance', moduleId: 'finance', href: '/finance' },
+  { role: 'commercial', moduleId: 'lcs', href: '/lcs' },
+  { role: 'planner', moduleId: 'planning', href: '/planning' },
+  { role: 'procurement', moduleId: 'procurement', href: '/procurement' },
+]
+
+/**
+ * The screen this caller lands on after sign-in.
+ *
+ * Owner, admin and merchandiser get "Your work" — the composed queue is built for them.
+ * Every other role gets its desk from `ROLE_LANDINGS`; a caller none of it covers
+ * (member, viewer) falls back to the first screen their sidebar offers, and a caller
+ * with no sidebar at all goes to Settings, where they can at least see who to ask.
+ */
+export function landingFor(
+  roles: readonly Role[],
+  factoryType: FactoryType,
+  marbimEnabled = true,
+): string {
+  if (roles.some((r) => r === 'owner' || r === 'admin' || r === 'merchandiser')) return '/home'
+
+  const nav = visibleNav(roles, factoryType, marbimEnabled)
+  const visible = new Set(nav.map((item) => item.id))
+
+  for (const landing of ROLE_LANDINGS) {
+    if (roles.includes(landing.role) && visible.has(landing.moduleId)) return landing.href
+  }
+
+  return nav[0]?.href ?? '/settings'
+}
+
 /** Screens that disappear when the copilot is off. Read by the pages that must refuse. */
 export const marbimScreens = (): readonly string[] =>
   NAV.filter((item) => item.requiresMarbim).map((item) => item.id)
