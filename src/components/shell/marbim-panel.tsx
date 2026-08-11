@@ -1,7 +1,7 @@
 'use client'
 
 import { usePathname } from 'next/navigation'
-import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { type PointerEvent as ReactPointerEvent, useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 
 import { MarbimSurface } from '@/app/(app)/marbim/surface-client'
 import { MarbimMark } from '@/components/fx/mark'
@@ -21,6 +21,22 @@ const WIDTH_MAX = 920
 function clampWidth(value: number): number {
   const ceiling = Math.min(WIDTH_MAX, typeof window !== 'undefined' ? window.innerWidth : WIDTH_MAX)
   return Math.min(ceiling, Math.max(WIDTH_MIN, Math.round(value)))
+}
+
+/**
+ * The stored width is read through `useSyncExternalStore`, which needs something to
+ * subscribe to. Nothing outside this tab writes the key, so the subscription is a no-op —
+ * declared honestly rather than omitted, because the hook's contract is that a change to the
+ * store notifies React, and a future writer (a second panel, a settings screen) would
+ * otherwise go unnoticed for reasons nobody could find.
+ */
+function subscribeToStoredWidth(onChange: () => void): () => void {
+  if (typeof window === 'undefined') return () => {}
+  const relay = (e: StorageEvent) => {
+    if (e.key === WIDTH_KEY) onChange()
+  }
+  window.addEventListener('storage', relay)
+  return () => window.removeEventListener('storage', relay)
 }
 
 function readStoredWidth(): number {
@@ -75,7 +91,6 @@ export function MarbimPanel({ entry, trust }: { entry: MarbimEntry; trust: Marbi
   const [conversationId, setConversationId] = useState(() => globalThis.crypto.randomUUID())
   const [historyOpen, setHistoryOpen] = useState(false)
   const [history, setHistory] = useState<HistoryRow[] | null>(null)
-  const [width, setWidth] = useState(WIDTH_DEFAULT)
   const dragging = useRef(false)
   // "change scope" — narrow to this screen's department, or let MARBIM read across all of
   // them. The canvas puts this on the context chip; it is the one thing about a question
@@ -87,9 +102,29 @@ export function MarbimPanel({ entry, trust }: { entry: MarbimEntry; trust: Marbi
   const screenModule = moduleForPath(pathname)
   const screenLabel = screenLabelForPath(pathname, words)
 
-  useEffect(() => {
-    setWidth(readStoredWidth())
-  }, [])
+  /*
+   * The stored width, read AFTER hydration.
+   *
+   * It cannot be the initial state: the server renders with no localStorage, and a client
+   * that started from a stored width would mismatch. It used to be a mount effect calling
+   * setState, which React's own lint objects to — an effect that sets state synchronously is
+   * a cascading render. `useSyncExternalStore` is the supported way to read a store that
+   * lives outside React: the server snapshot is the default, the client snapshot is what was
+   * saved, and the swap happens without a second render pass of our own making.
+   */
+  const storedWidth = useSyncExternalStore(
+    subscribeToStoredWidth,
+    readStoredWidth,
+    () => WIDTH_DEFAULT,
+  )
+  // Null until this session changes it, and then it wins — a resize is about the panel in
+  // front of you, not about what a previous session preferred.
+  const [sessionWidth, setSessionWidth] = useState<number | null>(null)
+  const width = sessionWidth ?? storedWidth
+  const setWidth = (next: number | ((current: number) => number)) =>
+    setSessionWidth((current) =>
+      typeof next === 'function' ? next(current ?? storedWidth) : next,
+    )
 
   useEffect(() => {
     if (!mounted) return
@@ -111,7 +146,7 @@ export function MarbimPanel({ entry, trust }: { entry: MarbimEntry; trust: Marbi
     const onMove = (ev: PointerEvent) => {
       if (!dragging.current) return
       // Panel is right-docked: width is distance from the pointer to the right edge.
-      setWidth(clampWidth(window.innerWidth - ev.clientX))
+      setSessionWidth(clampWidth(window.innerWidth - ev.clientX))
     }
     const onUp = (ev: PointerEvent) => {
       dragging.current = false
@@ -185,7 +220,8 @@ export function MarbimPanel({ entry, trust }: { entry: MarbimEntry; trust: Marbi
   useEffect(() => {
     if (!historyOpen) return
     let cancelled = false
-    setHistory(null)
+    // Cleared by whoever OPENS the list, not here: a setState in an effect body is a
+    // cascading render, and "show nothing while this loads" is a property of the gesture.
     void listChatHistory()
       .then((rows) => {
         if (!cancelled) setHistory(rows)
@@ -350,7 +386,12 @@ export function MarbimPanel({ entry, trust }: { entry: MarbimEntry; trust: Marbi
             </span>
             {!historyOpen ? (
               <button
-                onClick={() => setHistoryOpen(true)}
+                onClick={() => {
+                  // Blank first, so a second visit does not show the previous list while
+                  // the new one loads.
+                  setHistory(null)
+                  setHistoryOpen(true)
+                }}
                 aria-label="Earlier chats"
                 title="Earlier chats"
                 style={{
@@ -462,6 +503,11 @@ export function MarbimPanel({ entry, trust }: { entry: MarbimEntry; trust: Marbi
             }}
           >
             <MarbimSurface
+              /* A different thread is a different surface: keying it here is what lets the
+                 surface treat "empty" as initial state rather than as five setState calls in
+                 an effect. Panel open/close does not change the key, so a closed panel still
+                 keeps its conversation. */
+              key={conversationId}
               conversationId={conversationId}
               suggestions={entry.suggestions}
               packLabel={entry.packLabel}

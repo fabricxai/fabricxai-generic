@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useRef, useState, useTransition, createRef, type RefObject } from 'react'
+import { useEffect, useRef, useState, useTransition } from 'react'
 
 import {
+  AnswerActions,
   AnswerText,
   PartialAnswerNotice,
   SuggestedPrompts,
@@ -37,6 +38,8 @@ interface Turn {
   receipt: string | null
   /** How many tools actually ran. Decides what the footer is allowed to claim. */
   toolsRun: number
+  vote?: 'up' | 'down' | null
+  copied?: boolean
 }
 
 /**
@@ -166,21 +169,43 @@ export function MarbimSurface({
   const [readyIds, setReadyIds] = useState<Set<string>>(() => new Set())
   const [pending, startTransition] = useTransition()
   const inputRef = useRef<HTMLTextAreaElement>(null)
-  const readRefs = useRef(new Map<string, RefObject<ReadDocumentHandle | null>>())
+  /*
+   * The imperative handle of each read flow, filled by a CALLBACK ref.
+   *
+   * It used to be a map of refs built during render — `readHandleFor(id)` reading and writing
+   * `readRefs.current` inline in JSX — which React's lint refuses outright: a render that
+   * touches a ref is a render that is not a pure function of its inputs, and under concurrent
+   * rendering it can run twice or be thrown away. A callback ref runs AFTER commit, which is
+   * the moment the handle actually exists.
+   */
+  const readHandles = useRef(new Map<string, ReadDocumentHandle | null>())
 
-  useEffect(() => {
+  /*
+   * Follow the prop when the PANEL changes it, without an effect.
+   *
+   * The tier is chosen in the composer, so it is this component's state; but the panel also
+   * hands one down, and that has to win when it changes. Adjusting state during render — the
+   * pattern React documents for exactly this — costs one extra render pass and no effect at
+   * all, where `useEffect(() => setTier(…))` is a second commit and a cascading render its
+   * own lint rule objects to.
+   */
+  const [lastGivenTier, setLastGivenTier] = useState(initialTier)
+  if (initialTier !== lastGivenTier) {
+    setLastGivenTier(initialTier)
     setTier(initialTier)
-  }, [initialTier])
+  }
 
-  // Reload when the conversation id changes (history pick / new chat). Survives panel close
-  // because the panel keeps this surface mounted.
+  /*
+   * Load this conversation's turns.
+   *
+   * It used to clear turns, attachments, ready ids and the draft synchronously here first —
+   * five setState calls in an effect body, which is a cascading render React's lint refuses.
+   * They are unnecessary: the mount sites key this component on `conversationId`, so picking
+   * a thread from history mounts a NEW surface whose initial state is already empty. The
+   * effect is left with the one thing an effect is for — talking to something outside React.
+   */
   useEffect(() => {
     let cancelled = false
-    setHydrating(true)
-    setTurns([])
-    setAttachments([])
-    setReadyIds(new Set())
-    setDraft('')
     void loadChatTurns({ conversationId })
       .then((rows) => {
         if (cancelled) return
@@ -203,19 +228,11 @@ export function MarbimSurface({
     if (autoFocus && !hydrating) inputRef.current?.focus()
   }, [autoFocus, hydrating, conversationId])
 
-  function readHandleFor(documentId: string): RefObject<ReadDocumentHandle | null> {
-    const existing = readRefs.current.get(documentId)
-    if (existing) return existing
-    const created = createRef<ReadDocumentHandle | null>()
-    readRefs.current.set(documentId, created)
-    return created
-  }
-
   function send(question: string) {
     const text = question.trim()
     const docStarts: ReadDocumentHandle[] = []
     for (const attachment of attachments) {
-      const handle = readRefs.current.get(attachment.documentId)?.current
+      const handle = readHandles.current.get(attachment.documentId)
       if (handle?.isReady()) docStarts.push(handle)
     }
 
@@ -409,7 +426,48 @@ export function MarbimSurface({
                         onRetry={() => send(turn.question)}
                       />
                     ) : turn.answer ? (
-                      <AnswerText>{turn.answer}</AnswerText>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <AnswerText>{turn.answer}</AnswerText>
+                        <AnswerActions
+                          vote={turn.vote ?? null}
+                          copied={turn.copied}
+                          onCopy={() => {
+                            void navigator.clipboard?.writeText(turn.answer ?? '').then(() => {
+                              setTurns((list) =>
+                                list.map((row) =>
+                                  row.id === turn.id ? { ...row, copied: true } : row,
+                                ),
+                              )
+                              window.setTimeout(() => {
+                                setTurns((list) =>
+                                  list.map((row) =>
+                                    row.id === turn.id ? { ...row, copied: false } : row,
+                                  ),
+                                )
+                              }, 1500)
+                            })
+                          }}
+                          onGood={() => {
+                            setTurns((list) =>
+                              list.map((row) =>
+                                row.id === turn.id
+                                  ? { ...row, vote: row.vote === 'up' ? null : 'up' }
+                                  : row,
+                              ),
+                            )
+                          }}
+                          onBad={() => {
+                            setTurns((list) =>
+                              list.map((row) =>
+                                row.id === turn.id
+                                  ? { ...row, vote: row.vote === 'down' ? null : 'down' }
+                                  : row,
+                              ),
+                            )
+                          }}
+                          onRetry={() => send(turn.question)}
+                        />
+                      </div>
                     ) : (
                       <AnswerText streaming>{''}</AnswerText>
                     )}
@@ -480,7 +538,9 @@ export function MarbimSurface({
               READABLE_BY_MARBIM(a.mimeType) ? (
                 <ReadDocumentFlow
                   key={a.documentId}
-                  ref={readHandleFor(a.documentId)}
+                  ref={(handle) => {
+                    readHandles.current.set(a.documentId, handle)
+                  }}
                   attachment={a}
                   onReadyChange={(ready) => {
                     setReadyIds((prev) => {
@@ -500,7 +560,7 @@ export function MarbimSurface({
           attachments={attachments}
           onAttach={(a) => setAttachments((list) => [...list, a])}
           onRemove={(id) => {
-            readRefs.current.delete(id)
+            readHandles.current.delete(id)
             setReadyIds((prev) => {
               const next = new Set(prev)
               next.delete(id)

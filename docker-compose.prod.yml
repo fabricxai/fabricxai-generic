@@ -103,6 +103,10 @@ x-app-env: &app-env
   # unset variable here and an absent one are the same thing.
   MARBIM_MODEL_EXTRACT: ${MARBIM_MODEL_EXTRACT:-}
   MARBIM_MODEL_REASON: ${MARBIM_MODEL_REASON:-}
+  # The "marbim large" composer tier's reason model. Forwarded for the same reason as the
+  # rest: a variable env.ts reads and compose does not pass is one an operator can set in
+  # .env.production and watch do nothing.
+  MARBIM_MODEL_REASON_LARGE: ${MARBIM_MODEL_REASON_LARGE:-}
   MARBIM_MODEL_EMBED: ${MARBIM_MODEL_EMBED:-}
   ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
   GEMINI_API_KEY: ${GEMINI_API_KEY:-}

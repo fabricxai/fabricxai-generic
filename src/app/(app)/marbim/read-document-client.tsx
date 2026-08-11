@@ -103,8 +103,6 @@ export const ReadDocumentFlow = forwardRef<
   const [phase, setPhase] = useState<Phase>({ step: 'offer' })
   const [contextValues, setContextValues] = useState<Record<string, string>>({})
   const polls = useRef(0)
-  const phaseRef = useRef(phase)
-  phaseRef.current = phase
 
   useEffect(() => {
     let cancelled = false
@@ -177,9 +175,9 @@ export const ReadDocumentFlow = forwardRef<
   }
 
   useImperativeHandle(ref, () => ({
-    isReady: () => phaseRef.current.step === 'ready',
+    isReady: () => phase.step === 'ready',
     start: async () => {
-      const current = phaseRef.current
+      const current = phase
       if (current.step !== 'ready') return
       await submit(current.kind, current.values)
     },

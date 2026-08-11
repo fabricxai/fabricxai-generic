@@ -1085,9 +1085,20 @@ export async function chat(
   })
 }
 
-/** A conversation, oldest turn first — only the caller's own threads. */
+/**
+ * A conversation, oldest turn first — only the caller's own threads.
+ *
+ * `RequestCtx`, not `AnyCtx`, and the narrowing is the point rather than a type detail: this
+ * query is scoped to `created_by = ctx.userId`, and a system context's `userId` is `null` by
+ * definition. "The caller's own threads" has no meaning for a caller that is not a person —
+ * the honest answers would be every thread in the company or none, and both are wrong for a
+ * function whose whole purpose is that a shared assistant does not show one operator another
+ * one's questions.
+ *
+ * Every caller is a server action behind `requireRole`, so nothing loses access.
+ */
 export async function conversation(
-  ctx: AnyCtx,
+  ctx: RequestCtx,
   conversationId: string,
 ): Promise<(typeof chatTurns.$inferSelect)[]> {
   return withTenantRead(ctx, async (tx) =>
@@ -1120,7 +1131,8 @@ export interface ConversationSummary {
  * surface another user's questions in somebody else's panel.
  */
 export async function listConversations(
-  ctx: AnyCtx,
+  // Personal history, so a real person — see `conversation` above.
+  ctx: RequestCtx,
   input: { limit?: number } = {},
 ): Promise<ConversationSummary[]> {
   const limit = Math.min(input.limit ?? 30, 50)
