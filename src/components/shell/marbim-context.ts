@@ -12,22 +12,35 @@
  */
 import { navItemFor, navLabelKey, type Words } from './nav'
 
-/** Starting points per role. Each one is answerable from what that role can already read. */
+/**
+ * Starting points per role. Each one is answerable from what that role can already read.
+ *
+ * **No chip names a record.** They used to: "Draft the buyer update for PO-88203", "What is
+ * the TNA status on PO-88203?" — a purchase order from a different tenant's demo data. A new
+ * factory's first conversation with the assistant was therefore a question about paperwork it
+ * had never seen, whose honest answer is "no such order", which reads as broken (day-one
+ * finding D3). The screen-scoped sets below already put a person in context; these only have
+ * to be answerable on an empty factory as well as a full one.
+ *
+ * The one place a real identifier belongs is a chip the user is handed FROM a row they are
+ * looking at — which is what `AskAboutRow` does, with the code that row actually prints.
+ */
 const SUGGESTIONS: Record<string, readonly string[]> = {
   merchandiser: [
     'Which milestones slip if fabric lands 3 days late?',
-    'Draft the buyer update for PO-88203',
-    'Planned vs actual on SH-4471 last 3 orders',
+    'Which of my orders are late, and on what?',
+    'Draft a buyer update for my most urgent order',
     'Which RFQs am I still waiting on?',
   ],
   production: [
-    'Why is line 3 behind today?',
-    'Hourly target vs actual · line 3',
-    'Which style changes over on Thursday?',
+    'Which line is behind target today, and why?',
+    'Hourly target vs actual across my lines',
+    'Which style changes over this week?',
   ],
   planner: [
-    'Which lines have spare capacity from 24 Aug?',
-    'What happens to the plan if I move PO-88219 forward?',
+    'Which lines have spare capacity in the next two weeks?',
+    'Which line is over-committed, and by how much?',
+    'What would moving my most urgent order forward do to the plan?',
   ],
   commercial: [
     'How much BTB headroom is left on the master LC?',
@@ -38,10 +51,15 @@ const SUGGESTIONS: Record<string, readonly string[]> = {
     'Buyer exposure as a share of the open book',
     'What needs my signature right now?',
   ],
+  /*
+   * The fallback set, and the one `/marbim` itself falls through to — so it is the first
+   * thing a `viewer` or `member` ever sees. It has to be answerable by a factory with
+   * nothing in it yet, which is exactly what naming a PO made impossible.
+   */
   viewer: [
-    'What is the TNA status on PO-88203?',
-    'When is ex-factory for this order?',
-    'Which milestones are late?',
+    'What can you help me with?',
+    'Which orders are late, and on what?',
+    'Who approves what here?',
   ],
 }
 

@@ -327,8 +327,15 @@ export default async function WorkforcePage() {
           </>
         ) : (
           /* The locked card says only that access is missing. No counts, no
-             headers, no skeletons — the shape of what is hidden is hidden too. */
-          <LockedState what="payroll" />
+             headers, no skeletons — the shape of what is hidden is hidden too.
+
+             `holders` because the default line is "ask an owner or admin", and an
+             ADMIN standing here was being told to ask themselves (day-one finding
+             D2). Payroll is hr+owner by rule 9, and that is what it should say. */
+          <LockedState
+            what="payroll"
+            holders="Payroll is HR and the owner only — a wage figure is seen by the two roles accountable for it."
+          />
         )}
 
         <section>

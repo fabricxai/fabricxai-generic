@@ -228,24 +228,19 @@ export function PolicyCard({
                       </Button>
                     )}
                   </div>
-                ) : (
+                ) : canEdit ? (
                   <button
                     type="button"
                     onClick={() => beginEdit(field)}
-                    disabled={!canEdit}
-                    title={canEdit ? 'Click to change' : undefined}
+                    title="Click to change"
                     style={{
                       all: 'unset',
-                      cursor: canEdit ? 'pointer' : 'default',
+                      cursor: 'pointer',
                       font: '500 14px/1.35 var(--fx-font-sans)',
                       color: isOverride ? 'var(--fx-text-primary)' : 'var(--fx-text-secondary)',
-                      ...(canEdit
-                        ? {
-                            textDecorationLine: 'underline',
-                            textDecorationStyle: 'dotted',
-                            textUnderlineOffset: 3,
-                          }
-                        : {}),
+                      textDecorationLine: 'underline',
+                      textDecorationStyle: 'dotted',
+                      textUnderlineOffset: 3,
                     }}
                   >
                     {formatDisplay(value, field)}
@@ -253,6 +248,27 @@ export function PolicyCard({
                       <span style={{ color: 'var(--fx-text-tertiary)', marginLeft: 8 }}>(set)</span>
                     ) : null}
                   </button>
+                ) : (
+                  /*
+                   * A span, not a disabled button (day-one finding D5).
+                   *
+                   * It looked right either way — the dotted underline was already dropped
+                   * when `canEdit` is false — but the ELEMENT was still a button, so a
+                   * storekeeper's settings page announced twenty-four disabled buttons to a
+                   * screen reader and put twenty-four dead stops in the tab order. A value
+                   * somebody may only read is text.
+                   */
+                  <span
+                    style={{
+                      font: '500 14px/1.35 var(--fx-font-sans)',
+                      color: isOverride ? 'var(--fx-text-primary)' : 'var(--fx-text-secondary)',
+                    }}
+                  >
+                    {formatDisplay(value, field)}
+                    {isOverride ? (
+                      <span style={{ color: 'var(--fx-text-tertiary)', marginLeft: 8 }}>(set)</span>
+                    ) : null}
+                  </span>
                 )}
               </div>
             </div>

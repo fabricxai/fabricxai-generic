@@ -20,10 +20,16 @@ export interface HomeSection {
 export function HomeView({
   sections,
   calm,
+  dayOne = false,
   calmLinks,
 }: {
   sections: readonly HomeSection[]
   calm: boolean
+  /**
+   * The factory has no orders at all — a first morning, not a quiet one (finding D4).
+   * Optional so the desk branch, which has no order book to check, keeps its old copy.
+   */
+  dayOne?: boolean
   /** Links shown when nothing is waiting — role-aware so we never point at a locked desk. */
   calmLinks: readonly { href: string; label: string }[]
 }) {
@@ -38,8 +44,8 @@ export function HomeView({
 
       {calm ? (
         <EmptyState
-          title={HOME_COPY.calmTitle}
-          body={HOME_COPY.calmBody}
+          title={dayOne ? HOME_COPY.dayOneTitle : HOME_COPY.calmTitle}
+          body={dayOne ? HOME_COPY.dayOneBody : HOME_COPY.calmBody}
           action={
             <span style={{ display: 'inline-flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
               {calmLinks.map((link) => (

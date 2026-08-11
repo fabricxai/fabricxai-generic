@@ -482,8 +482,15 @@ export function ErrorState({
  * The quiet 403. Leaks no data shape: no counts, no column headers, no
  * skeletons — a role without access should not learn the size of what it
  * cannot see.
+ *
+ * `holders` names who actually has the thing, for the cases where the default
+ * "ask an owner or admin" is not merely unhelpful but wrong. Payroll is hr+owner
+ * (rule 9), so an ADMIN reading that sentence was being told to ask themselves —
+ * the one place in this product where the copy contradicted the rule it enforces
+ * (day-one finding D2). Naming the holder leaks nothing the role list does not
+ * already publish.
  */
-export function LockedState({ what }: { what: string }) {
+export function LockedState({ what, holders }: { what: string; holders?: string }) {
   const t = useT()
 
   return (
@@ -510,7 +517,7 @@ export function LockedState({ what }: { what: string }) {
             marginTop: 4,
           }}
         >
-          {t('ui.common.ask_owner')}
+          {holders ?? t('ui.common.ask_owner')}
         </div>
       </div>
     </div>

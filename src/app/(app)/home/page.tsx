@@ -271,17 +271,37 @@ export default async function HomePage() {
   sections.push(await capsAssignedSection(ctx, today, words))
 
   const calm = sections.every((s) => s.rows.length === 0)
-  const calmLinks = isOwnerView
-    ? [
-        { href: '/dashboard', label: HOME_COPY.calmDashboard },
-        { href: '/orders', label: HOME_COPY.calmOrders },
-      ]
-    : [
-        { href: '/buyers', label: 'Buyer desk' },
-        { href: '/orders', label: HOME_COPY.calmOrders },
-      ]
 
-  return <HomeView sections={sections} calm={calm} calmLinks={calmLinks} />
+  /*
+   * Day one is not a quiet morning (finding D4).
+   *
+   * The calm copy — "nothing waiting on you, the factory pulse and the order book are a
+   * good place to look" — is written for an established factory having a slow Tuesday.
+   * A merchandiser signing in on a tenant with no orders was sent to two empty screens
+   * and told nothing about the one act that unblocks every other desk: no buyer, no
+   * enquiry, no order, no work anywhere in the building.
+   *
+   * Keyed on the order book being genuinely empty rather than on an account age, because
+   * that is the condition the copy is actually about.
+   */
+  const dayOne = calm && orders.length === 0
+  const calmLinks = dayOne
+    ? [
+        { href: '/setup', label: 'Set the factory up' },
+        { href: '/buyers', label: 'Add your first buyer' },
+        { href: '/orders', label: HOME_COPY.calmOrders },
+      ]
+    : isOwnerView
+      ? [
+          { href: '/dashboard', label: HOME_COPY.calmDashboard },
+          { href: '/orders', label: HOME_COPY.calmOrders },
+        ]
+      : [
+          { href: '/buyers', label: 'Buyer desk' },
+          { href: '/orders', label: HOME_COPY.calmOrders },
+        ]
+
+  return <HomeView sections={sections} calm={calm} dayOne={dayOne} calmLinks={calmLinks} />
 }
 
 function describeDetail(

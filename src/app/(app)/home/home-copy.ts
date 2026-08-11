@@ -92,6 +92,18 @@ export const HOME_COPY = {
   calmTitle: 'Nothing waiting on you',
   calmBody:
     'When a draft, exception or overdue desk item lands, it shows up here. Until then the factory pulse and the order book are a good place to look.',
+
+  /*
+   * Day one is a different empty (finding D4). The calm copy above says "look around";
+   * on a factory with no orders at all there is nothing to look at, and the merchandiser
+   * is the one role whose next act unblocks every other desk.
+   *
+   * Order of the links matters: setup first, because a buyer with no items behind them
+   * still cannot get cloth through the door.
+   */
+  dayOneTitle: 'Nothing in the factory yet',
+  dayOneBody:
+    'Start by telling the system what your factory is made of — items, store locations, sewing lines, workers. Then add a buyer, and the first order can be booked. Nothing else has anything to show until an order exists.',
   calmDashboard: 'Factory pulse',
   calmOrders: 'Order desk',
   decideEmpty: 'No drafts in your queue.',
