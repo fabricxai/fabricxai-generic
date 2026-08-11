@@ -86,6 +86,43 @@ export interface MarbimPolicy {
 const HISTORY_BUDGET_CHARS = 12_000
 
 /**
+ * What the extractor is told, beyond the schema.
+ *
+ * ## Why dates need saying out loud
+ *
+ * The schema demands `YYYY-MM-DD` and nothing ever told the model so. Every date field in
+ * this system is a strict calendar date, and almost no document a factory receives writes
+ * one: a SWIFT MT700 states `261118` for 18 November 2026, a Bangladeshi challan writes
+ * `18/11/2026`, an audit report writes "06 Oct 2026". The model transcribed what the page
+ * said — faithfully, which is what it is for — and zod refused the payload with
+ * "expected YYYY-MM-DD", after the model call had been paid for.
+ *
+ * Converting a written date into the storage format is READING, not inventing, so it
+ * belongs in the instruction rather than in a coercion step afterwards. And it must be the
+ * model that does it, because only the model can see the rest of the page: `05/12/2026` is
+ * two different dates depending on where the document came from, and the code holding the
+ * result has no way to tell.
+ *
+ * ## And why it may refuse instead
+ *
+ * An ambiguous numeric date with nothing around it to settle it is left EMPTY. A missing
+ * ex-factory date is visible to whoever approves the draft; a plausible wrong one is not,
+ * and a date that is wrong by six months is the class of error that reaches a bank.
+ */
+export function extractionInstruction(moduleId: string, targetTable: string): string {
+  return [
+    `Extract a ${targetTable} record for the ${moduleId} module.`,
+    '',
+    'Dates: every date field must be written YYYY-MM-DD, whatever the document does.',
+    'Convert what the page states — "18/11/2026", "18 Nov 2026", and the six-digit SWIFT',
+    'form "261118" are all 2026-11-18. Do not copy the document\'s formatting through.',
+    'If a purely numeric date is ambiguous (05/12/2026 could be 5 December or 12 May) and',
+    'nothing else on the page settles which, leave that field empty rather than choosing:',
+    'a missing date is visible to the person approving this, and a wrong one is not.',
+  ].join('\n')
+}
+
+/**
  * What to record on a failed job.
  *
  * An `AppError`'s `message` is only `kind: messageKey` — the thing that actually says WHY is
@@ -475,7 +512,7 @@ export async function runExtraction(
       role: 'extract',
       schema,
       input: source,
-      instruction: `Extract a ${job.targetTable} record for the ${job.moduleId} module.`,
+      instruction: extractionInstruction(job.moduleId, job.targetTable),
       ...(file ? { file } : {}),
     })
 
