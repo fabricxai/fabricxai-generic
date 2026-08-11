@@ -33,7 +33,7 @@ Legend: 🅗 high · 🅜 medium · S/M/L = hours / day / multi-day
   computes by hand today). Bangla-first on store/cutting/production/quality screens.
   *Verify:* chips differ between two screens for one role; floor chips render Bangla under
   the bn locale.
-- [ ] **1.3 🅗 M "Ask about this row."** One affordance on desk tables/cards (orders,
+- [x] **1.3 🅗 M "Ask about this row."** `8521f3e` — orders, buyers, LC register (the desks whose codes resolve); requisitions/tickets follow their resolvers. — One affordance on desk tables/cards (orders,
   buyers, LC register, requisitions, tickets) that opens the panel with the row's code
   pre-filled — "Ask about PO-BF-2044…". Pairs with the shipped ref-resolvers, closing the
   identifier gap at the UI end.
