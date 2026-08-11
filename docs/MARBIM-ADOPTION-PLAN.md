@@ -38,7 +38,7 @@ Legend: 🅗 high · 🅜 medium · S/M/L = hours / day / multi-day
   pre-filled — "Ask about PO-BF-2044…". Pairs with the shipped ref-resolvers, closing the
   identifier gap at the UI end.
   *Verify:* clicking it on an order row opens the panel with the PO number in the composer.
-- [ ] **1.4 🅗 S–M Refusal → "Ask MARBIM why," pre-filled.** The five server gates
+- [x] **1.4 🅗 S–M Refusal → "Ask MARBIM why," pre-filled.** `6f94e89` — at the toasts chokepoint, so every gate present and future gets it. — The five server gates
   (PP-approval, UD balance, BTB headroom, EXP, LC latest-shipment) and
   `actionErrorMessage` toasts gain a pre-filled ask. A person who just got blocked is the
   most motivated learner in the building.
