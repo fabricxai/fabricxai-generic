@@ -1,0 +1,24 @@
+[Unit]
+Description=FabricXAI · weekly proof that the backups actually restore
+Documentation=file:///opt/fabricxai/docs/runbooks/RESTORE-RUNBOOK.md
+After=docker.service
+Wants=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/fabricxai
+ExecStart=/opt/fabricxai/scripts/restore-verify.sh
+
+# Longer than the 4h RTO on purpose: if a restore takes longer than the budget, the
+# useful outcome is a report saying so, not a killed unit that reports nothing.
+TimeoutStartSec=6h
+
+SyslogIdentifier=fabricxai-restore-verify
+
+# This restores a second full copy of the database on the live host. It must lose every
+# scheduling contest against the ERP itself.
+Nice=15
+IOSchedulingClass=idle
+
+[Install]
+WantedBy=multi-user.target

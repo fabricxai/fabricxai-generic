@@ -87,6 +87,11 @@ const baseSchema = z.object({
    */
   MARBIM_MODEL_EXTRACT: z.string().min(1).default('gemini-2.5-flash'),
   MARBIM_MODEL_REASON: z.string().min(1).default('claude-sonnet-5'),
+  /**
+   * Reason model for the "marbim large" composer tier. Fast stays on `MARBIM_MODEL_REASON`.
+   * Both are still Anthropic — the switch is product-facing, not a vendor change.
+   */
+  MARBIM_MODEL_REASON_LARGE: z.string().min(1).default('claude-opus-4'),
   MARBIM_MODEL_EMBED: z.string().min(1).default('text-embedding-3-small'),
   /** Serve MARBIM from fixtures — no provider calls. Dev/test only. */
   MARBIM_MOCK: bool.default(false),

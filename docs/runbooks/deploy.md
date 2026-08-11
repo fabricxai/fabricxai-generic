@@ -105,8 +105,11 @@ chmod 640 secrets/pgbouncer-userlist.txt
 ```
 
 `secrets/` is gitignored. Back up `.env.production` and
-`PGBACKREST_CIPHER_PASS` somewhere that survives this host — without the cipher pass the
-backups are unreadable, and there is no recovery from that.
+`PGBACKREST_REPO1_CIPHER_PASS` somewhere that survives this host, and **separately from
+the backups it unlocks** — without the cipher pass the repository is unreadable
+ciphertext, and there is no recovery from that. How long it takes to find that
+passphrase is scored in the quarterly drill, because it is inside the RTO whether
+anybody counts it or not.
 
 ---
 
@@ -115,49 +118,77 @@ backups are unreadable, and there is no recovery from that.
 Do this **before** the factory enters real data, not after.
 
 ```bash
-cp /dev/null .env.backup && chmod 600 .env.backup
-cat >> .env.backup <<'EOF'
-PGBACKREST_BUCKET=
-PGBACKREST_ENDPOINT=
-PGBACKREST_REGION=auto
-PGBACKREST_KEY=
-PGBACKREST_SECRET=
-PGBACKREST_CIPHER_PASS=
-DOCS_BACKUP_ENDPOINT=
-DOCS_BACKUP_BUCKET=
-DOCS_BACKUP_KEY=
-DOCS_BACKUP_SECRET=
-BACKUP_HEARTBEAT_URL=
-BACKUP_ALERT_URL=
-EOF
+cp .env.backup.example .env.backup && chmod 600 .env.backup
+# Then fill it in. Two buckets, not one — pgBackRest expires objects and rclone deletes
+# them, and pointing both at the same bucket means each destroys the other's work.
 ```
 
-The repository must be **somewhere else** — R2, B2, another region. A backup on the host
-you are recovering from is not a backup.
+The repositories must be **somewhere else** — R2, B2, another region. A backup on the
+host you are recovering from is not a backup.
+
+> The variable names in that file are pgBackRest's, not ours:
+> `PGBACKREST_REPO1_S3_BUCKET`, not `PGBACKREST_BUCKET`. pgBackRest does not expand
+> `${VAR}` inside its config file — it takes the literal characters — so credentials
+> reach it as environment variables it matches by name. Renaming them breaks archiving
+> silently, which is the worst way for this to break.
 
 ```bash
-# Initialise the stanza once, then take one full backup and prove it reads back.
-docker compose -f docker-compose.prod.yml --env-file .env.production \
-  run --rm --entrypoint pgbackrest backup --stanza=fabricxai stanza-create
-bash scripts/backup.sh
+export COMPOSE="docker compose -f docker-compose.prod.yml --env-file .env.production --profile backup"
 
-# Cron, at 01:15 Dhaka.
-echo '15 1 * * * cd /opt/fabricxai && ./scripts/backup.sh >> /var/log/fabricxai-backup.log 2>&1' | crontab -
+# The postgres image is BUILT here, not pulled: archive_command runs inside that
+# container, so pgbackrest has to be in it. See docker/postgres/Dockerfile.
+$COMPOSE build postgres
+$COMPOSE up -d postgres
+
+# Initialise the stanza once. Until this runs, archive_command fails every 5 minutes and
+# says so in the postgres log — which is the intended behaviour, not a reason to delay.
+$COMPOSE run --rm backup --stanza=fabricxai stanza-create
+
+# Prove the round trip: this forces a WAL switch and confirms the segment reaches the
+# repository. It is the whole RPO promise in one command. Run it after every credential
+# rotation, forever.
+$COMPOSE run --rm backup --stanza=fabricxai check
+
+# First full backup, and the first document sync.
+sudo ./scripts/backup.sh
+sudo ./scripts/docs-sync.sh
+
+# Timers: nightly backup, 15-minute document sync, weekly restore verification.
+sudo ./ops/systemd/install.sh
+systemctl list-timers 'fabricxai-*' --no-pager
 ```
 
-Then **rehearse the restore** against a scratch host and sign the log in
-[`restore.md`](./restore.md). Until that is done the RPO is unknown.
+Then, **from your own machine and not from this host**, lock the buckets so a stolen S3
+token cannot delete the backups:
+
+```bash
+CLOUDFLARE_ACCOUNT_ID=… CLOUDFLARE_API_TOKEN=… ./scripts/r2-protect.sh
+```
+
+The account token stays off the VPS deliberately — see
+[`RESTORE-RUNBOOK.md`](./RESTORE-RUNBOOK.md). Put only a read-only R2 token in
+`.env.backup` as `CLOUDFLARE_R2_READ_TOKEN`, and the weekly verification will tell you
+if anybody removes the locks.
+
+Backups are **full on Sunday, differential the other six nights**, with WAL archived
+continuously and a forced segment switch every five minutes so an idle afternoon cannot
+stretch the recovery point past the 15-minute promise. Documents sync every 15 minutes,
+so both halves of a restore land at the same moment in time.
+
+Then **rehearse the restore** against a scratch host — [`RESTORE-RUNBOOK.md`](./RESTORE-RUNBOOK.md)
+§3, exact commands, and sign the log in §8. Until that is done the RPO is a claim.
 
 ---
 
 ## 4 · First bring-up
 
 ```bash
-docker compose -f docker-compose.prod.yml --env-file .env.production pull
+docker compose -f docker-compose.prod.yml --env-file .env.production pull --ignore-buildable
 docker compose -f docker-compose.prod.yml --env-file .env.production up -d
 ```
 
-Order is enforced by the file, not by you: `postgres` → `migrate` (migrations + roles,
+`--ignore-buildable` skips `postgres`, which §3 already built. Order is enforced by the
+file, not by you: `postgres` → `migrate` (migrations + roles,
 runs to completion) → `pgbouncer`/`redis`/`minio` → `app`/`worker` → `caddy`. If
 `migrate` exits non-zero, app and worker never start — which is the point, because a new
 image serving requests against an un-migrated schema is a 500-storm with no obvious
@@ -242,8 +273,20 @@ you need it. If the mail never arrives, the account exists and cannot be used.
 cd /opt/fabricxai
 git pull                                    # for compose/Caddyfile changes
 # Pin the new image by digest in .env.production, then:
-docker compose -f docker-compose.prod.yml --env-file .env.production pull
+docker compose -f docker-compose.prod.yml --env-file .env.production pull --ignore-buildable
 docker compose -f docker-compose.prod.yml --env-file .env.production up -d
+```
+
+`--ignore-buildable` because `postgres` is built here rather than pulled — it carries
+pgbackrest, for the reason in `docker/postgres/Dockerfile`. Without the flag, `pull`
+tries to fetch a local image tag from a registry and fails the deploy on a service that
+was never going to be pulled. **After a base-image bump** (a new Postgres minor, a
+pgvector release) rebuild it explicitly and restart the database in a maintenance
+window:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.production build --pull postgres
+docker compose -f docker-compose.prod.yml --env-file .env.production up -d postgres
 ```
 
 `up -d` re-runs `migrate` to completion first, then recreates `app` and `worker`. The

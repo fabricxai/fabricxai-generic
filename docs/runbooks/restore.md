@@ -5,6 +5,13 @@ is worthless until it has been **rehearsed once against a scratch host**. Until 
 rehearsal is signed off, this deployment has an undefined RPO and should not hold a
 factory's payroll.
 
+> **This is the incident procedure — something is broken, restore it.** The rehearsal,
+> the scoring sheet and the sign-off log live in
+> [`RESTORE-RUNBOOK.md`](./RESTORE-RUNBOOK.md), along with what runs automatically
+> (`scripts/restore-verify.sh` performs a real restore every Monday). If a drill finds a
+> command in this file that is wrong, fix it **here** first — this is the copy somebody
+> reads at 3am.
+
 > Read the whole thing before typing anything. Step 3 is destructive and step 6 is the
 > one people skip.
 
@@ -133,11 +140,12 @@ Restore into a scratch database and copy the rows across. Slower to read, far le
 destructive than §2.
 
 ```bash
-# Restore the backup somewhere harmless.
-docker compose -f docker-compose.prod.yml --env-file .env.production \
-  run --rm --entrypoint pgbackrest backup \
-  --stanza=fabricxai --delta --target-action=promote \
-  --pg1-path=/tmp/scratch restore
+# Restore the backup somewhere harmless. No --target-action: pgBackRest refuses it
+# unless you also name a recovery target (time/lsn/name/xid/immediate), and here you
+# want the newest recoverable moment, which is what --type=default gives you.
+docker compose -f docker-compose.prod.yml --env-file .env.production --profile backup \
+  run --rm -v scratch-restore:/scratch backup \
+  --stanza=fabricxai --pg1-path=/scratch --archive-mode=off --type=default restore
 
 # Then dump the one table out of the scratch instance and load it, checking company_id
 # scoping as you go — a cross-tenant row copied in by hand is a breach that no policy
@@ -201,17 +209,33 @@ Then check the things a factory will notice, in this order:
 
 ## 7 · Objects only
 
+Documents sync offsite every 15 minutes via rclone (`scripts/docs-sync.sh`), so the
+offsite copy is at most one quarter-hour behind the database. The mirror lives under
+`live/`; anything a sync run replaced or deleted was moved aside into
+`_replaced/<timestamp>/` rather than propagated.
+
 ```bash
-docker compose -f docker-compose.prod.yml --env-file .env.production \
-  run --rm --entrypoint sh minio-init -c '
-    mc alias set dst http://minio:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD"
-    mc alias set src "$DOCS_BACKUP_ENDPOINT" "$DOCS_BACKUP_KEY" "$DOCS_BACKUP_SECRET"
-    mc mirror --overwrite "src/$DOCS_BACKUP_BUCKET" "dst/$S3_BUCKET"
-  '
+export COMPOSE="docker compose -f docker-compose.prod.yml --env-file .env.production --profile backup"
+
+# The whole mirror, back into MinIO.
+$COMPOSE run --rm docs-sync copy \
+  "dst:${DOCS_BACKUP_BUCKET}/live" "src:${S3_BUCKET}" \
+  --transfers 8 --checkers 16 --stats 30s --stats-one-line
 ```
 
-Note the direction is reversed from `scripts/backup.sh`, and there is **no `--remove`**:
-a restore should never delete objects the live bucket has and the backup does not.
+`copy`, not `sync`, and the direction is reversed from `docs-sync.sh`: a restore must
+never delete objects the live bucket has and the backup does not.
+
+For a single file somebody overwrote rather than a whole-bucket loss:
+
+```bash
+# Which runs displaced anything, and when.
+$COMPOSE run --rm docs-sync lsd "dst:${DOCS_BACKUP_BUCKET}/_replaced"
+
+$COMPOSE run --rm docs-sync copyto \
+  "dst:${DOCS_BACKUP_BUCKET}/_replaced/<timestamp>/<object-key>" \
+  "src:${S3_BUCKET}/<object-key>"
+```
 
 ---
 
@@ -221,12 +245,9 @@ a restore should never delete objects the live bucket has and the backup does no
   they cannot re-enter what nobody told them about.
 - If this was a point-in-time restore, the gap between the target and the moment of
   discovery is data the floor still has on paper for a day or two. That window is short.
-- Note the actual elapsed time against the 4h RTO in this file's rehearsal log below.
+- Note the actual elapsed time against the 4h RTO — in the log in
+  [`RESTORE-RUNBOOK.md` §8](./RESTORE-RUNBOOK.md#8--the-log), which is where the
+  rehearsal log now lives so that drills and real incidents accumulate in one place.
 
-## Rehearsal log
-
-A restore that has never been performed is a document, not a capability.
-
-| Date | Performed by | Scenario | Elapsed | Data lost | Notes |
-|---|---|---|---|---|---|
-| — | — | — | — | — | **Never rehearsed. Do this before the pilot holds real data.** |
+A restore that has never been performed is a document, not a capability. The log is
+still empty.

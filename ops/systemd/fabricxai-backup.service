@@ -1,0 +1,25 @@
+[Unit]
+Description=FabricXAI · Postgres backup (full Sunday, differential otherwise)
+Documentation=file:///opt/fabricxai/docs/runbooks/RESTORE-RUNBOOK.md
+After=docker.service
+Wants=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/fabricxai
+ExecStart=/opt/fabricxai/scripts/backup.sh
+
+# A full backup of a factory-sized database over a factory uplink. Generous, because a
+# timeout that kills a backup at 90% produces an aborted backup AND no alert about why.
+TimeoutStartSec=6h
+
+SyslogIdentifier=fabricxai-backup
+
+# Yield to the ERP. The floor is entering data at 01:15 in some factories, and a backup
+# that makes the store screen slow is a backup somebody will eventually turn off.
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+
+[Install]
+WantedBy=multi-user.target

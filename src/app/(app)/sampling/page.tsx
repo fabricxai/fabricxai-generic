@@ -8,9 +8,12 @@ import { Badge } from '@/components/fx/primitives'
 import { SectionHeading } from '@/components/fx/signature'
 import { Ident } from '@/components/fx/format'
 import { PageHeader } from '@/components/shell/page-shell'
+import { WorkCue } from '@/components/shell/work-cue'
 import { getCtx } from '@/modules/core/session'
 import { orderList } from '@/modules/orders/queries'
 import { ppApprovedStyles, sampleBoard, type SampleRow } from '@/modules/sampling/queries'
+import { ppBlockingAlerts, type SamplingPolicy } from '@/modules/sampling/service'
+import { getPolicy } from '@/modules/settings/service'
 
 import { NewSampleButton } from './new-sample'
 
@@ -31,9 +34,12 @@ export default async function SamplingPage() {
   if (!ctx) redirect('/login')
 
   const now = new Date()
-  const [samples, approvedStyles] = await Promise.all([
+  const today = now.toISOString().slice(0, 10)
+  const policy = await getPolicy<SamplingPolicy>(ctx, 'sampling')
+  const [samples, approvedStyles, blocking] = await Promise.all([
     sampleBoard(ctx, { now }),
     ppApprovedStyles(ctx),
+    ppBlockingAlerts(ctx, { today }, policy),
   ])
 
   const pp = samples.filter((s) => s.type === 'pp')
@@ -44,6 +50,20 @@ export default async function SamplingPage() {
       s.daysToDue < 0 &&
       !['approved', 'rejected', 'closed'].includes(s.status),
   )
+
+  const cueItems = [
+    ...(blocking.length > 0
+      ? [
+          {
+            label: `${blocking.length} PP style${blocking.length === 1 ? '' : 's'} blocking cut`,
+            href: '/sampling',
+          },
+        ]
+      : []),
+    ...(overdue.length > 0
+      ? [{ label: `${overdue.length} overdue sample${overdue.length === 1 ? '' : 's'}`, href: '/sampling' }]
+      : []),
+  ]
 
   return (
     <FloorScreen>
@@ -64,6 +84,8 @@ export default async function SamplingPage() {
           />
         }
       />
+
+      <WorkCue items={cueItems} />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 30 }}>
         {ppOutstanding.length > 0 ? (
@@ -133,6 +155,18 @@ export default async function SamplingPage() {
             <EmptyState
               title="Nothing else in the room"
               body="Proto, fit, SMS, TOP and shipment samples all pass through here. Only the PP verdict gates cutting."
+              action={
+                <Link
+                  href="/orders"
+                  style={{
+                    font: '500 13px/1 var(--fx-font-sans)',
+                    color: 'var(--fx-accent-pressed)',
+                    textDecoration: 'none',
+                  }}
+                >
+                  Open order desk →
+                </Link>
+              }
             />
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>

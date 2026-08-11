@@ -179,6 +179,17 @@ const ALL_ACCESS: readonly Role[] = ['owner', 'admin']
 export const NAV: readonly NavItem[] = [
   // ── Work ────────────────────────────────────────────────
   {
+    id: 'home',
+    label: 'Your work',
+    href: '/home',
+    section: 'work',
+    // Owner / admin see every entry via ALL_ACCESS. Merchandiser is the other
+    // audience for the composed work feed; floor roles keep their existing landings.
+    roles: ['merchandiser'],
+    // Compose-only: no writes originate here.
+    writeRoles: [],
+  },
+  {
     id: 'approve',
     label: 'Approve inbox',
     href: '/approve',

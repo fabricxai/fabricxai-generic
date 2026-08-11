@@ -14,7 +14,8 @@ import { describe, expect, it } from 'vitest'
 
 import { extractorVersionFor } from '../marbim'
 import { byRoleProvider, configuredRoles, type ByRoleConfig } from '../providers/by-role'
-import { ProviderError } from '../provider'
+import { ProviderError, providerSurfaceLabel } from '../provider'
+import { surfaceLabelFor } from '../surface-label'
 
 const MODELS = {
   reason: 'claude-sonnet-5',
@@ -102,6 +103,15 @@ describe('byRoleProvider · each role goes to the vendor that can serve it', () 
       extract: 'gemini-2.5-flash',
       embed: 'text-embedding-3-small',
     })
+  })
+
+  it('5b · the panel face shows marbim fast / marbim large, not the vendor id', () => {
+    // Jobs still record claude-sonnet-5; the header a person reads uses the product name.
+    expect(providerSurfaceLabel('claude-sonnet-5')).toBe('marbim fast')
+    expect(surfaceLabelFor('claude-sonnet-5')).toBe('marbim fast')
+    expect(surfaceLabelFor('claude-opus-4')).toBe('marbim large')
+    expect(surfaceLabelFor('mock/deterministic-v1')).toBe('mock/deterministic-v1')
+    expect(surfaceLabelFor(null)).toBeNull()
   })
 
   it('6 · names what it DOES have when there is no reasoner', () => {

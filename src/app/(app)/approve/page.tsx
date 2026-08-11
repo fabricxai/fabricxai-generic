@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 
 import { LockedState } from '@/components/fx/feedback'
 import { PageHeader } from '@/components/shell/page-shell'
+import { WorkCue } from '@/components/shell/work-cue'
 import { canSee, NAV } from '@/components/shell/nav'
 import { getCtx } from '@/modules/core/session'
 import { inboxRows } from '@/modules/approvals/queries'
@@ -46,10 +47,30 @@ export default async function ApprovePage() {
       <PageHeader
         eyebrow="Approve inbox"
         title={rows.length === 0 ? 'Nothing waiting' : `${rows.length} waiting on you`}
-        meta={aging > 0 ? `${aging} over ${policy.agingEscalateAfterHours}h` : undefined}
+        meta={
+          rows.length === 0
+            ? "Your role's queue · oldest first"
+            : aging > 0
+              ? `${aging} aging · oldest first · your role's queue`
+              : "Oldest first · your role's queue"
+        }
         // The amber moment on this screen belongs to the one approve action in
         // the list, not to the header rule.
         ownsAmber={false}
+      />
+      <WorkCue
+        items={
+          aging > 0
+            ? [
+                {
+                  label: `${aging} draft${aging === 1 ? '' : 's'} past ${policy.agingEscalateAfterHours}h`,
+                  href: '/approve',
+                },
+              ]
+            : rows.length > 0
+              ? [{ label: `${rows.length} draft${rows.length === 1 ? '' : 's'} waiting on your role`, href: '/approve' }]
+              : []
+        }
       />
       <ApproveInbox
         rows={rows.map((r) => ({

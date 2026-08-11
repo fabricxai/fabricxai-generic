@@ -1,6 +1,12 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from 'react'
 
 import { actionErrorMessage } from '@/lib/action-error'
 import {
@@ -21,25 +27,12 @@ import type { Attachment } from './attach-client'
  * that guessed would file a tech pack as a buyer PO and park a wrong draft in somebody's
  * approve inbox (the exact failure `attach-client.tsx` refuses). So the person answers
  * with one tap — the same kinds the intake page offers, as chips — and everything after
- * that is the machine's: queue, extract, follow the job, and say where the draft went.
+ * that waits for Send: queue, extract, follow the job, and say where the draft went.
  *
- * The follow is the part the intake page never had. "Queued" with no sequel taught a
- * tester the pipeline was hung when it had finished in three seconds — the draft just
- * lands in an inbox the submitter may not even be allowed to see. This box polls the job
- * to its end and says, in words, "waiting in the approve inbox for owner/admin".
+ * Choosing a type (and any context) only prepares the job. The composer's Send button
+ * is what starts it — same gesture as asking a question.
  */
 
-/**
- * What MARBIM can read, mirrored from the server for chip-enabling; the server re-checks the
- * stored mime on submit, so a spoofed type is refused at the door rather than queued.
- *
- * Two ways in, and the difference matters only to the machine. PDFs and photographs go to
- * the extract model whole — it renders the pages itself. Word, Excel and CSV are turned into
- * text server-side first (`lib/document-text.ts`), because the model cannot open a zip of
- * XML; from there they are ordinary source text with the same measured confidence.
- *
- * What a person sees is one thing: the file gets chips, or it gets a sentence saying why not.
- */
 export const MODEL_READABLE = /^(application\/pdf|image\/(jpeg|png|webp))$/
 
 const SERVER_EXTRACTABLE =
@@ -66,6 +59,7 @@ interface ContextField {
 type Phase =
   | { step: 'offer' }
   | { step: 'context'; kind: Kind; fields: ContextField[] }
+  | { step: 'ready'; kind: Kind; values: Record<string, string> }
   | { step: 'queueing'; kind: Kind }
   | { step: 'watching'; kind: Kind; jobId: string }
   | { step: 'done'; kind: Kind; targetTable: string }
@@ -90,11 +84,27 @@ const MONO: React.CSSProperties = {
   color: 'var(--fx-text-tertiary)',
 }
 
-export function ReadDocumentFlow({ attachment }: { attachment: Attachment }) {
+/** What the composer Send button calls to start a prepared read. */
+export interface ReadDocumentHandle {
+  /** True when a kind (and any required context) is chosen and nothing has been queued yet. */
+  isReady: () => boolean
+  /** Queue the prepared extraction. No-op if not ready. */
+  start: () => Promise<void>
+}
+
+export const ReadDocumentFlow = forwardRef<
+  ReadDocumentHandle,
+  {
+    attachment: Attachment
+    onReadyChange?: (ready: boolean) => void
+  }
+>(function ReadDocumentFlow({ attachment, onReadyChange }, ref) {
   const [kinds, setKinds] = useState<Kind[] | null>(null)
   const [phase, setPhase] = useState<Phase>({ step: 'offer' })
   const [contextValues, setContextValues] = useState<Record<string, string>>({})
   const polls = useRef(0)
+  const phaseRef = useRef(phase)
+  phaseRef.current = phase
 
   useEffect(() => {
     let cancelled = false
@@ -110,6 +120,10 @@ export function ReadDocumentFlow({ attachment }: { attachment: Attachment }) {
       cancelled = true
     }
   }, [])
+
+  useEffect(() => {
+    onReadyChange?.(phase.step === 'ready')
+  }, [phase, onReadyChange])
 
   // Follow the job to its end. The interval lives and dies with the watching phase.
   useEffect(() => {
@@ -145,20 +159,6 @@ export function ReadDocumentFlow({ attachment }: { attachment: Attachment }) {
     return () => clearInterval(timer)
   }, [phase])
 
-  async function choose(kind: Kind) {
-    setContextValues({})
-    if (!kind.needsContext) {
-      await submit(kind, {})
-      return
-    }
-    try {
-      const fields = await intakeContext(kind.id)
-      setPhase({ step: 'context', kind, fields })
-    } catch (error) {
-      setPhase({ step: 'failed', message: actionErrorMessage(error, 'The choices could not be loaded.') })
-    }
-  }
-
   async function submit(kind: Kind, values: Record<string, string>) {
     setPhase({ step: 'queueing', kind })
     try {
@@ -169,7 +169,36 @@ export function ReadDocumentFlow({ attachment }: { attachment: Attachment }) {
       })
       setPhase({ step: 'watching', kind, jobId: result.jobId })
     } catch (error) {
-      setPhase({ step: 'failed', message: actionErrorMessage(error, 'MARBIM was not asked to read it.') })
+      setPhase({
+        step: 'failed',
+        message: actionErrorMessage(error, 'MARBIM was not asked to read it.'),
+      })
+    }
+  }
+
+  useImperativeHandle(ref, () => ({
+    isReady: () => phaseRef.current.step === 'ready',
+    start: async () => {
+      const current = phaseRef.current
+      if (current.step !== 'ready') return
+      await submit(current.kind, current.values)
+    },
+  }))
+
+  async function choose(kind: Kind) {
+    setContextValues({})
+    if (!kind.needsContext) {
+      setPhase({ step: 'ready', kind, values: {} })
+      return
+    }
+    try {
+      const fields = await intakeContext(kind.id)
+      setPhase({ step: 'context', kind, fields })
+    } catch (error) {
+      setPhase({
+        step: 'failed',
+        message: actionErrorMessage(error, 'The choices could not be loaded.'),
+      })
     }
   }
 
@@ -202,8 +231,8 @@ export function ReadDocumentFlow({ attachment }: { attachment: Attachment }) {
           ))}
         </div>
         <span style={MONO}>
-          The model reads the file itself — pages, scans and all. The draft waits in the
-          approve inbox; nothing is written until a person signs it.
+          Pick the type, then press Send — nothing is queued until you do. The draft waits in
+          the approve inbox; nothing is written until a person signs it.
         </span>
       </div>
     )
@@ -245,18 +274,20 @@ export function ReadDocumentFlow({ attachment }: { attachment: Attachment }) {
         <div style={{ display: 'flex', gap: 8 }}>
           <button
             disabled={!complete}
-            onClick={() => void submit(phase.kind, contextValues)}
+            onClick={() =>
+              setPhase({ step: 'ready', kind: phase.kind, values: { ...contextValues } })
+            }
             style={{
-              border: 'none',
+              border: '1px solid var(--fx-border-default)',
               borderRadius: 'var(--fx-radius-sm)',
-              background: complete ? 'var(--fx-accent)' : 'var(--fx-bg-surface)',
-              color: complete ? 'var(--fx-accent-on)' : 'var(--fx-text-disabled)',
+              background: complete ? 'var(--fx-bg-surface)' : 'transparent',
+              color: complete ? 'var(--fx-text-primary)' : 'var(--fx-text-disabled)',
               padding: '8px 12px',
               font: '600 12px/1.2 var(--fx-font-sans)',
               cursor: complete ? 'pointer' : 'not-allowed',
             }}
           >
-            Read it
+            Ready for Send
           </button>
           <button
             onClick={() => setPhase({ step: 'offer' })}
@@ -273,6 +304,32 @@ export function ReadDocumentFlow({ attachment }: { attachment: Attachment }) {
             Back
           </button>
         </div>
+      </div>
+    )
+  }
+
+  if (phase.step === 'ready') {
+    return (
+      <div style={BOX}>
+        <span style={{ font: '500 12.5px/1.4 var(--fx-font-sans)' }}>
+          {attachment.filename} ready as {phase.kind.label}
+        </span>
+        <span style={MONO}>Press Send to start the read. Nothing is queued yet.</span>
+        <button
+          onClick={() => setPhase({ step: 'offer' })}
+          style={{
+            alignSelf: 'flex-start',
+            border: '1px solid var(--fx-border-default)',
+            borderRadius: 'var(--fx-radius-sm)',
+            background: 'transparent',
+            color: 'var(--fx-text-secondary)',
+            padding: '7px 10px',
+            font: '500 12px/1.2 var(--fx-font-sans)',
+            cursor: 'pointer',
+          }}
+        >
+          Change type
+        </button>
       </div>
     )
   }
@@ -305,7 +362,10 @@ export function ReadDocumentFlow({ attachment }: { attachment: Attachment }) {
 
   return (
     <div style={BOX}>
-      <span style={{ ...MONO, color: 'var(--fx-danger, var(--fx-text-secondary))' }} aria-live="polite">
+      <span
+        style={{ ...MONO, color: 'var(--fx-danger, var(--fx-text-secondary))' }}
+        aria-live="polite"
+      >
         {phase.message}
       </span>
       <button
@@ -325,7 +385,7 @@ export function ReadDocumentFlow({ attachment }: { attachment: Attachment }) {
       </button>
     </div>
   )
-}
+})
 
 /**
  * What a file MARBIM cannot read gets instead of chips: a sentence.

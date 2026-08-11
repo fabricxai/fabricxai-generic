@@ -895,6 +895,10 @@ export async function chat(
     /** Role-filtered by the action (audit AI-H6). Empty means "answer without tools". */
     tools?: readonly ModuleTool[]
     policy?: MarbimPolicy
+    /**
+     * Vendor model for this turn (composer tier). Absent → the registered reasoner's default.
+     */
+    model?: string
   },
 ): Promise<ChatResult> {
   const question = redactForPrompt(input.question)
@@ -968,6 +972,7 @@ export async function chat(
       role: 'reason' as const,
       system: prompt.text,
       messages,
+      ...(input.model ? { model: input.model } : {}),
       ...(finalPass || tools.length === 0
         ? {}
         : {
@@ -1080,7 +1085,7 @@ export async function chat(
   })
 }
 
-/** A conversation, oldest turn first. */
+/** A conversation, oldest turn first — only the caller's own threads. */
 export async function conversation(
   ctx: AnyCtx,
   conversationId: string,
@@ -1089,9 +1094,60 @@ export async function conversation(
     tx
       .select()
       .from(chatTurns)
-      .where(eq(chatTurns.conversationId, conversationId))
+      .where(
+        and(
+          eq(chatTurns.companyId, ctx.companyId),
+          eq(chatTurns.conversationId, conversationId),
+          eq(chatTurns.createdBy, ctx.userId),
+        ),
+      )
       .orderBy(chatTurns.turnIndex),
   )
+}
+
+export interface ConversationSummary {
+  conversationId: string
+  /** First question in the thread — what the history list shows. */
+  preview: string
+  turnCount: number
+  lastAt: Date
+}
+
+/**
+ * Recent threads this person started, newest activity first.
+ *
+ * Scoped to `createdBy` so history is personal — a factory's shared assistant must not
+ * surface another user's questions in somebody else's panel.
+ */
+export async function listConversations(
+  ctx: AnyCtx,
+  input: { limit?: number } = {},
+): Promise<ConversationSummary[]> {
+  const limit = Math.min(input.limit ?? 30, 50)
+  return withTenantRead(ctx, async (tx) => {
+    const rows = await tx
+      .select({
+        conversationId: chatTurns.conversationId,
+        preview: sql<string>`coalesce(
+          min(case when ${chatTurns.turnIndex} = 0 then ${chatTurns.question} end),
+          min(${chatTurns.question})
+        )`,
+        turnCount: sql<number>`count(*)::int`,
+        lastAt: sql<Date>`max(${chatTurns.createdAt})`,
+      })
+      .from(chatTurns)
+      .where(and(eq(chatTurns.companyId, ctx.companyId), eq(chatTurns.createdBy, ctx.userId)))
+      .groupBy(chatTurns.conversationId)
+      .orderBy(sql`max(${chatTurns.createdAt}) desc`)
+      .limit(limit)
+
+    return rows.map((row) => ({
+      conversationId: row.conversationId,
+      preview: row.preview,
+      turnCount: row.turnCount,
+      lastAt: row.lastAt instanceof Date ? row.lastAt : new Date(row.lastAt),
+    }))
+  })
 }
 
 /** Recent extraction jobs, newest first — the admin runbook screen. */

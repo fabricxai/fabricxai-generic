@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
 import { useT } from '@/components/fx/locale'
+import { Badge } from '@/components/fx/primitives'
 
 import { navLabelKey, navSectionKey, NAV_SECTIONS, type NavItem, type NavSection } from './nav'
 import { NavIcon } from './nav-icons'
@@ -12,8 +13,18 @@ import { NavIcon } from './nav-icons'
  * The sidebar. The active item is marked by a 2px amber slash at the wordmark's
  * 34° plus a bg-selected wash — an active indicator, which the amber rule
  * sanctions, and under 24px so it does not consume the view's amber moment.
+ *
+ * `badges` carries counts the shell already computed (Approve routed pending).
+ * Zero / missing means no chip — a badge that cannot be cleared teaches people
+ * to stop reading badges.
  */
-export function Sidebar({ items }: { items: readonly NavItem[] }) {
+export function Sidebar({
+  items,
+  badges = {},
+}: {
+  items: readonly NavItem[]
+  badges?: Readonly<Record<string, number>>
+}) {
   const pathname = usePathname()
   const t = useT()
 
@@ -58,6 +69,7 @@ export function Sidebar({ items }: { items: readonly NavItem[] }) {
               item={item}
               label={t(navLabelKey(item.id))}
               active={pathname === item.href || pathname.startsWith(`${item.href}/`)}
+              badge={badges[item.id] ?? 0}
             />
           ))}
         </div>
@@ -70,10 +82,12 @@ function SidebarLink({
   item,
   label,
   active,
+  badge,
 }: {
   item: NavItem
   label: string
   active: boolean
+  badge: number
 }) {
   return (
     <Link
@@ -88,7 +102,7 @@ function SidebarLink({
        * is not a smaller sidebar, it is no sidebar at all. `title` gives the same word to a
        * long-press on the tablet this collapse exists for.
        */
-      aria-label={label}
+      aria-label={badge > 0 ? `${label}, ${badge} waiting` : label}
       title={label}
       style={{
         display: 'flex',
@@ -114,7 +128,14 @@ function SidebarLink({
         }}
       />
       <NavIcon id={item.id} />
-      <span className="fx-sidebar-label">{label}</span>
+      <span className="fx-sidebar-label" style={{ flex: 1, minWidth: 0 }}>
+        {label}
+      </span>
+      {badge > 0 ? (
+        <span className="fx-sidebar-label">
+          <Badge tone="accent">{badge > 99 ? '99+' : badge}</Badge>
+        </span>
+      ) : null}
     </Link>
   )
 }

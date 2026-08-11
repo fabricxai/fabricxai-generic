@@ -30,6 +30,7 @@
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "verify:phase0": "node scripts/verify-phase0.mjs",
     "db:setup-roles": "node scripts/setup-db-roles.mjs",
+    "export:tenant": "tsx scripts/export-tenant.ts",
     "payroll:parallel-run": "tsx --env-file=.env scripts/payroll-parallel-run.ts",
     "k6": "tsx --env-file=.env scripts/k6.ts"
   },

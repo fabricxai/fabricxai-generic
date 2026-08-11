@@ -8,7 +8,7 @@ import { getCtx } from '@/modules/core/session'
 import { auditTrail, auditedTables, companyProfile, listPolicies, roleMatrix } from '@/modules/settings/service'
 
 import { AuditViewer } from './audit-viewer'
-import { PolicyCard } from './policy-card'
+import { PolicySection } from './policy-section'
 import { RoleControls } from './role-controls'
 import { FactoryTypePanel, ProfileForm } from './settings-client'
 
@@ -78,24 +78,16 @@ export default async function SettingsPage() {
           <FactoryTypePanel current={profile?.factoryType ?? 'woven'} />
         </section>
 
-        <section>
-          <SectionHeading eyebrow={`${policies.length} modules`}>Policy</SectionHeading>
-          {/* Editable in place since the live test found the card read-only over a
-              complete write path — see PolicyCard. */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {policies.map((p) => (
-              <PolicyCard
-                key={p.moduleId}
-                moduleId={p.moduleId}
-                label={p.label}
-                effective={p.effective}
-                overrides={p.overrides}
-                unresolvable={p.unresolvable}
-                canEdit={canEdit}
-              />
-            ))}
-          </div>
-        </section>
+        <PolicySection
+          canEdit={canEdit}
+          policies={policies.map((p) => ({
+            moduleId: p.moduleId,
+            label: p.label,
+            effective: p.effective,
+            overrides: p.overrides,
+            unresolvable: p.unresolvable,
+          }))}
+        />
 
         <section>
           <SectionHeading eyebrow={`${matrix.length} people`}>Who can do what</SectionHeading>

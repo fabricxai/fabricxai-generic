@@ -7,6 +7,7 @@ import { EmptyState } from '@/components/fx/feedback'
 import { Ident } from '@/components/fx/format'
 import { StatusLabel } from '@/components/fx/signature'
 import { PageHeader } from '@/components/shell/page-shell'
+import { WorkCue } from '@/components/shell/work-cue'
 import { canWrite, NAV } from '@/components/shell/nav'
 import { getCtx } from '@/modules/core/session'
 import { buyerAccounts } from '@/modules/buyers/queries'
@@ -44,6 +45,7 @@ export default async function OrdersPage() {
 
   const rows = await orderList(ctx, { now: new Date() })
   const late = rows.filter((r) => r.health === 'late').length
+  const risk = rows.filter((r) => r.health === 'risk').length
 
   // Read through the buyers module's own queries (rule 11), not its tables.
   const profile = await companyProfile(ctx)
@@ -56,6 +58,11 @@ export default async function OrdersPage() {
   // A viewer sees the operation, not the commercial terms (live-test finding, Phase 9).
   const seesPrices = ctx.roles.some((r) => r !== 'viewer' && r !== 'member')
 
+  const cueItems = [
+    ...(late > 0 ? [{ label: `${late} late order${late === 1 ? '' : 's'}`, href: '/orders' }] : []),
+    ...(risk > 0 ? [{ label: `${risk} at risk`, href: '/orders' }] : []),
+  ]
+
   return (
     <>
       <PageHeader
@@ -66,10 +73,30 @@ export default async function OrdersPage() {
         actions={mayWrite ? <NewOrderButton buyers={buyers} /> : undefined}
       />
 
+      <WorkCue items={cueItems} />
+
       {rows.length === 0 ? (
         <EmptyState
           title="The book is empty"
           body="Orders arrive from a buyer PO — drop one on MARBIM and it drafts the order, its TNA and the size breakdown for you to approve. Or open one here and enter it yourself."
+          action={
+            mayWrite ? (
+              <span style={{ font: '400 13px/1.4 var(--fx-font-sans)', color: 'var(--fx-text-tertiary)' }}>
+                Use New order above, or check Your work for drafts.
+              </span>
+            ) : ctx.roles.some((r) => r === 'owner' || r === 'admin' || r === 'merchandiser') ? (
+              <Link
+                href="/home"
+                style={{
+                  font: '500 13px/1 var(--fx-font-sans)',
+                  color: 'var(--fx-accent-pressed)',
+                  textDecoration: 'none',
+                }}
+              >
+                See Your work →
+              </Link>
+            ) : undefined
+          }
         />
       ) : (
         /*

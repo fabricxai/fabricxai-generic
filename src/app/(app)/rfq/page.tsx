@@ -6,6 +6,7 @@ import { Badge } from '@/components/fx/primitives'
 import { Eyebrow, SectionHeading, StatusLabel } from '@/components/fx/signature'
 import { Ident } from '@/components/fx/format'
 import { PageHeader } from '@/components/shell/page-shell'
+import { WorkCue } from '@/components/shell/work-cue'
 import { canWrite, NAV } from '@/components/shell/nav'
 import { getCtx } from '@/modules/core/session'
 import { companyProfile } from '@/modules/settings/service'
@@ -15,6 +16,7 @@ import { RfqOpener } from './rfq-opener'
 import type { DrawerRfq } from './rfq-drawer'
 import type { RfqPolicy } from '@/modules/rfq/service'
 import { getPolicy } from '@/modules/settings/service'
+import Link from 'next/link'
 
 /**
  * 1.2 RFQ & Quotation.
@@ -83,6 +85,31 @@ export default async function RfqPage() {
         ownsAmber
       />
 
+      <WorkCue
+        items={[
+          ...(overdue.length > 0
+            ? [
+                {
+                  label: `${overdue.length} overdue quote${overdue.length === 1 ? '' : 's'}`,
+                  href: '/rfq',
+                },
+              ]
+            : []),
+          ...(groups
+            .flatMap((g) => g.rfqs)
+            .filter((r) => r.openClarifications > 0).length > 0
+            ? [
+                {
+                  label: `${
+                    groups.flatMap((g) => g.rfqs).filter((r) => r.openClarifications > 0).length
+                  } with open clarifications`,
+                  href: '/rfq',
+                },
+              ]
+            : []),
+        ]}
+      />
+
       <div style={{ display: 'flex', flexDirection: 'column', gap: 36 }}>
         {overdue.length > 0 || soon.length > 0 ? (
           <section>
@@ -111,6 +138,18 @@ export default async function RfqPage() {
             <EmptyState
               title="No enquiries yet"
               body="An RFQ is a buyer asking what something would cost. Drop their email or PDF on MARBIM and it drafts the enquiry for you to check before it exists."
+              action={
+                <Link
+                  href="/buyers"
+                  style={{
+                    font: '500 13px/1 var(--fx-font-sans)',
+                    color: 'var(--fx-accent-pressed)',
+                    textDecoration: 'none',
+                  }}
+                >
+                  Open buyer desk →
+                </Link>
+              }
             />
           ) : (
             <div

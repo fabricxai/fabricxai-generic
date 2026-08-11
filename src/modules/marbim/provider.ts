@@ -161,6 +161,11 @@ export interface TextRequest {
    * tools again would invite a request that will not be run (plan 6.5).
    */
   tools?: { name: string; description: string; schema?: unknown }[]
+  /**
+   * Optional per-call model id (composer "marbim fast" / "marbim large").
+   * When absent, the reasoner uses the model it was constructed with.
+   */
+  model?: string
 }
 
 /** What a call cost, when the vendor says. Recorded per call for the ceiling (audit AI-H4). */
@@ -228,18 +233,29 @@ export function getProvider(): MarbimProvider {
 
 export const hasProvider = (): boolean => provider !== null
 
+import { surfaceLabelFor } from './surface-label'
+
 /**
- * Which model answered, for the surface to show.
+ * Which model answered, for telemetry and jobs.
  *
- * The design canvas prints a model name in the panel header and under every tool strip.
- * This returns the id of the provider actually in force rather than that name: with
- * `MARBIM_MOCK` set the answer came from `mock/deterministic-v1`, and a panel captioned
- * `marbim-large` over a deterministic answer is the exact class of small lie that makes
- * somebody trust the big numbers too.
+ * Returns the vendor model id actually in force (`claude-sonnet-5`, `mock/…`, …).
+ * Prefer `providerSurfaceLabel()` for anything a person reads.
  *
  * Null when nothing is registered — the caller shows nothing rather than guessing.
  */
 export const providerId = (): string | null => provider?.id ?? null
+
+/**
+ * Product-facing name for the panel header (and anything else a person skims).
+ *
+ * People see "marbim fast" / "marbim large". The backend is unchanged: reason still
+ * runs on the configured Claude model, extract/embed on their configured vendors.
+ * This function only renames the caption — it never picks a model. Mock stays as
+ * itself so a deterministic answer is never dressed up as a product tier.
+ */
+export function providerSurfaceLabel(id: string | null = providerId()): string | null {
+  return surfaceLabelFor(id)
+}
 
 /**
  * The model serving one role, for a caller that needs to name it specifically.

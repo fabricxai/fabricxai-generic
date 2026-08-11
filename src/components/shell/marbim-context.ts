@@ -64,7 +64,10 @@ export interface MarbimEntry {
   suggestions: readonly string[]
   packLabel: string
   readOnly: boolean
-  /** The provider in force, shown in the panel header. Null when none is registered. */
+  /**
+   * Product-facing model label for the panel header (`marbim fast` / `marbim large`).
+   * Null when none is registered. Vendor ids stay on jobs — see `providerSurfaceLabel`.
+   */
   model?: string | null
 }
 

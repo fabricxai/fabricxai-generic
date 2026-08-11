@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react'
 
+import { parseAnswerProse, type Block, type Inline } from './answer-prose'
 import { MarbimMark } from './mark'
 
 /**
@@ -152,8 +153,17 @@ export function ToolStrip({ steps, footer }: { steps: readonly ToolStep[]; foote
   )
 }
 
-/** The assistant's prose. The amber caret is the only amber in a streaming view. */
+/**
+ * The assistant's prose. The amber caret is the only amber in a streaming view.
+ *
+ * A string answer is parsed into paragraphs / headings / lists — the model writes
+ * light markdown, and dumping it raw collapsed every newline into one wall of text.
+ * Non-string children (tests, hand-built nodes) still pass through untouched.
+ */
 export function AnswerText({ children, streaming }: { children: ReactNode; streaming?: boolean }) {
+  const body =
+    typeof children === 'string' ? <AnswerProse text={children} /> : children
+
   return (
     <div
       style={{
@@ -162,7 +172,7 @@ export function AnswerText({ children, streaming }: { children: ReactNode; strea
         textWrap: 'pretty',
       }}
     >
-      {children}
+      {body}
       {streaming ? (
         <span
           aria-hidden="true"
@@ -178,6 +188,118 @@ export function AnswerText({ children, streaming }: { children: ReactNode; strea
         />
       ) : null}
     </div>
+  )
+}
+
+function AnswerProse({ text }: { text: string }) {
+  const blocks = parseAnswerProse(text)
+  if (blocks.length === 0) return null
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {blocks.map((block, i) => (
+        <AnswerBlock key={i} block={block} />
+      ))}
+    </div>
+  )
+}
+
+function AnswerBlock({ block }: { block: Block }) {
+  switch (block.kind) {
+    case 'heading': {
+      const size = block.level === 1 ? 18 : block.level === 2 ? 16.5 : 15
+      return (
+        <div
+          style={{
+            font: `600 ${size}px/1.35 var(--fx-font-sans)`,
+            color: 'var(--fx-text-primary)',
+            marginTop: 4,
+          }}
+        >
+          <AnswerInlines parts={block.inlines} />
+        </div>
+      )
+    }
+    case 'list': {
+      const Tag = block.ordered ? 'ol' : 'ul'
+      return (
+        <Tag
+          style={{
+            margin: 0,
+            paddingLeft: 22,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 6,
+          }}
+        >
+          {block.items.map((item, i) => (
+            <li key={i} style={{ paddingLeft: 2 }}>
+              <AnswerInlines parts={item} />
+            </li>
+          ))}
+        </Tag>
+      )
+    }
+    case 'code':
+      return (
+        <pre
+          style={{
+            margin: 0,
+            padding: '12px 14px',
+            borderRadius: 'var(--fx-radius-md)',
+            border: '1px solid var(--fx-border-subtle)',
+            background: 'var(--fx-bg-sunken)',
+            font: '400 12.5px/1.5 var(--fx-font-mono)',
+            color: 'var(--fx-text-primary)',
+            overflowX: 'auto',
+            whiteSpace: 'pre-wrap',
+          }}
+        >
+          {block.text}
+        </pre>
+      )
+    case 'paragraph':
+    default:
+      return (
+        <p style={{ margin: 0 }}>
+          <AnswerInlines parts={block.inlines} />
+        </p>
+      )
+  }
+}
+
+function AnswerInlines({ parts }: { parts: readonly Inline[] }) {
+  return (
+    <>
+      {parts.map((part, i) => {
+        switch (part.kind) {
+          case 'strong':
+            return (
+              <strong key={i} style={{ fontWeight: 600 }}>
+                {part.text}
+              </strong>
+            )
+          case 'em':
+            return <em key={i}>{part.text}</em>
+          case 'code':
+            return (
+              <code
+                key={i}
+                style={{
+                  font: '400 12.5px/1.4 var(--fx-font-mono)',
+                  background: 'var(--fx-bg-sunken)',
+                  borderRadius: 'var(--fx-radius-sm)',
+                  padding: '1px 5px',
+                }}
+              >
+                {part.text}
+              </code>
+            )
+          default:
+            return <span key={i}>{part.text}</span>
+        }
+      })}
+    </>
   )
 }
 

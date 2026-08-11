@@ -5,6 +5,7 @@ import { LockedState } from '@/components/fx/feedback'
 import { CoverageNote, ExceptionRow, FigureTile } from '@/components/fx/figures'
 import { SectionHeading } from '@/components/fx/signature'
 import { PageHeader } from '@/components/shell/page-shell'
+import { WorkCue } from '@/components/shell/work-cue'
 import { canSee, NAV } from '@/components/shell/nav'
 import { getCtx } from '@/modules/core/session'
 import {
@@ -81,6 +82,19 @@ export default async function DashboardPage() {
         // Amber only when something is actually waiting. A dashboard that glows on a quiet
         // morning has spent the one signal it has by the time something is genuinely wrong.
         ownsAmber={feed.exceptions.length > 0}
+      />
+
+      <WorkCue
+        items={
+          feed.exceptions.length > 0
+            ? [
+                {
+                  label: `${feed.exceptions.length} exception${feed.exceptions.length === 1 ? '' : 's'} on Your work`,
+                  href: '/home',
+                },
+              ]
+            : []
+        }
       />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 36 }}>

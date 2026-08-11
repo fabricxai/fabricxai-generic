@@ -418,10 +418,12 @@ a:hover {
 }
 
 /* Sidebar: scroll still works; the track just does not take space or attention. */
-.fx-sidebar {
+.fx-sidebar,
+.fx-scroll-quiet {
   scrollbar-width: none;
 }
-.fx-sidebar::-webkit-scrollbar {
+.fx-sidebar::-webkit-scrollbar,
+.fx-scroll-quiet::-webkit-scrollbar {
   display: none;
 }
 

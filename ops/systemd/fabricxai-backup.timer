@@ -1,0 +1,16 @@
+[Unit]
+Description=FabricXAI · nightly Postgres backup at 01:15
+
+[Timer]
+# 01:15 in the HOST timezone, which docs/runbooks/deploy.md §1 sets to Asia/Dhaka. After
+# the 00:30 nightly derivations finish, before the morning shift enters anything.
+OnCalendar=*-*-* 01:15:00
+RandomizedDelaySec=5m
+AccuracySec=1m
+
+# A host that was down at 01:15 backs up when it comes back, rather than skipping a
+# night and quietly widening the recovery window to 48 hours.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,29 @@
+[Unit]
+Description=FabricXAI · sync documents from MinIO to offsite object storage
+Documentation=file:///opt/fabricxai/docs/runbooks/RESTORE-RUNBOOK.md
+# Docker must be up. Not Requires=: if Docker is restarting, a skipped sync is correct
+# behaviour and the next tick is four minutes away.
+After=docker.service
+Wants=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/fabricxai
+ExecStart=/opt/fabricxai/scripts/docs-sync.sh
+
+# The sync holds its own flock and exits 0 when a previous run is still going, so a slow
+# tick never stacks. This is the second belt: systemd will not start a new instance while
+# one is running either.
+TimeoutStartSec=14m
+
+# One line per run in the journal, tagged so `journalctl -t fabricxai-docs-sync` finds it.
+SyslogIdentifier=fabricxai-docs-sync
+
+# Failures are reported by the script itself (BACKUP_ALERT_URL) because a systemd unit
+# failing on a VPS nobody is logged into is a tree falling in a forest.
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=6
+
+[Install]
+WantedBy=multi-user.target

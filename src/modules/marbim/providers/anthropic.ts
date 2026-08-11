@@ -146,7 +146,7 @@ export function anthropicReasoner({ apiKey, model }: AnthropicOptions) {
       let response
       try {
         response = await client.messages.create({
-          model,
+          model: request.model ?? model,
           max_tokens: MAX_TOKENS,
           system: request.system,
           messages: request.messages.map(toAnthropicMessage),

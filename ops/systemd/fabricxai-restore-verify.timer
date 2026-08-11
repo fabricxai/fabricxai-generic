@@ -1,0 +1,17 @@
+[Unit]
+Description=FabricXAI · weekly restore verification, Mondays 03:30
+
+[Timer]
+# Monday, after Sunday night's FULL backup. Verifying the week's newest full is the
+# point: a differential proves nothing if the full it depends on is unreadable.
+OnCalendar=Mon *-*-* 03:30:00
+RandomizedDelaySec=10m
+AccuracySec=1m
+
+# Deliberately NOT Persistent. A missed verification should run at the next scheduled
+# quiet hour, not the moment a host finishes booting — which is the one time it is least
+# able to spare the disk and CPU a full restore needs.
+Persistent=false
+
+[Install]
+WantedBy=timers.target

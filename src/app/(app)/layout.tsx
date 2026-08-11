@@ -1,6 +1,7 @@
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 
+import { AlertsPopover } from '@/components/shell/alerts-popover'
 import { MarbimButton } from '@/components/shell/marbim-button'
 import { marbimEntryFor } from '@/components/shell/marbim-context'
 import { MarbimPanel } from '@/components/shell/marbim-panel'
@@ -17,13 +18,15 @@ import {
 } from '@/components/shell/nav'
 import { LockedState, ReadOnlyNote } from '@/components/fx/feedback'
 import { LocaleProvider } from '@/components/fx/locale'
+import { t } from '@/lib/i18n'
 import { tui } from '@/lib/i18n-ui'
 import { env } from '@/lib/env'
 import { requestLocale } from '@/lib/ui-locale'
 import { marbimTrust, routedPendingCount } from '@/modules/approvals/queries'
 import type { ApprovalsPolicy } from '@/modules/approvals/service'
+import { listUnread } from '@/modules/core/notifications'
 import { getCtx, signedInUser } from '@/modules/core/session'
-import { providerId } from '@/modules/marbim/provider'
+import { providerSurfaceLabel } from '@/modules/marbim/provider'
 import { companyDisplayName, companyProfile, getPolicy } from '@/modules/settings/service'
 
 /**
@@ -55,15 +58,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const ctx = await getCtx(requestHeaders)
   if (!ctx) redirect('/login')
 
-  const [me, profile, displayName, trust, approvalsPolicy] = await Promise.all([
+  const [me, profile, displayName, trust, approvalsPolicy, unread] = await Promise.all([
     signedInUser(requestHeaders),
     companyProfile(ctx),
     companyDisplayName(ctx),
     marbimTrust(ctx),
     getPolicy<ApprovalsPolicy>(ctx, 'approvals'),
+    listUnread(ctx, 20),
   ])
 
-  // The FAB badge counts what is routed to THIS reviewer, not every draft in the company.
+  // Approve badge counts what is routed to THIS reviewer, not every draft in the company.
   // A storekeeper whose inbox reads "Nothing routed to you" must not carry a "4" on every
   // screen — a badge that cannot be cleared is one people stop reading.
   const routed = await routedPendingCount(ctx, approvalsPolicy)
@@ -71,6 +75,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // one. Every client component reads this through `LocaleProvider` below.
   const locale = await requestLocale(profile?.locale)
   const factoryType: FactoryType = profile?.factoryType ?? 'woven'
+  const alertItems = unread.map((n) => ({
+    id: n.id,
+    title: t(locale, n.titleKey, (n.params ?? {}) as Record<string, unknown>),
+    body: n.bodyKey
+      ? t(locale, n.bodyKey, (n.params ?? {}) as Record<string, unknown>)
+      : undefined,
+    href: n.href,
+    severity: n.severity as 'info' | 'warning' | 'critical',
+    age: alertAge(n.createdAt),
+  }))
   /*
    * Whether the copilot is offered at all (plan 6.1, audit AI-B1).
    *
@@ -108,10 +122,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               companyName={displayName ?? 'FabricXAI'}
             />
           }
-          actions={marbimEnabled ? <MarbimButton /> : undefined}
+          actions={
+            <>
+              <AlertsPopover alerts={alertItems} />
+              {marbimEnabled ? <MarbimButton /> : null}
+            </>
+          }
         />
         <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
-          <Sidebar items={nav} />
+          <Sidebar items={nav} badges={routed > 0 ? { approve: routed } : {}} />
           <PageBody>
             {allowed ? (
               <>
@@ -130,7 +149,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             the shell so the thread survives navigation. */}
         {marbimEnabled ? (
           <MarbimPanel
-            entry={{ ...marbimEntryFor(ctx.roles), model: providerId() }}
+            entry={{ ...marbimEntryFor(ctx.roles), model: providerSurfaceLabel() }}
             trust={{ ...trust, pending: routed }}
           />
         ) : null}
@@ -141,5 +160,18 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       </div>
     </LocaleProvider>
   )
+}
+
+/**
+ * How long ago, in words. Reads the clock itself so the layout's own body stays pure —
+ * a render that calls `Date.now()` is a render React is entitled to treat as repeatable
+ * and is not, which the hooks lint says out loud.
+ */
+function alertAge(createdAt: Date): string {
+  const hours = Math.floor(Math.max(0, Date.now() - createdAt.getTime()) / 3_600_000)
+  if (hours < 1) return 'just now'
+  if (hours < 24) return `${hours}h`
+  const days = Math.floor(hours / 24)
+  return days === 1 ? '1 day' : `${days} days`
 }
 

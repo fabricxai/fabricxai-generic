@@ -1,0 +1,21 @@
+[Unit]
+Description=FabricXAI · document sync every 15 minutes (RPO 15min, documents half)
+
+[Timer]
+# Every quarter hour, on the quarter. The database's RPO is 15 minutes; this is the
+# other half of the same promise — a restored GRN row whose challan photo is missing is
+# not a restored GRN row.
+OnCalendar=*:0/15
+
+# Spread the load off the exact minute boundary. Four processes on a small VPS all
+# waking at :00 alongside whatever else uses cron-style scheduling is avoidable
+# contention, and the offsite provider sees a nicer request pattern too.
+RandomizedDelaySec=45
+AccuracySec=30s
+
+# If the host was down or asleep across a boundary, run once on boot rather than waiting
+# for the next quarter — the gap is exactly the window this is meant to close.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

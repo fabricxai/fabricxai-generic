@@ -118,6 +118,7 @@ describe('production boot · the copilot cannot be half-configured', () => {
     if (!parsed.success) return
     expect(parsed.data.MARBIM_MODEL_EXTRACT).toBe('gemini-2.5-flash')
     expect(parsed.data.MARBIM_MODEL_REASON).toBe('claude-sonnet-5')
+    expect(parsed.data.MARBIM_MODEL_REASON_LARGE).toBe('claude-opus-4')
     expect(parsed.data.MARBIM_MODEL_EMBED).toBe('text-embedding-3-small')
   })
 })

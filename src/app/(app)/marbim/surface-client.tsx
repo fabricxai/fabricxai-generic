@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, useTransition } from 'react'
+import { useEffect, useRef, useState, useTransition, createRef, type RefObject } from 'react'
 
 import {
   AnswerText,
@@ -12,10 +12,20 @@ import {
 } from '@/components/fx/ai'
 import { EmptyState } from '@/components/fx/feedback'
 import { MarbimMark, type MarkState } from '@/components/fx/mark'
-import { ask } from '@/modules/marbim/actions'
+import { ask, loadChatTurns } from '@/modules/marbim/actions'
+import {
+  MARBIM_TIERS,
+  surfaceLabelFor,
+  type MarbimTier,
+} from '@/modules/marbim/surface-label'
 
 import { AttachControl, type Attachment } from './attach-client'
-import { READABLE_BY_MARBIM, ReadDocumentFlow, UnreadableNote } from './read-document-client'
+import {
+  READABLE_BY_MARBIM,
+  ReadDocumentFlow,
+  UnreadableNote,
+  type ReadDocumentHandle,
+} from './read-document-client'
 
 interface Turn {
   id: string
@@ -23,21 +33,19 @@ interface Turn {
   answer: string | null
   toolSteps: ToolStep[]
   failed: boolean
-  /** `marbim-large · 4 tools · 2.4 s` in the canvas — the run's receipt. */
+  /** `marbim large · 4 tools · 2.4 s` — product name, not the vendor id. */
   receipt: string | null
   /** How many tools actually ran. Decides what the footer is allowed to claim. */
   toolsRun: number
 }
 
 /**
- * The line under a tool strip: which model, how many tools, how long.
+ * The line under a tool strip: which product tier, how many tools, how long.
  *
- * Named after what it is — a receipt for a run somebody is about to act on. The model is
- * whatever actually answered, never a fixed product name: an answer captioned with a model
- * that did not produce it is worse than no caption.
+ * The caption uses "marbim fast" / "marbim large". The vendor model that actually ran
+ * is still recorded on the turn server-side — this string is only what a person reads.
  */
-function receiptOf(model: string, toolCount: number, durationMs: number): string {
-  const seconds = (durationMs / 1000).toFixed(1)
+function receiptOf(model: string, toolCount: number, durationMs?: number): string {
   /*
    * "N tools" means N tools RAN, and since 6.5 that is finally true. It counted requests
    * before the execution loop existed, which is a fabricated citation — worse than no
@@ -45,7 +53,39 @@ function receiptOf(model: string, toolCount: number, durationMs: number): string
    */
   const tools =
     toolCount === 0 ? 'no tools run' : toolCount === 1 ? '1 tool' : `${toolCount} tools`
-  return `${model} · ${tools} · ${seconds} s`
+  const label = surfaceLabelFor(model) ?? model
+  if (durationMs === undefined) return `${label} · ${tools}`
+  const seconds = (durationMs / 1000).toFixed(1)
+  return `${label} · ${tools} · ${seconds} s`
+}
+
+function turnsFromStored(
+  rows: Awaited<ReturnType<typeof loadChatTurns>>,
+): Turn[] {
+  return rows.map((row) => {
+    const toolsRun = row.toolCalls.length
+    return {
+      id: row.id,
+      question: row.question,
+      answer: row.answer,
+      failed: false,
+      toolsRun,
+      receipt: row.model ? receiptOf(row.model, toolsRun) : null,
+      toolSteps: [
+        {
+          label: 'reading the department primers',
+          state: 'done' as const,
+        },
+        ...row.toolCalls.map(
+          (c): ToolStep => ({
+            label: c.name,
+            state: c.ok ? 'done' : 'failed',
+            ...(c.error ? { meta: c.error } : c.ms ? { meta: `${c.ms} ms` } : {}),
+          }),
+        ),
+      ],
+    }
+  })
 }
 
 /**
@@ -95,6 +135,7 @@ export function MarbimSurface({
   fromModule,
   floatingMark = true,
   autoFocus = false,
+  initialTier = 'fast',
 }: {
   conversationId: string
   suggestions: readonly string[]
@@ -112,29 +153,90 @@ export function MarbimSurface({
    */
   floatingMark?: boolean
   autoFocus?: boolean
+  /** Composer starting tier — "marbim fast" or "marbim large". */
+  initialTier?: MarbimTier
 }) {
   const [turns, setTurns] = useState<Turn[]>([])
+  const [hydrating, setHydrating] = useState(true)
   const [draft, setDraft] = useState('')
+  const [tier, setTier] = useState<MarbimTier>(initialTier)
   const [focused, setFocused] = useState(false)
   const [mark, setMark] = useState<MarkState>('rest')
   const [attachments, setAttachments] = useState<Attachment[]>([])
+  const [readyIds, setReadyIds] = useState<Set<string>>(() => new Set())
   const [pending, startTransition] = useTransition()
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const readRefs = useRef(new Map<string, RefObject<ReadDocumentHandle | null>>())
+
+  useEffect(() => {
+    setTier(initialTier)
+  }, [initialTier])
+
+  // Reload when the conversation id changes (history pick / new chat). Survives panel close
+  // because the panel keeps this surface mounted.
+  useEffect(() => {
+    let cancelled = false
+    setHydrating(true)
+    setTurns([])
+    setAttachments([])
+    setReadyIds(new Set())
+    setDraft('')
+    void loadChatTurns({ conversationId })
+      .then((rows) => {
+        if (cancelled) return
+        setTurns(turnsFromStored(rows))
+      })
+      .catch(() => {
+        if (!cancelled) setTurns([])
+      })
+      .finally(() => {
+        if (!cancelled) setHydrating(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [conversationId])
 
   // The slide-over opens because somebody wants to type. Landing the caret in the composer
   // is the difference between a panel and a panel you have to click into first.
   useEffect(() => {
-    if (autoFocus) inputRef.current?.focus()
-  }, [autoFocus])
+    if (autoFocus && !hydrating) inputRef.current?.focus()
+  }, [autoFocus, hydrating, conversationId])
+
+  function readHandleFor(documentId: string): RefObject<ReadDocumentHandle | null> {
+    const existing = readRefs.current.get(documentId)
+    if (existing) return existing
+    const created = createRef<ReadDocumentHandle | null>()
+    readRefs.current.set(documentId, created)
+    return created
+  }
 
   function send(question: string) {
     const text = question.trim()
-    if (!text || pending) return
+    const docStarts: ReadDocumentHandle[] = []
+    for (const attachment of attachments) {
+      const handle = readRefs.current.get(attachment.documentId)?.current
+      if (handle?.isReady()) docStarts.push(handle)
+    }
+
+    if ((!text && docStarts.length === 0) || pending) return
+
+    setDraft('')
+
+    // Document reads first — they are independent of the chat turn index.
+    for (const handle of docStarts) {
+      void handle.start()
+    }
+
+    if (!text) {
+      setMark('thinking')
+      setTimeout(() => setMark('rest'), 600)
+      return
+    }
 
     const turnIndex = turns.length
     const localId = `${conversationId}:${turnIndex}`
 
-    setDraft('')
     setTurns((t) => [
       ...t,
       {
@@ -154,7 +256,13 @@ export function MarbimSurface({
 
     startTransition(async () => {
       try {
-        const result = await ask({ conversationId, turnIndex, question: text, fromModule })
+        const result = await ask({
+          conversationId,
+          turnIndex,
+          question: text,
+          fromModule,
+          tier,
+        })
         setTurns((t) =>
           t.map((turn) =>
             turn.id === localId
@@ -211,6 +319,8 @@ export function MarbimSurface({
     })
   }
 
+  const canSend = Boolean(draft.trim() || readyIds.size > 0) && !pending && !hydrating
+
   return (
     <div
       style={{
@@ -227,6 +337,7 @@ export function MarbimSurface({
       }}
     >
       <div
+        className="fx-scroll-quiet"
         style={{
           flex: 1,
           minHeight: 0,
@@ -236,7 +347,16 @@ export function MarbimSurface({
           gap: 24,
         }}
       >
-        {turns.length === 0 ? (
+        {hydrating ? (
+          <span
+            style={{
+              font: '400 12.5px/1.4 var(--fx-font-mono)',
+              color: 'var(--fx-text-tertiary)',
+            }}
+          >
+            Loading conversation…
+          </span>
+        ) : turns.length === 0 ? (
           <EmptyState
             title="Ask about an order, a line, or a date"
             body="MARBIM reads what your role can already read. It proposes changes for you to approve — it never writes to this factory itself."
@@ -300,7 +420,7 @@ export function MarbimSurface({
           </div>
         )}
 
-        {turns.length === 0 ? (
+        {!hydrating && turns.length === 0 ? (
           <SuggestedPrompts label={packLabel} prompts={suggestions} onPick={send} />
         ) : null}
       </div>
@@ -344,11 +464,10 @@ export function MarbimSurface({
             resize: 'none',
             background: 'transparent',
             color: 'var(--fx-text-primary)',
-            font: "400 15px/1.5 var(--fx-font-sans)",
+            font: '400 15px/1.5 var(--fx-font-sans)',
           }}
         />
-        {/* The bridge from "attached" to "drafted": one flow per file MARBIM can read —
-            PDFs and photos it reads itself, Word/Excel/CSV converted server-side first.
+        {/* The bridge from "attached" to "drafted": prepare with chips, start with Send.
             Hidden for read-only roles — their submit would 403, and chips that refuse are
             worse than no chips. Keyed by document id so a second attach gets its own flow.
 
@@ -359,7 +478,19 @@ export function MarbimSurface({
         {!readOnly
           ? attachments.map((a) =>
               READABLE_BY_MARBIM(a.mimeType) ? (
-                <ReadDocumentFlow key={a.documentId} attachment={a} />
+                <ReadDocumentFlow
+                  key={a.documentId}
+                  ref={readHandleFor(a.documentId)}
+                  attachment={a}
+                  onReadyChange={(ready) => {
+                    setReadyIds((prev) => {
+                      const next = new Set(prev)
+                      if (ready) next.add(a.documentId)
+                      else next.delete(a.documentId)
+                      return next
+                    })
+                  }}
+                />
               ) : (
                 <UnreadableNote key={a.documentId} attachment={a} />
               ),
@@ -368,39 +499,90 @@ export function MarbimSurface({
         <AttachControl
           attachments={attachments}
           onAttach={(a) => setAttachments((list) => [...list, a])}
-          onRemove={(id) => setAttachments((list) => list.filter((a) => a.documentId !== id))}
+          onRemove={(id) => {
+            readRefs.current.delete(id)
+            setReadyIds((prev) => {
+              const next = new Set(prev)
+              next.delete(id)
+              return next
+            })
+            setAttachments((list) => list.filter((a) => a.documentId !== id))
+          }}
           disabled={readOnly}
         >
+          <label style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44 }}>
+            <select
+              value={tier}
+              onChange={(e) => setTier(e.target.value as MarbimTier)}
+              aria-label="MARBIM model"
+              disabled={pending}
+              style={{
+                appearance: 'none',
+                WebkitAppearance: 'none',
+                background: 'transparent',
+                border: '1px solid var(--fx-border-default)',
+                borderRadius: 'var(--fx-radius-sm)',
+                padding: '9px 28px 9px 11px',
+                font: '500 12px/1 var(--fx-font-mono)',
+                color: 'var(--fx-text-secondary)',
+                cursor: pending ? 'not-allowed' : 'pointer',
+                minHeight: 44,
+                backgroundImage:
+                  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%236B7280' d='M1 1l4 4 4-4'/%3E%3C/svg%3E\")",
+                backgroundRepeat: 'no-repeat',
+                backgroundPosition: 'right 10px center',
+              }}
+            >
+              {MARBIM_TIERS.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
           <span
-            style={{ font: "400 11.5px/1.4 var(--fx-font-mono)", color: 'var(--fx-text-tertiary)' }}
+            style={{ font: '400 11.5px/1.4 var(--fx-font-mono)', color: 'var(--fx-text-tertiary)' }}
           >
             {readOnly ? 'read-only role · answers only' : 'proposes drafts · never writes'}
           </span>
           {/* The one amber moment on this screen. */}
           <button
             onClick={() => send(draft)}
-            disabled={!draft.trim() || pending}
+            disabled={!canSend}
             aria-label="Send"
             style={{
               marginLeft: 'auto',
               width: 44,
               height: 44,
               borderRadius: 'var(--fx-radius-md)',
-              background: draft.trim() && !pending ? 'var(--fx-accent)' : 'var(--fx-bg-sunken)',
-              color:
-                draft.trim() && !pending ? 'var(--fx-accent-on)' : 'var(--fx-text-disabled)',
+              background: canSend ? 'var(--fx-accent)' : 'var(--fx-bg-sunken)',
+              color: canSend ? 'var(--fx-accent-on)' : 'var(--fx-text-disabled)',
               border: 'none',
-              cursor: draft.trim() && !pending ? 'pointer' : 'not-allowed',
+              cursor: canSend ? 'pointer' : 'not-allowed',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              font: "600 16px/1 var(--fx-font-sans)",
+              font: '600 16px/1 var(--fx-font-sans)',
             }}
           >
             ↑
           </button>
         </AttachControl>
       </div>
+
+      <p
+        style={{
+          margin: 0,
+          padding: '0 4px',
+          font: '400 11.5px/1.45 var(--fx-font-mono)',
+          color: 'var(--fx-text-tertiary)',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+        }}
+      >
+        AI can be wrong — check before you act · proposes drafts · never writes
+      </p>
 
       {/* Bottom-right, in whichever of its six states fits. */}
       {floatingMark ? (

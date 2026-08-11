@@ -35,6 +35,15 @@ function Glyph({ children }: { children: ReactNode }) {
 }
 
 const ICONS: Record<string, ReactNode> = {
+  // Checklist — what needs you today
+  home: (
+    <Glyph>
+      <path d="M3 3.5h10v10H3z" />
+      <path d="M5.5 6.5h5" />
+      <path d="M5.5 9h3.5" />
+      <path d="M5.5 11.5h4" />
+    </Glyph>
+  ),
   // Inbox tray
   approve: (
     <Glyph>

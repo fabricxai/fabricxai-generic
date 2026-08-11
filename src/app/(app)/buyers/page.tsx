@@ -5,6 +5,7 @@ import { Badge } from '@/components/fx/primitives'
 import { EmptyState } from '@/components/fx/feedback'
 import { Eyebrow, SectionHeading } from '@/components/fx/signature'
 import { PageHeader } from '@/components/shell/page-shell'
+import { WorkCue } from '@/components/shell/work-cue'
 import { canWrite, NAV } from '@/components/shell/nav'
 import { getCtx } from '@/modules/core/session'
 import { companyProfile } from '@/modules/settings/service'
@@ -16,6 +17,7 @@ import { LeadOpener } from './pipeline-client'
 import { BuyerTermsButton } from './buyer-terms'
 import { NewLead } from './new-lead'
 import type { DrawerLead } from './lead-drawer'
+import Link from 'next/link'
 
 /**
  * 1.1 Buyer & Lead Desk.
@@ -73,6 +75,19 @@ export default async function BuyersPage() {
          * both. For a read-only role there is no button, and the header takes it back.
          */
         ownsAmber={!mayWrite}
+      />
+
+      <WorkCue
+        items={
+          board.quiet.length > 0
+            ? [
+                {
+                  label: `${board.quiet.length} quiet lead${board.quiet.length === 1 ? '' : 's'}`,
+                  href: '/buyers',
+                },
+              ]
+            : []
+        }
       />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 36 }}>
@@ -143,6 +158,24 @@ export default async function BuyersPage() {
             <EmptyState
               title="No leads yet"
               body="A lead is anyone who might become a buyer — from a fair, a referral, a buying house or straight inbound. Logging the first call starts the quiet clock."
+              action={
+                mayWrite ? (
+                  <span style={{ font: '400 13px/1.4 var(--fx-font-sans)', color: 'var(--fx-text-tertiary)' }}>
+                    Use New lead above to start one.
+                  </span>
+                ) : (
+                  <Link
+                    href="/orders"
+                    style={{
+                      font: '500 13px/1 var(--fx-font-sans)',
+                      color: 'var(--fx-accent-pressed)',
+                      textDecoration: 'none',
+                    }}
+                  >
+                    Open order desk →
+                  </Link>
+                )
+              }
             />
           ) : (
             <div

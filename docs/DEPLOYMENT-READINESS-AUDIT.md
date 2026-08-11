@@ -54,7 +54,7 @@
 | INFRA-H4 worker PID-1 / healthcheck | `9ded55a`, `8a5de28` | dumb-init entrypoint, `healthcheck: disable` on the worker, 60s start-period, `unhandledRejection`/`uncaughtException` handlers |
 | INFRA-H5 no migration step in deploy | `9ded55a` | one-shot `migrate` service; app/worker gated on `service_completed_successfully` |
 | INFRA-M6/M9/M11 image + Redis + bucket hardening | `9ded55a` | read-only rootfs, `cap_drop: ALL`, memory limits; Redis AOF/noeviction/requirepass; bucket private **and versioned** |
-| INFRA-B3 / DB-B2 no backups or restore | `445e4be`, `e0e560b` | pgBackRest with continuous WAL to an offsite encrypted repo, `scripts/backup.sh` (full Sun / incr otherwise, heartbeat on success), `restore.md` branching by failure mode with a verification list — **rehearsal log deliberately empty** |
+| INFRA-B3 / DB-B2 no backups or restore | `445e4be`, `e0e560b`, _this change_ | pgBackRest to an offsite AES-256 repo — full Sunday / **differential** the other six nights, WAL archived continuously with a forced 5-minute switch; documents synced to offsite object storage **every 15 minutes** (rclone, displaced objects kept under `_replaced/`); `scripts/restore-verify.sh` performs a **real restore into a throwaway instance every Monday** and posts backup age, WAL lag and restore-vs-RTO to monitoring; `scripts/export-tenant.ts` for single-tenant extraction; `RESTORE-RUNBOOK.md` drill + `restore.md` incident procedure — **rehearsal log still empty** |
 | INFRA-M7 / TEST-M10 / TEST-L12 CI gaps | `91257ff` | job timeouts, `--max-warnings=0`, `pnpm audit --prod`, gitleaks over full history, trivy on the image, a boot-refusal check, and `:latest` tags pinned |
 | INFRA-H7 no rate limiting | `32d19f7` | Redis token buckets on auth/sync/presign; Better Auth on the same Redis; **fails open** so a Redis blip cannot stop a floor recording production |
 | INFRA-L3 implicit cookie flags | `32d19f7` | `useSecureCookies` pinned to production |
@@ -96,7 +96,15 @@ Reconciled 2026-08-07. Every finding this file's Fix log records as complete is 
 
 **Genuinely open, and none of it is code:**
 
-- **INFRA-B3 / DB-B2** — pgBackRest, the offsite repo and `restore.md` all exist. The **restore rehearsal has never been executed**. A backup nobody has restored is a belief.
+- **INFRA-B3 / DB-B2** — the layer is now complete and self-checking: offsite encrypted
+  repo, real WAL archiving (the `archive_command` was `true` — a command that succeeds
+  without archiving anything, which made every prior backup restorable only to the
+  instant it ended), a 15-minute document RPO to match the database's, and a weekly
+  automated restore that proves it. What is **still open is the human drill**: nobody has
+  built a host from these backups, and the credential hunt inside the 4h RTO has never
+  been timed. `RESTORE-RUNBOOK.md` §3 is the procedure; §8 is the log, and it is empty.
+  A backup nobody has restored is a belief — an automated restore narrows that, it does
+  not close it.
 - **Deployment wiring** — point the prod compose healthcheck and Caddy's upstream at `/api/ready` (7.5 built it; nothing consumes it), set `HEALTH_TOKEN`, finish the S3 proxy and the CI deploy job. Deliberately outside the plan's scope, and listed in its header.
 - **Payroll has never been parallel-run.** `pnpm payroll:parallel-run` is built and proven end to end; it needs a real gazette, a real month of attendance and the factory's own sheet. Non-negotiable before go-live.
 - **MARBIM has never called a live model.** Three vendors and the execution loop are wired; no key exists in this environment, so the SDK bodies and the multi-tool round trip are unproven. All fail loudly, so the risk is a dead feature rather than a wrong number.
@@ -128,7 +136,7 @@ Reconciled 2026-08-07. Every finding this file's Fix log records as complete is 
   Only `docker-compose.dev.yml`. No prod compose, no Caddy/nginx/TLS, no restart policies, no resource limits, no deploy job (`.github/workflows/ci.yml:188-202` builds with `push: false` and stops). The dev-plan explicitly requires all of this (`docs/02-backend/fabricxai-backend-dev-plan.md:116, :32, :35, :118`). `docs/07-rollout/rollout-playbook.md` has zero deployment content.
   **Fix:** `docker-compose.prod.yml` (app + worker + pg + pgbouncer + redis + minio + caddy; `restart: unless-stopped`; memory limits; DB/Redis/MinIO ports not published), Caddyfile with automatic TLS, deploy workflow (build → push GHCR by digest → SSH `compose pull && up -d`).
 
-- [ ] **INFRA-B3 · No backups, no restore path, no DR — against a doc that calls it non-negotiable.**  ◐ **partly done** — backups and the runbook exist; the restore REHEARSAL has never been executed.
+- [ ] **INFRA-B3 · No backups, no restore path, no DR — against a doc that calls it non-negotiable.**  ◐ **partly done** — the backup layer is built, wired and weekly-verified (see the fixed table above); the **human DR drill on a scratch host has never been executed**, which is the half that proves a person can rebuild this, not just that the bytes are readable.
   dev-plan:34 ("pgBackRest → offsite — non-negotiable before first real factory data"), :192 (RTO ≤4h / RPO ≤15min), :216 (four required runbooks). Reality: `docs/runbooks/` holds one file (`phase-0-exit.md`); no backup script, no WAL archiving, no MinIO replication.
   **Fix:** pgBackRest/wal-g sidecar with offsite repo + WAL archiving; `mc mirror` for MinIO; a `restore-from-backup.md` runbook **executed once against a scratch host** before pilot data lands.
 
@@ -214,7 +222,7 @@ Reconciled 2026-08-07. Every finding this file's Fix log records as complete is 
   `0002_rls_policies.sql:40` claims FORCE RLS "does not lock the migration runner out of its own tables" — false: FORCE applies RLS to the table owner, and every policy in the schema targets only `fabricxai_app` (verified: zero policies for any other role). Eight SECURITY DEFINER functions run as the owner and read forced tables (`app.memberships_for_user` → `roles`; `app.lock_outbox_batch`/`mark_outbox_published` → `outbox`; `app.scheduler_last_success`/`scheduler_observed_since` → `job_runs`; partition helper). If ops hardens the owner to non-superuser (the standard move, and what `scripts/setup-db-roles.mjs` implies): **login breaks for everyone** (memberships → 0 rows), **outbox delivery stops silently**, health reports the scheduler never ran, seed reads nothing. It only works today because dev/CI owner is the initdb superuser — so CI cannot catch it.
   **Fix:** decide + document the owner privilege model — either grant `BYPASSRLS` explicitly in `setup-db-roles.mjs` and correct `0002:40`, or add owner-scoped policies. Then add a CI job running the suite with a non-superuser, non-BYPASSRLS owner.
 
-- [ ] **DB-B2 · No backup or restore story at all** (same as INFRA-B3, confirmed independently from the DB side: no pgBackRest/pg_dump/WAL archiving; `docs/runbooks/` has one file; `userlist.txt` even points at a runbook that doesn't exist; rollout playbook has zero hits for backup/restore/RTO/RPO). Payroll + LC + bonded-warehouse data cannot go live with undefined RPO/RTO.  ◐ **partly done** — same as INFRA-B3 — the rehearsal is the open half.
+- [ ] **DB-B2 · No backup or restore story at all** (same as INFRA-B3, confirmed independently from the DB side: no pgBackRest/pg_dump/WAL archiving; `docs/runbooks/` has one file; `userlist.txt` even points at a runbook that doesn't exist; rollout playbook has zero hits for backup/restore/RTO/RPO). Payroll + LC + bonded-warehouse data cannot go live with undefined RPO/RTO.  ◐ **partly done** — same as INFRA-B3 — the human rehearsal is the open half. RPO is now *measured* rather than asserted: `restore-verify.sh` reads `pg_stat_archiver` weekly and fails if WAL lag exceeds twice the 15-minute budget.
 
 ### High
 

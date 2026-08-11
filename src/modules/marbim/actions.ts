@@ -22,9 +22,12 @@ import { hasProvider, MODEL_READABLE_MIME, modelForRole } from './provider'
 import { primerModulesForRoles, toolsForRoles } from './scope'
 import {
   chat,
+  conversation,
   extractionStatus,
+  listConversations,
   queueExtraction,
   type ChatResult,
+  type ConversationSummary,
   type MarbimPolicy,
 } from './service'
 import type { ToolPack } from './tools'
@@ -77,11 +80,13 @@ const askInput = z.object({
   question: z.string().min(1).max(4000),
   /** The screen MARBIM was opened from. Narrows which primers lead. */
   fromModule: z.string().min(1).max(64).optional(),
+  /** Composer tier — maps to Claude sonnet (fast) or opus (large). */
+  tier: z.enum(['fast', 'large']).default('fast'),
 })
 
 export async function ask(input: z.input<typeof askInput>): Promise<ChatResult> {
   const ctx = await requireRole(await headers(), ...ASK_ROLES)
-  const { conversationId, turnIndex, question, fromModule } = askInput.parse(input)
+  const { conversationId, turnIndex, question, fromModule, tier } = askInput.parse(input)
 
   // Only modules that actually registered a primer, and only ones this caller's
   // roles can already read — MARBIM never widens what a person can see.
@@ -120,10 +125,15 @@ export async function ask(input: z.input<typeof askInput>): Promise<ChatResult> 
 
   const policy = await getPolicy<MarbimPolicy>(ctx, 'marbim')
 
+  // Product tiers stay Claude — fast is MARBIM_MODEL_REASON, large is the opus-class override.
+  const model =
+    tier === 'large' ? env.MARBIM_MODEL_REASON_LARGE : env.MARBIM_MODEL_REASON
+
   return chat(ctx, {
     conversationId,
     turnIndex,
     question,
+    model,
     // Primers follow the same audience. A primer for a module whose tools this person cannot
     // call is prompt they can only be frustrated by, and it is paid for on every request.
     moduleIds: primerModulesForRoles(
@@ -393,4 +403,61 @@ export async function extractionJobStatus(input: { jobId: string }): Promise<{
     pendingChangeId: job.pendingChangeId,
     targetTable: job.targetTable,
   }
+}
+
+/** Recent threads for the history list in the panel. */
+export async function listChatHistory(): Promise<
+  { conversationId: string; preview: string; turnCount: number; lastAt: string }[]
+> {
+  const ctx = await requireRole(await headers(), ...ASK_ROLES)
+  const rows: ConversationSummary[] = await listConversations(ctx, { limit: 30 })
+  return rows.map((row) => ({
+    conversationId: row.conversationId,
+    preview: row.preview,
+    turnCount: row.turnCount,
+    lastAt: row.lastAt.toISOString(),
+  }))
+}
+
+/** Turns for one of the caller's conversations — hydrates the surface on reopen / history pick. */
+export async function loadChatTurns(input: { conversationId: string }): Promise<
+  {
+    id: string
+    turnIndex: number
+    question: string
+    answer: string | null
+    toolCalls: { name: string; ok: boolean; ms?: number; error?: string }[]
+    model: string | null
+  }[]
+> {
+  const ctx = await requireRole(await headers(), ...ASK_ROLES)
+  const { conversationId } = z.object({ conversationId: z.string().uuid() }).parse(input)
+  const turns = await conversation(ctx, conversationId)
+  return turns.map((turn) => ({
+    id: turn.id,
+    turnIndex: turn.turnIndex,
+    question: turn.question,
+    answer: turn.answer,
+    toolCalls: normalizeStoredToolCalls(turn.toolCalls),
+    model: turn.model,
+  }))
+}
+
+function normalizeStoredToolCalls(
+  raw: unknown,
+): { name: string; ok: boolean; ms?: number; error?: string }[] {
+  if (!Array.isArray(raw)) return []
+  return raw.flatMap((entry) => {
+    if (typeof entry !== 'object' || entry === null) return []
+    const row = entry as { name?: unknown; ok?: unknown; ms?: unknown; error?: unknown }
+    if (typeof row.name !== 'string') return []
+    return [
+      {
+        name: row.name,
+        ok: row.ok !== false,
+        ...(typeof row.ms === 'number' ? { ms: row.ms } : {}),
+        ...(typeof row.error === 'string' ? { error: row.error } : {}),
+      },
+    ]
+  })
 }

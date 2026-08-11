@@ -8,6 +8,7 @@ import { Badge } from '@/components/fx/primitives'
 import { Eyebrow, SectionHeading } from '@/components/fx/signature'
 import { Ident } from '@/components/fx/format'
 import { PageHeader } from '@/components/shell/page-shell'
+import { WorkCue } from '@/components/shell/work-cue'
 import { canWrite, NAV } from '@/components/shell/nav'
 import { getCtx } from '@/modules/core/session'
 import { buyerAccounts } from '@/modules/buyers/queries'
@@ -64,6 +65,19 @@ export default async function LcsPage() {
         title={rows.length === 0 ? 'No credits on file' : `${rows.length} letters of credit`}
         meta={flagged.length > 0 ? `${flagged.length} need attention` : undefined}
         ownsAmber
+      />
+
+      <WorkCue
+        items={
+          flagged.length > 0
+            ? [
+                {
+                  label: `${flagged.length} credit${flagged.length === 1 ? '' : 's'} need attention`,
+                  href: '/lcs',
+                },
+              ]
+            : []
+        }
       />
 
       <nav style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 20 }}>
@@ -135,6 +149,24 @@ export default async function LcsPage() {
             <EmptyState
               title="No letters of credit yet"
               body="A master LC is what the buyer opens to pay for an order. Back-to-back credits for fabric and trims are drawn against it, and never past its limit."
+              action={
+                mayWrite ? (
+                  <span style={{ font: '400 13px/1.4 var(--fx-font-sans)', color: 'var(--fx-text-tertiary)' }}>
+                    Use New LC above to record the first one.
+                  </span>
+                ) : (
+                  <Link
+                    href="/lcs/submissions"
+                    style={{
+                      font: '500 13px/1 var(--fx-font-sans)',
+                      color: 'var(--fx-accent-pressed)',
+                      textDecoration: 'none',
+                    }}
+                  >
+                    Documents at the bank →
+                  </Link>
+                )
+              }
             />
           ) : (
             /*
