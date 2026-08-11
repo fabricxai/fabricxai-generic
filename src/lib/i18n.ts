@@ -411,8 +411,11 @@ export const MESSAGES: Catalogue = {
     'marbim.errors.invalid': 'That does not fit what MARBIM accepts here.',
     'marbim.errors.nothing_to_read':
       'There is nothing to read — paste the text, or attach a PDF or photo the model can read on its own.',
+    /* Covers both refusals: the type is not one that can be read at all, and the type is
+       readable but these particular bytes produced nothing (a damaged archive). The remedy
+       is the same sentence either way, so it is one key rather than two near-identical ones. */
     'marbim.errors.file_unreadable':
-      'The model cannot read this file type directly. It reads PDF, JPEG, PNG and WebP — for anything else, paste the text.',
+      'MARBIM could not read this file. It reads PDF, JPEG, PNG, WebP, Word, Excel and CSV — if this is one of those, the file may be damaged. For anything else, paste the text on the intake page instead.',
     'marbim.errors.job_not_found': 'That extraction no longer exists.',
     'marbim.errors.job_rejected':
       'That extraction was rejected and will not be retried — what it read did not fit the target.',
@@ -914,7 +917,7 @@ export const MESSAGES: Catalogue = {
     'marbim.errors.nothing_to_read':
       'পড়ার মতো কিছু নেই — টেক্সট পেস্ট করুন, অথবা এমন PDF বা ছবি যুক্ত করুন যা model নিজে পড়তে পারে।',
     'marbim.errors.file_unreadable':
-      'এই ধরনের ফাইল model সরাসরি পড়তে পারে না। PDF, JPEG, PNG আর WebP পড়তে পারে — অন্য কিছু হলে টেক্সট পেস্ট করুন।',
+      'MARBIM এই ফাইলটি পড়তে পারেনি। এটি PDF, JPEG, PNG, WebP, Word, Excel ও CSV পড়তে পারে — এগুলোর একটি হলে ফাইলটি হয়তো নষ্ট। অন্য কিছু হলে intake পাতায় লেখাটি পেস্ট করুন।',
     'marbim.errors.token_ceiling':
       'এই ফ্যাক্টরির আজকের model বাজেট শেষ হয়ে গেছে। গত ২৪ ঘণ্টার হিসাব শেষ হলে MARBIM আবার উত্তর দেবে, অথবা owner চাইলে Settings-এ দৈনিক সীমা বাড়াতে পারেন।',
     'marbim.notifications.extraction_succeeded.title':

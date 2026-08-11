@@ -15,7 +15,7 @@ import { MarbimMark, type MarkState } from '@/components/fx/mark'
 import { ask } from '@/modules/marbim/actions'
 
 import { AttachControl, type Attachment } from './attach-client'
-import { MODEL_READABLE, ReadDocumentFlow } from './read-document-client'
+import { READABLE_BY_MARBIM, ReadDocumentFlow, UnreadableNote } from './read-document-client'
 
 interface Turn {
   id: string
@@ -347,13 +347,23 @@ export function MarbimSurface({
             font: "400 15px/1.5 var(--fx-font-sans)",
           }}
         />
-        {/* The bridge from "attached" to "drafted": one flow per file the model can read.
+        {/* The bridge from "attached" to "drafted": one flow per file MARBIM can read —
+            PDFs and photos it reads itself, Word/Excel/CSV converted server-side first.
             Hidden for read-only roles — their submit would 403, and chips that refuse are
-            worse than no chips. Keyed by document id so a second attach gets its own flow. */}
+            worse than no chips. Keyed by document id so a second attach gets its own flow.
+
+            A file it cannot read gets a SENTENCE rather than nothing. The upload allowlist
+            is wider than what can be drafted from (legacy .doc, HEIC), and the difference
+            used to be expressed as silence: the file appeared, no chips came, and there was
+            no way to tell a slow screen from an unsupported one. */}
         {!readOnly
-          ? attachments
-              .filter((a) => MODEL_READABLE.test(a.mimeType))
-              .map((a) => <ReadDocumentFlow key={a.documentId} attachment={a} />)
+          ? attachments.map((a) =>
+              READABLE_BY_MARBIM(a.mimeType) ? (
+                <ReadDocumentFlow key={a.documentId} attachment={a} />
+              ) : (
+                <UnreadableNote key={a.documentId} attachment={a} />
+              ),
+            )
           : null}
         <AttachControl
           attachments={attachments}

@@ -14,6 +14,7 @@
 import { and, desc, eq, gte, sql } from 'drizzle-orm'
 import { z } from 'zod'
 
+import { extractDocumentText } from '@/lib/document-text'
 import { consume } from '@/lib/rate-limit'
 
 import type { AnyCtx, RequestCtx } from '../core/ctx'
@@ -42,6 +43,7 @@ import {
 } from './loop'
 import {
   getProvider,
+  MODEL_READABLE_MIME,
   ProviderError,
   type ExtractFile,
   type MarbimProvider,
@@ -424,7 +426,7 @@ export async function runExtraction(
 
   try {
     const schema = resolvePendingSchema(job.moduleId, job.targetTable, job.zodSchemaKey)
-    const source = job.sourceText ?? ''
+    let source = job.sourceText ?? ''
 
     /*
      * No text means the file IS the document (plan: file-native intake). The bytes are
@@ -438,10 +440,34 @@ export async function runExtraction(
     if (!source.trim() && job.sourceDocumentId) {
       const { readDocumentBytes } = await import('@/modules/core/documents')
       const original = await readDocumentBytes(ctx, job.sourceDocumentId)
-      file = {
-        base64: Buffer.from(original.bytes).toString('base64'),
-        mimeType: original.mimeType,
-        filename: original.filename,
+
+      if (MODEL_READABLE_MIME.has(original.mimeType)) {
+        file = {
+          base64: Buffer.from(original.bytes).toString('base64'),
+          mimeType: original.mimeType,
+          filename: original.filename,
+        }
+      } else {
+        /*
+         * A Word document or a spreadsheet — which the model cannot read, and which this
+         * product accepted at upload and then did nothing with, in silence, until now.
+         *
+         * The text comes out here rather than at the door because the bytes are already
+         * being fetched tenant-scoped at this point, and because a conversion that failed
+         * during upload would have to be reported through a presign response that has no
+         * room to say anything useful. Extracted text is ordinary source text from here on:
+         * same extractor, same measured per-field confidence, same approve inbox.
+         */
+        const extracted = extractDocumentText(original.bytes, original.mimeType)
+        if (extracted === null) {
+          // `.doc` from 1997, a HEIC photo, a corrupt archive. Refused by name, so the
+          // person is told to paste the text rather than left waiting for a draft.
+          throw new AppError('validation_failed', 'marbim.errors.file_unreadable', {
+            mimeType: original.mimeType,
+            filename: original.filename,
+          })
+        }
+        source = extracted
       }
     }
 

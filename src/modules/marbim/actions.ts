@@ -8,6 +8,8 @@ import { env } from '@/lib/env'
 import { requireRole } from '@/modules/core/session'
 import { companyProfile, getPolicy } from '@/modules/settings/service'
 import { listModules } from '@/modules/core/registry'
+import { TEXT_EXTRACTABLE_MIME } from '@/lib/document-text'
+
 import { AppError } from '@/modules/core/errors'
 import type { AnyCtx } from '@/modules/core/ctx'
 import { buyerAccounts } from '@/modules/buyers/queries'
@@ -260,10 +262,14 @@ export async function readDocument(input: {
   /*
    * The one-of-them-is-readable gate, checked before any work is queued.
    *
-   * A file-only submission is only accepted when the extract model can actually read the
-   * type — checked against the document row, not the client's word, because the mime the
-   * server stored at upload is the one the worker will fetch. Refusing here beats a job
-   * that queues, runs, and fails where only the status list would ever say why.
+   * A file-only submission is only accepted when the file can actually be read — by the
+   * extract model directly (PDF, photographs) or by the server's own converter first
+   * (Word, Excel, CSV). Checked against the document row, not the client's word, because
+   * the mime the server stored at upload is the one the worker will fetch. Refusing here
+   * beats a job that queues, runs, and fails where only the status list would say why.
+   *
+   * The upload allowlist stays WIDER than this on purpose: a legacy `.doc` or a HEIC photo
+   * is worth keeping as evidence against a GRN even though nothing can draft from it.
    */
   const sourceText = input.sourceText?.trim() ? input.sourceText : undefined
   if (!sourceText) {
@@ -272,7 +278,7 @@ export async function readDocument(input: {
     }
     const { documentMeta } = await import('@/modules/core/documents')
     const meta = await documentMeta(ctx, input.documentId)
-    if (!MODEL_READABLE_MIME.has(meta.mimeType)) {
+    if (!MODEL_READABLE_MIME.has(meta.mimeType) && !TEXT_EXTRACTABLE_MIME.has(meta.mimeType)) {
       throw new AppError('validation_failed', 'marbim.errors.file_unreadable', {
         mimeType: meta.mimeType,
       })
