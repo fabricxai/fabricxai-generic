@@ -68,7 +68,7 @@ Legend: 🅗 high · 🅜 medium · S/M/L = hours / day / multi-day
 
 ## Phase 3 — Decisions required (do deliberately, not in passing)
 
-- [ ] **3.1 🅗 M Self-approval policy.** One person can draft and sign the same
+- [x] **3.1 🅗 M Self-approval policy.** `380fd5d` — the line is `registerAuditedTables` itself; solo-owner consequence stated in the commit. — One person can draft and sign the same
   single-approval change (also `HANDOVER-READINESS` DL-8). Proposed split: forbid
   approving your own draft on ⚖ tables (money, payroll, LCs, UD overrides), allow
   elsewhere so intake's review-your-own-upload flow survives. **Needs owner sign-off on
