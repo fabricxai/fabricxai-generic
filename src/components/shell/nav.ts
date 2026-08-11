@@ -183,9 +183,12 @@ export const NAV: readonly NavItem[] = [
     label: 'Your work',
     href: '/home',
     section: 'work',
-    // Owner / admin see every entry via ALL_ACCESS. Merchandiser is the other
-    // audience for the composed work feed; floor roles keep their existing landings.
-    roles: ['merchandiser'],
+    // Owner / admin see every entry via ALL_ACCESS. The four desks gained their own
+    // composition in adoption plan 2.2; floor roles keep their landing screens (1.1) and
+    // reach this from the sidebar. Cutting/production/maintenance stay off deliberately —
+    // their queue IS their landing screen, and a second, thinner copy of it here would be
+    // two places to check instead of one.
+    roles: ['merchandiser', 'store', 'quality', 'shipment', 'commercial'],
     // Compose-only: no writes originate here.
     writeRoles: [],
   },

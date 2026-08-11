@@ -84,3 +84,17 @@ describe('the fallbacks still hold', () => {
     expect(landingFor([], KNIT)).toBe('/settings')
   })
 })
+
+describe('the desks reach Your work from the sidebar (adoption plan 2.2)', () => {
+  it('offers /home to the four composed desks without changing their landing', async () => {
+    const { visibleNav } = await import('@/components/shell/nav')
+    for (const role of ['store', 'quality', 'shipment', 'commercial'] as const) {
+      expect(
+        visibleNav([role], KNIT).some((item) => item.id === 'home'),
+        role,
+      ).toBe(true)
+      // The landing stays the desk itself — Your work is a stop, not the front door.
+      expect(landingFor([role], KNIT)).not.toBe('/home')
+    }
+  })
+})

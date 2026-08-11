@@ -25,6 +25,7 @@ import {
   HOME_COPY,
   type WorkRow,
 } from './home-copy'
+import { deskCalmLinks, deskRoleFor, deskSections } from './desk-sections'
 import { HomeView, type HomeSection } from './home-view'
 
 /**
@@ -52,13 +53,16 @@ export default async function HomePage() {
   ])
   const locale = await requestLocale(profile?.locale)
 
-  const [drafts, buyersBoard, quotes, orders, pp] = await Promise.all([
-    inboxRows(ctx, { now, limit: 12 }, approvalsPolicy),
-    pipeline(ctx, { now, quietAfterDays: buyerPolicy.quietAfterDays }),
-    rfqBoard(ctx, { now }),
-    orderList(ctx, { now }),
-    ppBlockingAlerts(ctx, { today }, samplingPolicy),
-  ])
+  const drafts = await inboxRows(ctx, { now, limit: 12 }, approvalsPolicy)
+
+  /*
+   * Which composition this person gets (adoption plan 2.2). The office feed wins for
+   * anyone who has one — same precedence the landing uses — and the four desks that never
+   * had a composed queue get their own below, early-returned so a storekeeper's morning
+   * does not run the merchandising desk's four queries to render none of them.
+   */
+  const desk =
+    isOwnerView || ctx.roles.includes('merchandiser') ? null : deskRoleFor(ctx.roles)
 
   const draftCap = capRows(drafts)
   const sections: HomeSection[] = [
@@ -89,6 +93,19 @@ export default async function HomePage() {
       })),
     },
   ]
+
+  if (desk) {
+    sections.push(...(await deskSections(ctx, desk, today)))
+    const calm = sections.every((s) => s.rows.length === 0)
+    return <HomeView sections={sections} calm={calm} calmLinks={deskCalmLinks(desk)} />
+  }
+
+  const [buyersBoard, quotes, orders, pp] = await Promise.all([
+    pipeline(ctx, { now, quietAfterDays: buyerPolicy.quietAfterDays }),
+    rfqBoard(ctx, { now }),
+    orderList(ctx, { now }),
+    ppBlockingAlerts(ctx, { today }, samplingPolicy),
+  ])
 
   if (isOwnerView) {
     const analyticsPolicy = await getPolicy<AnalyticsPolicy>(ctx, 'analytics')
