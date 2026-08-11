@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react'
 
+import { useT } from '@/components/fx/locale'
+import { requestMarbimOpen } from './marbim-open'
 import { OUTCOME_EVENT, type OutcomeDetail, type OutcomeKind } from '@/lib/notify'
 
 interface Shown extends OutcomeDetail {
@@ -22,6 +24,7 @@ const TONE: Record<OutcomeKind, { border: string; mark: string; label: string }>
  * and the person mid-task needs the answer to "did that happen?" where their eye is.
  */
 export function OutcomeToasts() {
+  const t = useT()
   const [shown, setShown] = useState<Shown[]>([])
   const nextId = useRef(1)
   const lastMessage = useRef<{ message: string; at: number }>({ message: '', at: 0 })
@@ -97,12 +100,40 @@ export function OutcomeToasts() {
             </span>
             <span
               style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 5,
                 font: "400 13px/1.45 var(--fx-font-sans)",
                 color: 'var(--fx-text-primary)',
                 overflowWrap: 'anywhere',
               }}
             >
               {toast.message}
+              {/* A person who was just refused is the most motivated learner in the
+                  building (adoption plan 1.4). The gate's sentence rides into the
+                  composer as context; MARBIM explains the rule it enforces. */}
+              {toast.kind === 'refused' ? (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    requestMarbimOpen(`${t('ui.marbim.ask_why_prefix')} "${toast.message}" — `)
+                  }}
+                  style={{
+                    alignSelf: 'flex-start',
+                    font: "500 12px/1.2 var(--fx-font-sans)",
+                    color: 'var(--fx-accent-pressed)',
+                    background: 'transparent',
+                    border: 'none',
+                    padding: 0,
+                    cursor: 'pointer',
+                    textDecoration: 'underline',
+                    textUnderlineOffset: 3,
+                  }}
+                >
+                  {t('ui.marbim.ask_why')}
+                </button>
+              ) : null}
             </span>
           </div>
         )

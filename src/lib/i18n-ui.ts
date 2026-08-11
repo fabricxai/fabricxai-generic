@@ -66,6 +66,8 @@ export const UI_MESSAGES: Catalogue = {
        instruction: a browser's own date field asks in whatever order its locale prefers,
        which is how 5 December was entered and stored as 12 May (live test, Phase 3). */
     'ui.marbim.ask_about_row': 'Ask MARBIM about {code}',
+    'ui.marbim.ask_why': 'Ask MARBIM why',
+    'ui.marbim.ask_why_prefix': 'I was refused with:',
     /* Screen-scoped MARBIM prompt chips (adoption plan 1.2). One set per first path
        segment; every chip is answerable by a tool that exists — a chip that yields
        "no tool ran" teaches people the assistant is decorative. */
@@ -1306,6 +1308,8 @@ export const UI_MESSAGES: Catalogue = {
     'ui.common.read_only_body':
       'আপনার রোল {what} পড়তে পারে, বদলাতে পারে না। দরকার হলে ওনার বা অ্যাডমিনকে বলুন।',
 'ui.marbim.ask_about_row': 'MARBIM-কে {code} সম্পর্কে জিজ্ঞেস করুন',
+    'ui.marbim.ask_why': 'MARBIM-কে কারণ জিজ্ঞেস করুন',
+    'ui.marbim.ask_why_prefix': 'আমাকে এই বলে আটকানো হয়েছে:',
         'ui.marbim.chips.buyers.1': 'কোন লিডগুলো চুপচাপ হয়ে গেছে?',
     'ui.marbim.chips.buyers.2': 'এই মুহূর্তে কোন বায়ারদের খোলা অর্ডার আছে?',
     'ui.marbim.chips.buyers.3': 'পাইপলাইনের অবস্থা ধাপে ধাপে কেমন?',
