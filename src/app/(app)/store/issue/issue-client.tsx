@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { InlineAlert } from '@/components/fx/feedback'
 import { SyncPill } from '@/components/fx/floor'
@@ -9,6 +9,7 @@ import { Badge, Button } from '@/components/fx/primitives'
 import { SectionHeading } from '@/components/fx/signature'
 import { Ident } from '@/components/fx/format'
 import { useOfflineQueue } from '@/lib/offline/use-offline-queue'
+import { udBalancePreview } from '@/modules/commercial/actions'
 import type { OutstandingLine, RollRow } from '@/modules/store/queries'
 
 /**
@@ -90,6 +91,37 @@ export function IssueClient({
   const mixingShades = pickedRolls.length > 0 && shadeGroups.length > 1
   const overFree = issuing > available
   const bonded = pickedRolls.some((roll) => roll.locationKind === 'bonded')
+
+  /*
+   * The declaration's remaining balance, shown BEFORE the gate refuses (adoption plan 2.3).
+   * `checkUdBalance` existed for exactly this and nothing called it — the storekeeper met
+   * the balance only as a refusal. Advisory: the draw re-checks under a lock, and two
+   * pickers can both be told yes; only the draw's answer counts.
+   */
+  const pickedUdIds = useMemo(
+    () => [...new Set(pickedRolls.map((roll) => roll.udId).filter((id): id is string => !!id))],
+    [pickedRolls],
+  )
+  const [udBalances, setUdBalances] = useState<
+    Record<string, { udNumber: string; items: { itemRef: string; unit: string; free: string }[] }>
+  >({})
+  useEffect(() => {
+    let cancelled = false
+    for (const udId of pickedUdIds) {
+      if (udBalances[udId]) continue
+      void udBalancePreview({ udId })
+        .then((balance) => {
+          if (!cancelled) setUdBalances((current) => ({ ...current, [udId]: balance }))
+        })
+        .catch(() => {
+          /* the preview is a courtesy; the gate still decides */
+        })
+    }
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- udBalances is a cache this effect fills
+  }, [pickedUdIds])
 
   function toggle(rollId: string) {
     setPicked((current) => {
@@ -308,7 +340,21 @@ export function IssueClient({
           ) : null}
 
           {bonded ? (
-            <InlineAlert tone="info">{t('ui.store.issue_bonded_note')}</InlineAlert>
+            <InlineAlert tone="info">
+              {t('ui.store.issue_bonded_note')}
+              {pickedUdIds.map((udId) => {
+                const balance = udBalances[udId]
+                if (!balance) return null
+                return (
+                  <span key={udId} style={{ display: 'block', marginTop: 4 }}>
+                    <Ident>{balance.udNumber}</Ident>{' '}
+                    {balance.items
+                      .map((item) => `${item.itemRef}: ${item.free} ${item.unit}`)
+                      .join(' · ')}
+                  </span>
+                )
+              })}
+            </InlineAlert>
           ) : null}
 
           {/* ── Pick rolls, grouped by shade ────────────────────────────── */}

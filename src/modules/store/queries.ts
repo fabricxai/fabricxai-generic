@@ -186,6 +186,9 @@ export interface RollRow {
   locationKind: string
   receivedAt: string
   challanNo: string
+  /** The declaration this roll's GRN named, when bonded — what the balance preview asks
+      about (adoption plan 2.3). Null for general stock. */
+  udId: string | null
 }
 
 export async function rollsForItem(ctx: AnyCtx, itemId: string): Promise<RollRow[]> {
@@ -204,6 +207,7 @@ export async function rollsForItem(ctx: AnyCtx, itemId: string): Promise<RollRow
         locationKind: locations.kind,
         receivedAt: grns.receivedAt,
         challanNo: grns.challanNo,
+        udId: grns.udId,
       })
       .from(rolls)
       .innerJoin(locations, eq(locations.id, rolls.locationId))

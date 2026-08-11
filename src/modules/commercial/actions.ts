@@ -11,6 +11,7 @@ import { getPolicy } from '@/modules/settings/service'
 import {
   amendLc,
   checkUdBalance,
+  getUdBalance,
   createLc as createLcIn,
   createUd as createUdIn,
   linkOrder as linkOrderIn,
@@ -177,6 +178,34 @@ export async function checkUdDraw(input: {
 }): Promise<UdDrawDecision> {
   const ctx = await requireRole(await headers(), 'store', 'commercial', 'compliance')
   return checkUdBalance(ctx, input)
+}
+
+/**
+ * The whole declaration's balance, for the issue screen's preview (adoption plan 2.3).
+ *
+ * Deliberately the WHOLE ledger and not `checkUdBalance` for the one item: the check needs
+ * the declaration's own item vocabulary, and the client only holds the store's ("FAB-DEN-12"
+ * vs "12oz stretch denim" — runbook #22's alias lesson). A preview that answered "not
+ * authorized" because the two vocabularies differ would teach the floor the preview lies.
+ * Showing every item's free balance lets the person read the row that is theirs.
+ *
+ * Advisory, like `checkUdDraw` above: the draw re-checks under a lock, and only that
+ * decision counts.
+ */
+export async function udBalancePreview(input: { udId: string }): Promise<{
+  udNumber: string
+  items: { itemRef: string; unit: string; free: string }[]
+}> {
+  const ctx = await requireRole(await headers(), 'store', 'commercial', 'compliance')
+  const balance = await getUdBalance(ctx, input.udId)
+  return {
+    udNumber: balance.udNumber,
+    items: balance.items.map((item) => ({
+      itemRef: item.itemRef,
+      unit: item.unit ?? '',
+      free: item.free ?? '0',
+    })),
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
