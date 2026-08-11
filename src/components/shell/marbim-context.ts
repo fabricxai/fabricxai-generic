@@ -45,6 +45,43 @@ const SUGGESTIONS: Record<string, readonly string[]> = {
   ],
 }
 
+/**
+ * Screen-scoped chips (adoption plan 1.2), keyed by first path segment.
+ *
+ * The role sets above answer "who are you"; these answer "where are you standing" — the
+ * question a person on the receiving bay actually has is about the shelf in front of them,
+ * not about their job title. Every chip is a question a REGISTERED tool can answer
+ * (`quality.pre_final_readiness`, `store.outstanding_requisitions`, `commercial.check_ud_draw`…)
+ * — a chip that ends in "no tool was run" teaches the floor the assistant is decorative,
+ * and the second bad experience ends the habit.
+ *
+ * Keys, not strings: the floor reads Bangla, and the catalogue is where both languages are
+ * enforced to exist. Segments without a set fall back to the role suggestions above.
+ */
+const SCREEN_CHIP_KEYS: Record<string, readonly [string, string, string]> = Object.fromEntries(
+  (
+    [
+      'orders', 'buyers', 'rfq', 'costing', 'sampling', 'lcs', 'ud', 'finance',
+      'procurement', 'planning', 'store', 'cutting', 'lines', 'quality', 'shipment',
+      'maintenance', 'workforce', 'compliance',
+    ] as const
+  ).map((segment) => [
+    segment,
+    [
+      `ui.marbim.chips.${segment}.1`,
+      `ui.marbim.chips.${segment}.2`,
+      `ui.marbim.chips.${segment}.3`,
+    ],
+  ]),
+)
+
+/** The chips for a screen, translated — or null when the segment has no set. */
+export function screenSuggestionsFor(pathname: string, words: Words): readonly string[] | null {
+  const segment = pathname.split('/').filter(Boolean)[0]
+  const keys = segment ? SCREEN_CHIP_KEYS[segment] : undefined
+  return keys ? keys.map((key) => words(key)) : null
+}
+
 const READ_ONLY_ROLES = new Set(['viewer', 'member'])
 
 /**
@@ -71,12 +108,18 @@ export interface MarbimEntry {
   model?: string | null
 }
 
-export function marbimEntryFor(roles: readonly string[]): MarbimEntry {
+export function marbimEntryFor(
+  roles: readonly string[],
+  /** Where the panel was opened. With `words`, the screen's own chips win over the role's. */
+  screen?: { pathname: string; words: Words },
+): MarbimEntry {
   const lead = ROLE_PRECEDENCE.find((r) => roles.includes(r)) ?? 'viewer'
   const readOnly = roles.length > 0 && roles.every((r) => READ_ONLY_ROLES.has(r))
 
+  const scoped = screen ? screenSuggestionsFor(screen.pathname, screen.words) : null
+
   return {
-    suggestions: SUGGESTIONS[lead] ?? SUGGESTIONS.viewer!,
+    suggestions: scoped ?? SUGGESTIONS[lead] ?? SUGGESTIONS.viewer!,
     packLabel: readOnly ? 'answers only · no draft tools' : `${lead} pack`,
     readOnly,
   }

@@ -149,7 +149,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             the shell so the thread survives navigation. */}
         {marbimEnabled ? (
           <MarbimPanel
-            entry={{ ...marbimEntryFor(ctx.roles), model: providerSurfaceLabel() }}
+            entry={{
+              // The screen's own chips win over the role's: the question a person on the
+              // receiving bay has is about the shelf in front of them, not their job title.
+              ...marbimEntryFor(ctx.roles, {
+                pathname,
+                words: (key, params) => tui(locale, key, params),
+              }),
+              model: providerSurfaceLabel(),
+            }}
             trust={{ ...trust, pending: routed }}
           />
         ) : null}
