@@ -314,6 +314,7 @@ export const MESSAGES: Catalogue = {
     'errors.confidence_out_of_range': 'A confidence must be between 0 and 1.',
     /* No placeholders: AppError.details do not survive a server action, and the reference
        the person typed is in the question they just asked. */
+    'approvals.errors.rule_not_found': 'That routing rule no longer exists, or was already retired.',
     'errors.self_approval':
       'You raised this draft, and this table needs a second pair of hands — a record a bank or an auditor will ask about cannot be signed into existence by its own author. Ask another approver to decide it.',
     'errors.reference_empty': 'That lookup needs something to look up — a code or an id.',
@@ -697,7 +698,8 @@ export const MESSAGES: Catalogue = {
     'commercial.notifications.lc_countdown_expiry.title':
       'LC {lcNumber}: মেয়াদ শেষের ({date}) বাকি {daysLeft} দিন',
     'commercial.errors.order_not_found': 'সেই অর্ডারটি আর নেই, তাই ক্রেডিট এটি কভার করতে পারবে না।',
-'errors.self_approval':
+    'approvals.errors.rule_not_found': 'এই রাউটিং নিয়মটি আর নেই, বা আগেই বাতিল হয়েছে।',
+    'errors.self_approval':
       'এই ড্রাফট আপনিই তুলেছেন, আর এই টেবিলে দ্বিতীয় একজনের সই লাগে — ব্যাংক বা অডিটর যে রেকর্ড দেখতে চাইবে, তা লেখক নিজে সই করে চালু করতে পারেন না। অন্য একজন অনুমোদনকারীকে সিদ্ধান্ত নিতে বলুন।',
         'errors.reference_empty': 'কী খুঁজতে হবে সেটাই দেওয়া হয়নি — একটি কোড বা আইডি লাগবে।',
     'errors.reference_kind_unknown':

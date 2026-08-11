@@ -608,3 +608,44 @@ export async function upsertApprovalRule(
 export function hoursBetween(from: Date, to: Date): number {
   return Math.floor((to.getTime() - from.getTime()) / 3_600_000)
 }
+
+/**
+ * Retire a rule, falling back to whatever governs beneath it — a narrower rule, or the
+ * module's registered defaults. Owner-only and audited for the same reason the upsert is:
+ * `approval_rules` decides who may approve what, and a silent change here rewrites every
+ * other module's controls (adoption plan 3.2 — the door the upsert never had).
+ */
+export async function deactivateApprovalRule(
+  ctx: RequestCtx,
+  input: { ruleId: string },
+): Promise<{ ruleId: string }> {
+  if (!ctx.roles.includes('owner')) {
+    throw new AppError('forbidden', 'approvals.errors.rules_are_owner_only', { roles: ctx.roles })
+  }
+
+  return withTenantTx(ctx, async (tx) => {
+    const [rule] = await tx
+      .select()
+      .from(approvalRules)
+      .where(scoped(approvalRules, ctx, eq(approvalRules.id, input.ruleId)))
+      .for('update')
+    if (!rule || !rule.isActive) {
+      throw notFound('approvals.errors.rule_not_found', { ruleId: input.ruleId })
+    }
+
+    await tx
+      .update(approvalRules)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(scoped(approvalRules, ctx, eq(approvalRules.id, rule.id)))
+
+    await recordChange(ctx, tx, {
+      action: 'update',
+      targetTable: 'approval_rules',
+      targetId: rule.id,
+      before: { moduleId: rule.moduleId, targetTable: rule.targetTable, operation: rule.operation, isActive: true },
+      after: { isActive: false },
+    })
+
+    return { ruleId: rule.id }
+  })
+}

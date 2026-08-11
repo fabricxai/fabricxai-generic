@@ -62,7 +62,7 @@ const FILES = tree('src').concat(
  * the very row it was checking. A document mentioning a function is not a call to it — the
  * same distinction as a comment mentioning one.
  */
-const SOURCE = FILES.filter((file) => file.startsWith('src/') && /\.tsx?$/.test(file))
+const _SOURCE = FILES.filter((file) => file.startsWith('src/') && /\.tsx?$/.test(file))
 
 /**
  * Backticked things that look like a source file.
@@ -169,19 +169,6 @@ const ABSENCE_CLAIMS: readonly {
   stillTrue: () => boolean
   tracker: string
 }[] = [
-  {
-    claim: '`upsertApprovalRule` has no caller — approval rules can only be set by seeding',
-    tracker: 'docs/STUBS.md',
-    stillTrue: () => {
-      const callers = SOURCE.filter(
-        (file) =>
-          !file.includes('__tests__') &&
-          !file.endsWith('approvals/service.ts') &&
-          withoutComments(file).includes('upsertApprovalRule'),
-      )
-      return callers.length === 0
-    },
-  },
   {
     claim: 'settings has no `queries.ts`, so its pages read `service.ts` directly (BE-M6)',
     tracker: 'docs/STUBS.md',

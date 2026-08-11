@@ -42,7 +42,7 @@ import { AppError } from '@/modules/core/errors'
 import { approve } from '@/modules/core/pending-changes'
 import { registerModule } from '@/modules/core/registry'
 
-import { draftDetail, inboxRows, marbimTrust } from '../queries'
+import { draftDetail, inboxRows, listApprovalRules, marbimTrust } from '../queries'
 import {
   agingDrafts,
   approversFor,
@@ -51,6 +51,7 @@ import {
   emitAgingEscalations,
   inbox,
   inboxCounts,
+  deactivateApprovalRule,
   upsertApprovalRule,
 } from '../service'
 
@@ -680,5 +681,51 @@ describe('the weakest field, not the average', () => {
 
     const [item] = await inbox(ownerCtx, { now: NOW }, POLICY)
     expect(item?.weakestConfidence).toBeNull()
+  })
+})
+
+describe('the owner tunes the routing (adoption plan 3.2)', () => {
+  it('lists a rule it just wrote, active only', async () => {
+    await upsertApprovalRule(ownerCtx, {
+      moduleId: MODULE,
+      requiredRoles: ['commercial'],
+    })
+
+    const rules = await listApprovalRules(ownerCtx)
+    const mine = rules.filter((r) => r.moduleId === MODULE)
+    expect(mine).toHaveLength(1)
+    expect(mine[0]!.requiredRoles).toEqual(['commercial'])
+  })
+
+  it('retires a rule, and the list stops showing it', async () => {
+    const { ruleId } = await upsertApprovalRule(ownerCtx, {
+      moduleId: `${MODULE}_temp`,
+      requiredRoles: ['commercial'],
+    })
+
+    await deactivateApprovalRule(ownerCtx, { ruleId })
+
+    const rules = await listApprovalRules(ownerCtx)
+    expect(rules.some((r) => r.id === ruleId)).toBe(false)
+  })
+
+  it('refuses a non-owner at both doors', async () => {
+    const { ruleId } = await upsertApprovalRule(ownerCtx, {
+      moduleId: `${MODULE}_guard`,
+      requiredRoles: ['commercial'],
+    })
+
+    await expect(
+      upsertApprovalRule(commCtx, { moduleId: MODULE, requiredRoles: ['commercial'] }),
+    ).rejects.toThrow(/rules_are_owner_only/)
+    await expect(deactivateApprovalRule(commCtx, { ruleId })).rejects.toThrow(
+      /rules_are_owner_only/,
+    )
+  })
+
+  it('refuses to retire a rule that is already gone', async () => {
+    await expect(
+      deactivateApprovalRule(ownerCtx, { ruleId: '00000000-0000-4000-8000-000000000000' }),
+    ).rejects.toThrow(/rule_not_found/)
   })
 })

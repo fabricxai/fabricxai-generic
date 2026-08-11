@@ -11,7 +11,7 @@
 import { and, desc, eq, gte, inArray } from 'drizzle-orm'
 import { z } from 'zod'
 
-import { pendingChangeApprovals, pendingChanges, users } from '@/db/schema/core'
+import { approvalRules, pendingChangeApprovals, pendingChanges, users } from '@/db/schema/core'
 import type { AnyCtx, RequestCtx } from '@/modules/core/ctx'
 import { readJsonbObject } from '@/modules/core/jsonb'
 import { scoped } from '@/modules/core/scoped'
@@ -492,5 +492,44 @@ export async function myRaisedDrafts(ctx: RequestCtx, limit = 8): Promise<Raised
       .where(scoped(pendingChanges, ctx, eq(pendingChanges.createdBy, ctx.userId)))
       .orderBy(desc(pendingChanges.createdAt))
       .limit(limit),
+  )
+}
+
+export interface ApprovalRuleRow {
+  id: string
+  moduleId: string
+  targetTable: string | null
+  operation: string | null
+  requiredRoles: string[]
+  approvalsRequired: number
+  autoApprove: boolean
+  minConfidence: string | null
+  priority: number
+}
+
+/**
+ * The active routing rules, for the Settings surface (adoption plan 3.2).
+ *
+ * Active only: a superseded rule is history, and the audit trail is where history lives.
+ * Ordered the way an owner reads the question — by module, then the narrower scope first,
+ * so "orders / order_breakdowns" sits under "orders / whole module" rather than shuffled.
+ */
+export async function listApprovalRules(ctx: RequestCtx): Promise<ApprovalRuleRow[]> {
+  return withTenantRead(ctx, (tx) =>
+    tx
+      .select({
+        id: approvalRules.id,
+        moduleId: approvalRules.moduleId,
+        targetTable: approvalRules.targetTable,
+        operation: approvalRules.operation,
+        requiredRoles: approvalRules.requiredRoles,
+        approvalsRequired: approvalRules.approvalsRequired,
+        autoApprove: approvalRules.autoApprove,
+        minConfidence: approvalRules.minConfidence,
+        priority: approvalRules.priority,
+      })
+      .from(approvalRules)
+      .where(scoped(approvalRules, ctx, eq(approvalRules.isActive, true)))
+      .orderBy(approvalRules.moduleId, approvalRules.targetTable, approvalRules.operation),
   )
 }

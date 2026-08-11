@@ -6,6 +6,8 @@ import { SectionHeading } from '@/components/fx/signature'
 import { PageHeader } from '@/components/shell/page-shell'
 import { getCtx } from '@/modules/core/session'
 import { auditTrail, auditedTables, companyProfile, listPolicies, roleMatrix } from '@/modules/settings/service'
+import { listApprovalRules } from '@/modules/approvals/queries'
+import { ApprovalRules } from './approval-rules'
 
 import { AuditViewer } from './audit-viewer'
 import { PolicySection } from './policy-section'
@@ -27,10 +29,11 @@ export default async function SettingsPage() {
 
   const canEdit = ctx.roles.includes('owner') || ctx.roles.includes('admin')
 
-  const [profile, policies, matrix] = await Promise.all([
+  const [profile, policies, matrix, approvalRuleRows] = await Promise.all([
     companyProfile(ctx),
     listPolicies(ctx),
     roleMatrix(ctx),
+    listApprovalRules(ctx),
   ])
 
   // The trail names who did what, so it is owner and admin only — a screen showing
@@ -172,6 +175,11 @@ export default async function SettingsPage() {
               </div>
             ))}
           </div>
+        </section>
+
+        <section>
+          <SectionHeading eyebrow="who signs which drafts">Approval routing</SectionHeading>
+          <ApprovalRules rules={approvalRuleRows} canEdit={ctx.roles.includes('owner')} />
         </section>
 
         {canEdit ? (

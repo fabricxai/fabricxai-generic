@@ -11,7 +11,9 @@ import {
   type ApproveResult,
 } from '@/modules/core/pending-changes'
 import { surfaced, type ActionFailure } from '@/lib/action-failure'
+import type { Role } from '@/modules/core/ctx'
 import { requireRole } from '@/modules/core/session'
+import { deactivateApprovalRule, upsertApprovalRule } from './service'
 
 import { draftDetail, draftTarget, recordTrail, type DraftDetail, type RecordTrail } from './queries'
 
@@ -150,4 +152,49 @@ export async function committedTrail(input: z.input<typeof trailInput>): Promise
   const { targetTable, targetId } = trailInput.parse(input)
 
   return recordTrail(ctx, { targetTable, targetId })
+}
+
+/**
+ * The routing rules an owner may tune (adoption plan 3.2).
+ *
+ * Owner-only, and surfaced: the service refuses a non-owner with a sentence, and
+ * `approval_rules` deciding who signs what means a refusal here has to be readable rather
+ * than a masked #441. NO `condition` field anywhere — `pickRule` matches on module, target
+ * and operation only, and a form offering a condition the engine ignores is the day-0
+ * script's own recorded trap (a rule that looks like a gate and is not one).
+ */
+const ruleInput = z.object({
+  moduleId: z.string().min(1),
+  targetTable: z.string().min(1).optional(),
+  operation: z.enum(['insert', 'update', 'delete']).optional(),
+  requiredRoles: z.array(z.string().min(1)).min(1),
+  approvalsRequired: z.number().int().min(1).max(5).optional(),
+  priority: z.number().int().optional(),
+})
+
+export async function setApprovalRule(
+  input: z.input<typeof ruleInput>,
+): Promise<{ ruleId: string } | ActionFailure> {
+  return surfaced(async () => {
+    const ctx = await requireRole(await headers(), 'owner')
+    const parsed = ruleInput.parse(input)
+    const { ruleId } = await upsertApprovalRule(ctx, {
+      ...parsed,
+      requiredRoles: parsed.requiredRoles as Role[],
+    })
+    revalidatePath('/settings')
+    return { ruleId }
+  })
+}
+
+export async function removeApprovalRule(
+  input: { ruleId: string },
+): Promise<{ ruleId: string } | ActionFailure> {
+  return surfaced(async () => {
+    const ctx = await requireRole(await headers(), 'owner')
+    const parsed = z.object({ ruleId: z.string().uuid() }).parse(input)
+    const result = await deactivateApprovalRule(ctx, parsed)
+    revalidatePath('/settings')
+    return result
+  })
 }
