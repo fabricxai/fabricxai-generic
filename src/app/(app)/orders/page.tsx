@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import { Badge } from '@/components/fx/primitives'
 import { EmptyState } from '@/components/fx/feedback'
 import { Ident } from '@/components/fx/format'
+import { milestoneLabel } from '@/components/fx/tna'
 import { StatusLabel } from '@/components/fx/signature'
 import { AskAboutRow } from '@/components/shell/ask-about-row'
 import { PageHeader } from '@/components/shell/page-shell'
@@ -14,6 +15,7 @@ import { getCtx } from '@/modules/core/session'
 import { buyerAccounts } from '@/modules/buyers/queries'
 import { companyProfile } from '@/modules/settings/service'
 import { orderList, type OrderHealth } from '@/modules/orders/queries'
+import { requestLocale } from '@/lib/ui-locale'
 
 import { NewOrderButton } from './new-order'
 
@@ -44,6 +46,7 @@ export default async function OrdersPage() {
   const ctx = await getCtx(await headers())
   if (!ctx) redirect('/login')
 
+  const locale = await requestLocale()
   const rows = await orderList(ctx, { now: new Date() })
   const late = rows.filter((r) => r.health === 'late').length
   const risk = rows.filter((r) => r.health === 'risk').length
@@ -253,7 +256,7 @@ export default async function OrdersPage() {
                         color: 'var(--fx-text-tertiary)',
                       }}
                     >
-                      {row.headline}
+                      {milestoneLabel(row.headline, locale)}
                     </span>
                   ) : (
                     <Badge>{row.status}</Badge>

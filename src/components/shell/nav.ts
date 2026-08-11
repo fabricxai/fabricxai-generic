@@ -452,6 +452,27 @@ export const NAV: readonly NavItem[] = [
     writeRoles: [],
   },
   {
+    /**
+     * Factory setup — the four master lists (day-one finding D1).
+     *
+     * Items, locations, lines and workers had no creation door anywhere in the product, so
+     * a factory that signed up this morning could not receive its first delivery, register
+     * its first worker, or put a line on the board. It sits in `system` next to Settings
+     * because it is the same kind of act — telling the system what this factory is — and
+     * above it in the list because nothing else works until it is done.
+     *
+     * Read by anyone whose desk depends on these lists, so a storekeeper looking at an
+     * empty item dropdown can see WHERE items come from. Writing is enforced per door in
+     * the services: store+procurement for items, hr for the roster, planner for lines.
+     */
+    id: 'setup',
+    label: 'Factory setup',
+    href: '/setup',
+    section: 'system',
+    roles: ['owner', 'admin', 'store', 'procurement', 'planner', 'hr', 'production'],
+    writeRoles: ['owner', 'admin', 'store', 'procurement', 'planner', 'hr'],
+  },
+  {
     id: 'settings',
     label: 'Settings',
     href: '/settings',

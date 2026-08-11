@@ -16,6 +16,45 @@ export const decimal = (max = 8) =>
 
 export const pct = z.string().regex(/^\d{1,3}(\.\d{1,2})?$/, 'expected a percentage')
 
+/**
+ * The factory's own shape: a unit, its floors, and the sewing lines on them.
+ *
+ * None of the three could be created. `lines` was read by the planning board, the hourly
+ * tracker, the day plan and the capacity arithmetic, and written only by the seed — so a
+ * factory that opened a new line could not put it in the system, and a factory that had
+ * never been seeded had no board at all.
+ *
+ * A line belongs to a floor and a floor to a unit, so the three go in together: asking a
+ * planner to create a unit, then a floor, then a line through three separate forms is how
+ * the first one gets abandoned.
+ */
+export const factoryUnitPayload = z.object({
+  code: z.string().min(1).max(40),
+  name: z.string().min(1).max(200),
+})
+
+export const floorPayload = z.object({
+  code: z.string().min(1).max(40),
+  name: z.string().min(1).max(200),
+  /** Either an existing unit, or the code of one to create alongside it. */
+  factoryUnitId: z.uuid().optional(),
+  factoryUnit: factoryUnitPayload.optional(),
+}).refine((f) => Boolean(f.factoryUnitId) || Boolean(f.factoryUnit), {
+  message: 'a floor belongs to a factory unit — name an existing one or describe a new one',
+  path: ['factoryUnitId'],
+})
+
+export const linePayload = z.object({
+  code: z.string().min(1).max(40),
+  name: z.string().min(1).max(200),
+  /** Nominal head count. The day plan carries what is actually rostered. */
+  capacityManpower: z.number().int().positive().optional(),
+  machinesCount: z.number().int().positive().optional(),
+  floorId: z.uuid().optional(),
+  floor: floorPayload.optional(),
+  isActive: z.boolean().default(true),
+})
+
 export const smvRecordPayload = z.object({
   styleCode: z.string().min(1),
   smv: decimal(6),

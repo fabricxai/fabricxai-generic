@@ -37,13 +37,20 @@ import {
 import { PLANNING_EVENTS } from './events'
 import {
   allocations,
+  factoryUnits,
+  floors,
   learningCurves,
   lineCalendars,
   lines,
   scenarios,
   smvRecords,
 } from './schema'
-import { allocationPayload, smvRecordPayload, type AllocationPayload } from './zod'
+import {
+  allocationPayload,
+  linePayload,
+  smvRecordPayload,
+  type AllocationPayload,
+} from './zod'
 
 /** ⚖ — an allocation is what the factory has promised its capacity to. */
 registerAuditedTables('allocations', 'smv_records')
@@ -112,6 +119,90 @@ export async function recordSmv(
   input: unknown,
 ): Promise<{ smvRecordId: string }> {
   return withTenantTx(ctx, (tx) => recordSmvIn(ctx, tx, input))
+}
+
+/**
+ * Create or update a sewing line, creating its floor and unit on the way if they are new.
+ *
+ * The whole chain in one call, because it is one thing a planner is doing: putting a line
+ * on the board. Three separate forms — unit, then floor, then line — is three chances to
+ * stop, and the day-one walkthrough found nobody could complete even the first.
+ *
+ * Codes are upserted, so re-submitting the same unit or floor attaches to it rather than
+ * colliding on an index the planner cannot see.
+ */
+export async function upsertLine(
+  ctx: RequestCtx,
+  input: unknown,
+): Promise<{ lineId: string; floorId: string; created: boolean }> {
+  const payload = linePayload.parse(input)
+
+  return withTenantTx(ctx, async (tx) => {
+    let floorId = payload.floorId ?? null
+
+    if (!floorId) {
+      const floor = payload.floor
+      if (!floor) {
+        throw new AppError('validation_failed', 'planning.errors.line_needs_floor', {
+          code: payload.code,
+        })
+      }
+
+      let unitId = floor.factoryUnitId ?? null
+      if (!unitId) {
+        const [unit] = await tx
+          .insert(factoryUnits)
+          .values({ companyId: ctx.companyId, code: floor.factoryUnit!.code, name: floor.factoryUnit!.name })
+          .onConflictDoUpdate({
+            target: [factoryUnits.companyId, factoryUnits.code],
+            set: { name: floor.factoryUnit!.name },
+          })
+          .returning({ id: factoryUnits.id })
+        unitId = unit!.id
+      }
+
+      const [row] = await tx
+        .insert(floors)
+        .values({ companyId: ctx.companyId, factoryUnitId: unitId, code: floor.code, name: floor.name })
+        .onConflictDoUpdate({
+          target: [floors.companyId, floors.code],
+          set: { name: floor.name, factoryUnitId: unitId },
+        })
+        .returning({ id: floors.id })
+      floorId = row!.id
+    }
+
+    const [before] = await tx
+      .select({ id: lines.id })
+      .from(lines)
+      .where(scoped(lines, ctx, eq(lines.code, payload.code)))
+
+    const [row] = await tx
+      .insert(lines)
+      .values({
+        companyId: ctx.companyId,
+        code: payload.code,
+        name: payload.name,
+        capacityManpower: payload.capacityManpower ?? null,
+        machinesCount: payload.machinesCount ?? null,
+        floorId,
+        isActive: payload.isActive,
+      })
+      .onConflictDoUpdate({
+        target: [lines.companyId, lines.code],
+        set: {
+          name: payload.name,
+          capacityManpower: payload.capacityManpower ?? null,
+          machinesCount: payload.machinesCount ?? null,
+          floorId,
+          isActive: payload.isActive,
+        },
+      })
+      .returning({ id: lines.id })
+
+    if (!row) throw new Error('lines upsert returned nothing')
+    return { lineId: row.id, floorId, created: !before }
+  })
 }
 
 /**

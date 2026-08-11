@@ -53,9 +53,11 @@ function fmt(date: string | null): string {
  * falls back to the key rather than to an empty cell — a missing translation
  * should look like one.
  */
-function label(name: string, locale: Locale): string {
+export function milestoneLabel(name: string, locale: Locale): string {
   return t(locale, `orders.milestones.${name}`)
 }
+
+const label = milestoneLabel
 
 export function MilestoneTimeline({
   milestones,

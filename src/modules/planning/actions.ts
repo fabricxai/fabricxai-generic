@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { headers } from 'next/headers'
 
+import { surfaced, type ActionFailure } from '@/lib/action-failure'
 import { requireRole } from '@/modules/core/session'
 import { getPolicy } from '@/modules/settings/service'
 
@@ -14,6 +15,7 @@ import {
   proposeScenarioApply as proposeScenarioApplyIn,
   recordSmv as recordSmvIn,
   setAllocationStatus as setAllocationStatusIn,
+  upsertLine,
   type AllocateResult,
   type AllocationStatus,
   type PlanningPolicy,
@@ -50,6 +52,31 @@ function refresh(): void {
   // The line board and the order desk both read what is committed to a line.
   revalidatePath('/lines')
   revalidatePath('/orders')
+}
+
+/**
+ * Put a sewing line on the board — creating its floor and factory unit if they are new.
+ *
+ * `lines` was read by five screens and written by the seed alone, so a factory that opened
+ * a new line could not record it and a factory that had never been seeded had no board at
+ * all. Owner and admin as well as planner, because this is also the day-one act of drawing
+ * the factory's own shape.
+ */
+export async function saveLine(input: {
+  code: string
+  name: string
+  capacityManpower?: number
+  machinesCount?: number
+  floorId?: string
+  floor?: { code: string; name: string; factoryUnitId?: string; factoryUnit?: { code: string; name: string } }
+  isActive?: boolean
+}): Promise<{ lineId: string; floorId: string; created: boolean } | ActionFailure> {
+  const ctx = await requireRole(await headers(), ...WRITERS, 'owner', 'admin')
+  return surfaced(async () => {
+    const result = await upsertLine(ctx, input)
+    refresh()
+    return result
+  })
 }
 
 /**

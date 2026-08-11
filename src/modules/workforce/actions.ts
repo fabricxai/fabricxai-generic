@@ -12,6 +12,7 @@ import {
   computePayrollRun,
   importDeviceAttendance,
   uploadGazette,
+  upsertWorker,
 } from './service'
 
 /**
@@ -111,6 +112,40 @@ export async function importAttendance(input: {
   return surfaced(async () => {
     const ctx = await requireRole(await headers(), 'hr')
     const result = await importDeviceAttendance(ctx, input)
+    revalidatePath('/workforce')
+    return result
+  })
+}
+
+/**
+ * Register a worker, or update one already on the roster.
+ *
+ * The absence this closes is total: nothing anywhere created a worker, so a new factory had
+ * no attendance to import against — `importAttendance` refuses the whole file on an unknown
+ * employee number, and every number was unknown — and therefore no payroll, ever. The
+ * screen said "No workers on file" and offered nothing to change it.
+ *
+ * hr, plus owner and admin for the person setting the factory up on day one. Not the
+ * payroll gate: registering somebody is not seeing what they are paid, and putting the
+ * roster behind the wage wall is what would push a factory back to the spreadsheet.
+ */
+export async function saveWorker(input: {
+  employeeNo: string
+  name: string
+  nameBn?: string
+  grade: string
+  designation?: string
+  section?: string
+  lineId?: string
+  joinDate: string
+  exitDate?: string
+  disbursementType?: 'bank' | 'bkash' | 'nagad' | 'cash'
+  disbursementRef?: string
+  status?: 'active' | 'on_leave' | 'exited'
+}): Promise<{ workerId: string; created: boolean } | ActionFailure> {
+  return surfaced(async () => {
+    const ctx = await requireRole(await headers(), 'hr', 'owner', 'admin')
+    const result = await upsertWorker(ctx, input)
     revalidatePath('/workforce')
     return result
   })

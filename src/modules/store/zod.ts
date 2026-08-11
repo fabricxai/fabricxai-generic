@@ -28,6 +28,42 @@ export const calendarDate = z
     message: 'not a real calendar date',
   })
 
+/**
+ * A new item on the master list.
+ *
+ * There was no way to create one. Not an action, not a screen, not a tool — the only
+ * writer was the seed script, so a factory that signed up this morning could never receive
+ * anything, because a GRN line needs an `itemId` and no `itemId` could come into being.
+ * Everything downstream (issue, cutting, production) sat behind that.
+ *
+ * `spec` is free-form on purpose: a fabric is described by construction, composition, gsm
+ * and width; a trim by nothing of the sort. Pinning a shape here would make the form lie
+ * to one of them.
+ */
+export const itemPayload = z.object({
+  code: z.string().min(1).max(60),
+  name: z.string().min(1).max(200),
+  kind: z.enum(['fabric', 'trim', 'accessory']),
+  /** Never converted implicitly anywhere in this module — so it is chosen once, here. */
+  uom: z.string().min(1).max(20),
+  spec: z.record(z.string(), z.unknown()).default({}),
+  isActive: z.boolean().default(true),
+})
+
+/**
+ * A new store location.
+ *
+ * `kind` has no default. A bonded location holds duty-free material that may only leave
+ * against a UD, and a system that guessed "general" for a store somebody meant as bonded
+ * would route customs-liable fabric through the gate that does not exist.
+ */
+export const locationPayload = z.object({
+  code: z.string().min(1).max(60),
+  name: z.string().min(1).max(200),
+  kind: z.enum(['bonded', 'general', 'floor']),
+  isActive: z.boolean().default(true),
+})
+
 export const rollReceipt = z.object({
   rollNo: z.string().min(1),
   qty: quantity,

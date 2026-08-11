@@ -475,6 +475,8 @@ export const MESSAGES: Catalogue = {
       'That allocation is finished. Moving it now would restate capacity the floor has already used.',
     'planning.errors.allocation_not_found': 'That allocation no longer exists.',
     'planning.errors.line_inactive': 'That line is not active.',
+    'planning.errors.line_needs_floor':
+      'A line belongs to a floor, and a floor to a factory unit. Name an existing floor or describe a new one.',
     'planning.errors.line_not_found': 'That line no longer exists.',
     'planning.errors.no_manpower':
       'That line has no manpower recorded for the day, so its capacity cannot be computed.',
@@ -609,6 +611,10 @@ export const MESSAGES: Catalogue = {
     'store.errors.bonded_requires_ud':
       'Bonded material must be issued against a utilization declaration. Issuing without one is a customs exposure, not a paperwork slip.',
     'store.errors.exceeds_requisition': 'That is more than the requisition asked for.',
+    'store.errors.item_uom_locked':
+      'That item already holds stock in its original unit. Changing the unit now would silently reinterpret every quantity already recorded against it.',
+    'store.errors.location_kind_locked':
+      'A location’s kind is fixed once it exists. Rolls already here were received under its current customs status, and changing it would reclassify them after the fact.',
     'store.errors.grn_not_found': 'That goods receipt no longer exists.',
     'store.errors.item_not_found': 'That item is not in the store.',
     'store.errors.item_not_requisitioned':
@@ -912,6 +918,11 @@ export const MESSAGES: Catalogue = {
     'maintenance.errors.invalid': 'এই রক্ষণাবেক্ষণ রেকর্ডে এটি চলে না।',
     'maintenance.errors.part_not_found': 'এই স্পেয়ার পার্টটি স্টোরে নেই।',
     'maintenance.errors.ticket_not_found': 'এই টিকিটটি আর নেই।',
+    // The first planning refusal to reach the floor in Bangla. The rest of that module's
+    // errors are still on AWAITING_BANGLA — a planner reads English today, an operator
+    // being told a line cannot be created should not have to.
+    'planning.errors.line_needs_floor':
+      'লাইন একটি ফ্লোরের অধীনে থাকে, আর ফ্লোর থাকে একটি ইউনিটের অধীনে। আগের কোনো ফ্লোর বেছে নিন, নয়তো নতুন ফ্লোরের তথ্য দিন।',
     'production.errors.count_exceeds_checked':
       'endline-এ যত পিস চেক হয়েছে, গণনা তার চেয়ে বেশি দেখানো হয়েছে।',
     'production.errors.downtime_already_closed': 'এই ডাউনটাইমটি আগেই বন্ধ করা হয়েছে।',
@@ -1007,6 +1018,10 @@ export const MESSAGES: Catalogue = {
     'store.errors.bonded_requires_ud':
       'বন্ডেড মাল UD ছাড়া ইস্যু করা যাবে না। UD ছাড়া ইস্যু করলে সেটা কাগজের ছোট ভুল নয়, কাস্টমসের ঝুঁকি।',
     'store.errors.exceeds_requisition': 'রিকুইজিশনে যা চাওয়া হয়েছে তার চেয়ে এটি বেশি।',
+    'store.errors.item_uom_locked':
+      'এই আইটেমের স্টক আগের এককেই রাখা আছে। এখন একক বদলালে আগে লেখা প্রতিটি পরিমাণের মানে চুপচাপ বদলে যাবে।',
+    'store.errors.location_kind_locked':
+      'লোকেশন তৈরি হয়ে গেলে তার ধরন আর বদলানো যায় না। এখানে থাকা রোলগুলো বর্তমান কাস্টমস স্ট্যাটাসেই এসেছে; ধরন বদলালে সেগুলো পরে গিয়ে অন্য শ্রেণিতে পড়ে যাবে।',
     'store.errors.grn_not_found': 'এই GRN-টি আর নেই।',
     'store.errors.item_not_found': 'এই আইটেমটি স্টোরে নেই।',
     'store.errors.item_not_requisitioned':

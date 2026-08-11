@@ -27,6 +27,44 @@ export const calendarDate = z
 
 export const period = z.string().regex(/^\d{4}-\d{2}$/, 'expected YYYY-MM')
 
+/**
+ * A worker joining the factory.
+ *
+ * There was no way to register one. `/workforce` said "No workers on file" and offered
+ * nothing to put one there, so a new factory had no attendance and no payroll — ever.
+ *
+ * `grade` is required and has no default. Wages here follow the gazette grade table, and a
+ * worker whose grade the system chose is a worker paid at a rate nobody set. It is resolved
+ * against the active gazette at payroll time, so a grade that is not in it fails then,
+ * loudly, rather than quietly paying zero.
+ *
+ * `nameBn` is optional but wanted: the payslip leads in Bangla, and a worker who cannot
+ * read their own name on it has been handed a document about somebody else.
+ */
+export const workerPayload = z.object({
+  employeeNo: z.string().min(1).max(40),
+  name: z.string().min(1).max(200),
+  nameBn: z.string().max(200).optional(),
+  grade: z.string().min(1).max(20),
+  designation: z.string().max(120).optional(),
+  section: z.string().max(120).optional(),
+  lineId: z.uuid().optional(),
+  joinDate: calendarDate,
+  exitDate: calendarDate.optional(),
+  disbursementType: z.enum(['bank', 'bkash', 'nagad', 'cash']).default('cash'),
+  /** Account or wallet number. Required for everything except cash. */
+  disbursementRef: z.string().max(120).optional(),
+  status: z.enum(['active', 'on_leave', 'exited']).default('active'),
+}).refine((w) => w.disbursementType === 'cash' || Boolean(w.disbursementRef), {
+  // A bank disbursement with no account number is a payroll line that cannot be paid, and
+  // it is found on payday rather than on the day it was typed.
+  message: 'a non-cash disbursement needs an account or wallet number',
+  path: ['disbursementRef'],
+}).refine((w) => !w.exitDate || w.exitDate >= w.joinDate, {
+  message: 'a worker cannot leave before they joined',
+  path: ['exitDate'],
+})
+
 /** One grade as printed in the notification. */
 export const gazetteGrade = z.object({
   grade: z.string().min(1).max(16),

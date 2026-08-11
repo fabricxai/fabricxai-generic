@@ -42,7 +42,7 @@ import {
   wageGrades,
   workers,
 } from './schema'
-import { attendanceImport, gazetteUpload, payrollRules } from './zod'
+import { attendanceImport, gazetteUpload, payrollRules, workerPayload } from './zod'
 
 registerAuditedTables('payroll_runs', 'payroll_lines', 'wage_gazettes', 'workers', 'attendance')
 
@@ -191,6 +191,70 @@ export async function importDeviceAttendance(
     })
 
     return { imported: payload.rows.length, exceptions }
+  })
+}
+
+/**
+ * Register a worker, or update one already on the roster.
+ *
+ * Nothing in this product created a worker. `/workforce` rendered "No workers on file"
+ * and offered no way to change that, so a factory that signed up this morning had no
+ * attendance to import against and no payroll to run — permanently, and invisibly, because
+ * the screen looked fine.
+ *
+ * Upsert on `employeeNo`, which is the number on the card and the key the attendance
+ * device sends. ⚖ through `recordChange`: a worker's grade decides what they are paid, so
+ * a change to it is an amount somebody must be able to point at afterwards.
+ */
+export async function upsertWorker(
+  ctx: RequestCtx,
+  input: unknown,
+): Promise<{ workerId: string; created: boolean }> {
+  const payload = workerPayload.parse(input)
+
+  return withTenantTx(ctx, async (tx) => {
+    const [before] = await tx
+      .select()
+      .from(workers)
+      .where(scoped(workers, ctx, eq(workers.employeeNo, payload.employeeNo)))
+
+    const values = {
+      companyId: ctx.companyId,
+      employeeNo: payload.employeeNo,
+      name: payload.name,
+      nameBn: payload.nameBn ?? null,
+      grade: payload.grade,
+      designation: payload.designation ?? null,
+      section: payload.section ?? null,
+      lineId: payload.lineId ?? null,
+      joinDate: payload.joinDate,
+      exitDate: payload.exitDate ?? null,
+      disbursementType: payload.disbursementType,
+      disbursementRef: payload.disbursementRef ?? null,
+      status: payload.status,
+      createdBy: ctx.userId,
+    }
+
+    const [row] = await tx
+      .insert(workers)
+      .values(values)
+      .onConflictDoUpdate({
+        target: [workers.companyId, workers.employeeNo],
+        set: { ...values, createdBy: before?.createdBy ?? ctx.userId, updatedAt: new Date() },
+      })
+      .returning({ id: workers.id })
+
+    if (!row) throw new Error('workers upsert returned nothing')
+
+    await recordChange(ctx, tx, {
+      action: before ? 'update' : 'insert',
+      targetTable: 'workers',
+      targetId: row.id,
+      before: before ? { grade: before.grade, status: before.status, name: before.name } : null,
+      after: { grade: payload.grade, status: payload.status, name: payload.name },
+    })
+
+    return { workerId: row.id, created: !before }
   })
 }
 

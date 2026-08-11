@@ -39,6 +39,7 @@ import {
   issueLines,
   issues,
   items,
+  locations,
   requisitionLines,
   requisitions,
   rolls,
@@ -51,7 +52,14 @@ import {
   type ItemStock,
   type StoreWarning,
 } from './stock'
-import { grnReceipt, issueRequest, requisitionRequest, stockAdjustmentDraft } from './zod'
+import {
+  grnReceipt,
+  issueRequest,
+  itemPayload,
+  locationPayload,
+  requisitionRequest,
+  stockAdjustmentDraft,
+} from './zod'
 
 /** ⚖ — adjustments move stock value; GRNs are the customs-facing record of receipt. */
 registerAuditedTables('grns', 'stock_adjustments')
@@ -144,6 +152,121 @@ function remaining(required: string, issued: string): string {
   const clamped = left < 0n ? 0n : left
   const digits = clamped.toString().padStart(3, '0')
   return `${digits.slice(0, -2)}.${digits.slice(-2)}`
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The master list
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Create or update an item on the master list.
+ *
+ * This did not exist. Every screen that reads items rendered correctly and had nothing to
+ * offer, and the store's receive form — which needs an `itemId` — could therefore never be
+ * completed by a factory that had not been seeded. The day-one walkthrough found it by
+ * trying to receive a delivery as a new customer would; a code read had not.
+ *
+ * Upsert on `code`, because the code is what a storekeeper types off a challan and typing
+ * it twice should correct the row rather than collide on an index they cannot see. What it
+ * will NOT do is change `uom`: quantities already recorded against this item are in the
+ * old unit, and silently reinterpreting 400 as metres when it was yards is a stock figure
+ * that is wrong in a way nobody can see.
+ */
+export async function upsertItem(
+  ctx: RequestCtx,
+  input: unknown,
+): Promise<{ itemId: string; created: boolean }> {
+  const payload = itemPayload.parse(input)
+
+  return withTenantTx(ctx, async (tx) => {
+    const [existing] = await tx
+      .select({ id: items.id, uom: items.uom })
+      .from(items)
+      .where(scoped(items, ctx, eq(items.code, payload.code)))
+
+    if (existing && existing.uom !== payload.uom) {
+      throw conflict('store.errors.item_uom_locked', {
+        code: payload.code,
+        currentUom: existing.uom,
+        requestedUom: payload.uom,
+      })
+    }
+
+    const [row] = await tx
+      .insert(items)
+      .values({
+        companyId: ctx.companyId,
+        code: payload.code,
+        name: payload.name,
+        kind: payload.kind,
+        uom: payload.uom,
+        spec: payload.spec,
+        isActive: payload.isActive,
+      })
+      .onConflictDoUpdate({
+        target: [items.companyId, items.code],
+        set: {
+          name: payload.name,
+          kind: payload.kind,
+          spec: payload.spec,
+          isActive: payload.isActive,
+          updatedAt: new Date(),
+        },
+      })
+      .returning({ id: items.id })
+
+    if (!row) throw new Error('items upsert returned nothing')
+    return { itemId: row.id, created: !existing }
+  })
+}
+
+/**
+ * Create or update a store location.
+ *
+ * `kind` is not editable once set, for the same reason `uom` is not: rolls already sitting
+ * in this location were received under its current customs status. Flipping a general
+ * store to bonded would retroactively claim duty-free treatment for material that never
+ * had it — and flipping the other way would strand bonded stock outside the gate that
+ * governs it.
+ */
+export async function upsertLocation(
+  ctx: RequestCtx,
+  input: unknown,
+): Promise<{ locationId: string; created: boolean }> {
+  const payload = locationPayload.parse(input)
+
+  return withTenantTx(ctx, async (tx) => {
+    const [existing] = await tx
+      .select({ id: locations.id, kind: locations.kind })
+      .from(locations)
+      .where(scoped(locations, ctx, eq(locations.code, payload.code)))
+
+    if (existing && existing.kind !== payload.kind) {
+      throw conflict('store.errors.location_kind_locked', {
+        code: payload.code,
+        currentKind: existing.kind,
+        requestedKind: payload.kind,
+      })
+    }
+
+    const [row] = await tx
+      .insert(locations)
+      .values({
+        companyId: ctx.companyId,
+        code: payload.code,
+        name: payload.name,
+        kind: payload.kind,
+        isActive: payload.isActive,
+      })
+      .onConflictDoUpdate({
+        target: [locations.companyId, locations.code],
+        set: { name: payload.name, isActive: payload.isActive },
+      })
+      .returning({ id: locations.id })
+
+    if (!row) throw new Error('locations upsert returned nothing')
+    return { locationId: row.id, created: !existing }
+  })
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

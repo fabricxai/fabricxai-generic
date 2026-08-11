@@ -81,7 +81,10 @@ describe('the ⚖ registry', () => {
   const TRAIL_LIVES_ELSEWHERE: Record<string, string> = {
     lc_amendments: 'lcs — an amendment is part of the credit it amends',
     order_revisions: 'order_breakdowns — the revision IS the breakdown change',
-    workers: 'nothing writes workers outside the seed yet; registered ahead of 10.1 doing so',
+    // `workers` left this list when `upsertWorker` gave it a real writer. The note it used
+    // to carry — "nothing writes workers outside the seed yet" — was true, and was also
+    // finding D1 of the day-one walkthrough sitting in a test file, unread, describing a
+    // factory that could not register a single employee.
   }
 
   it('has a recordChange naming every table it registers', () => {

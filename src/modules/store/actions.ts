@@ -7,7 +7,52 @@ import { surfaced, type ActionFailure } from '@/lib/action-failure'
 import { propose } from '@/modules/core/pending-changes'
 import { requireRole } from '@/modules/core/session'
 
-import { createRequisition } from './service'
+import { createRequisition, upsertItem, upsertLocation } from './service'
+
+/**
+ * Put an item on the master list.
+ *
+ * The missing first link, and a worse one than the requisition's: nothing anywhere in this
+ * product created an item, so a factory that signed up this morning could not receive its
+ * first delivery — the receive form needs an `itemId` and no `itemId` could exist. Every
+ * downstream flow (issue, cutting, production) sat behind that one absence.
+ *
+ * Store and procurement between them, because the two desks that know an item is real are
+ * the one that ordered it and the one that will put it on a shelf. Owner and admin too,
+ * for the person setting the factory up on day one.
+ */
+export async function saveItem(input: {
+  code: string
+  name: string
+  kind: 'fabric' | 'trim' | 'accessory'
+  uom: string
+  spec?: Record<string, unknown>
+  isActive?: boolean
+}): Promise<{ itemId: string; created: boolean } | ActionFailure> {
+  const ctx = await requireRole(await headers(), 'store', 'procurement', 'owner', 'admin')
+  return surfaced(async () => {
+    const result = await upsertItem(ctx, input)
+    revalidatePath('/store')
+    revalidatePath('/store/receive')
+    return result
+  })
+}
+
+/** Put a store location on the map. Same absence, same day-one consequence. */
+export async function saveLocation(input: {
+  code: string
+  name: string
+  kind: 'bonded' | 'general' | 'floor'
+  isActive?: boolean
+}): Promise<{ locationId: string; created: boolean } | ActionFailure> {
+  const ctx = await requireRole(await headers(), 'store', 'owner', 'admin')
+  return surfaced(async () => {
+    const result = await upsertLocation(ctx, input)
+    revalidatePath('/store')
+    revalidatePath('/store/receive')
+    return result
+  })
+}
 
 /**
  * Size an order's material need, from a screen.
