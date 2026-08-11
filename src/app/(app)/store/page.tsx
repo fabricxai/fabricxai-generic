@@ -13,6 +13,8 @@ import { requestLocale } from '@/lib/ui-locale'
 import { getCtx } from '@/modules/core/session'
 import { recentGrns, stockOnHand } from '@/modules/store/queries'
 
+import { RaisedDrafts } from '@/components/shell/raised-drafts'
+
 /**
  * 3.1 Store.
  *
@@ -59,6 +61,9 @@ export default async function StorePage() {
         }
         ownsAmber
       />
+
+      {/* Their corrections and overrides route to an inbox they cannot see (2.1). */}
+      <RaisedDrafts />
 
       {/* The store is four screens, not one: the count, the rolls behind it, what the
           floor is owed, and what arrived. A storekeeper moves between them all shift. */}

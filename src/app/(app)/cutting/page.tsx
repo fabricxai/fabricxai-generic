@@ -15,6 +15,8 @@ import { requestLocale } from '@/lib/ui-locale'
 import { getCtx } from '@/modules/core/session'
 import { cuttableOrders, recentLays } from '@/modules/cutting/queries'
 
+import { RaisedDrafts } from '@/components/shell/raised-drafts'
+
 /**
  * 5.1 Cutting.
  *
@@ -57,6 +59,9 @@ export default async function CuttingPage() {
         }
         ownsAmber
       />
+
+      {/* Their corrections and overrides route to an inbox they cannot see (2.1). */}
+      <RaisedDrafts />
 
       <nav style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         {(

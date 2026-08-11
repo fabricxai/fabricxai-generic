@@ -16,6 +16,7 @@ import {
   ticketBoard,
   unassigned,
 } from '@/modules/maintenance/queries'
+import { RaisedDrafts } from '@/components/shell/raised-drafts'
 
 /**
  * 9.1 Maintenance.
@@ -52,6 +53,9 @@ export default async function MaintenancePage() {
         meta={down.length > 0 ? `${down.length} line down` : undefined}
         ownsAmber
       />
+
+      {/* Their corrections and overrides route to an inbox they cannot see (2.1). */}
+      <RaisedDrafts />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
         {down.length > 0 ? (

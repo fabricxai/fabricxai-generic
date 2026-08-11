@@ -12,7 +12,7 @@ import { and, desc, eq, gte, inArray } from 'drizzle-orm'
 import { z } from 'zod'
 
 import { pendingChangeApprovals, pendingChanges, users } from '@/db/schema/core'
-import type { AnyCtx } from '@/modules/core/ctx'
+import type { AnyCtx, RequestCtx } from '@/modules/core/ctx'
 import { readJsonbObject } from '@/modules/core/jsonb'
 import { scoped } from '@/modules/core/scoped'
 import { withTenantRead } from '@/modules/core/tenancy'
@@ -450,4 +450,47 @@ export async function recordTrail(
       committedAt: draft.committedAt,
     }
   })
+}
+
+export interface RaisedDraft {
+  id: string
+  targetTable: string
+  status: string
+  createdAt: Date
+  /** The reviewer's note — for a rejection, the reason they gave. */
+  reviewNote: string | null
+  /** Set when status is `failed`: what the commit refused with. */
+  error: unknown
+}
+
+/**
+ * The drafts THIS person raised, newest first (adoption plan 2.1).
+ *
+ * Cutting, maintenance and the store can raise drafts but hold no approve nav — their
+ * corrections and overrides vanished into a queue they cannot see, and the only signal
+ * back was the change silently appearing (or never appearing). Runbook #21 recorded the
+ * shape: a double-click on a refusal masked as React #441, with no way to check what
+ * became of the first click.
+ *
+ * Scoped to `created_by` and NOT to the caller's approver roles — that is the point: this
+ * is the raiser's view, not the reviewer's. Terminal states stay visible for a bounded
+ * window so "it was rejected, and here is the reviewer's reason" is an answer the floor
+ * can read the next morning, not only in the minute it happened.
+ */
+export async function myRaisedDrafts(ctx: RequestCtx, limit = 8): Promise<RaisedDraft[]> {
+  return withTenantRead(ctx, (tx) =>
+    tx
+      .select({
+        id: pendingChanges.id,
+        targetTable: pendingChanges.targetTable,
+        status: pendingChanges.status,
+        createdAt: pendingChanges.createdAt,
+        reviewNote: pendingChanges.reviewNote,
+        error: pendingChanges.error,
+      })
+      .from(pendingChanges)
+      .where(scoped(pendingChanges, ctx, eq(pendingChanges.createdBy, ctx.userId)))
+      .orderBy(desc(pendingChanges.createdAt))
+      .limit(limit),
+  )
 }
