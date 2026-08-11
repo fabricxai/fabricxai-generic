@@ -34,6 +34,7 @@ import {
   setSubmissionStatus,
 } from '@/modules/commercial/service'
 import type { RequestCtx } from '@/modules/core/ctx'
+import { approve, propose } from '@/modules/core/pending-changes'
 import { withTenantRead } from '@/modules/core/tenancy'
 import { orderLcs, orders } from '@/modules/orders/schema'
 import { shipments } from '@/modules/shipment/schema'
@@ -745,5 +746,114 @@ describe('2.1 · covering an order (the join everything else runs through)', () 
   it('another company cannot link through this factory’s LC', async () => {
     const lcId = await newLc()
     await expect(linkOrder(otherCtx, { lcId, orderId })).rejects.toThrow(/lc_not_found/)
+  })
+})
+
+/**
+ * A credit that arrives by being READ.
+ *
+ * `lcs` became a pending target so a SWIFT message can be drafted instead of transcribed —
+ * runbook #14 records both live-test credits as hand-entered, and #17 records that a typo in
+ * one had to be corrected with psql because the register offers no edit.
+ *
+ * What matters here is that the draft path is not a second, weaker door. Everything that
+ * makes an LC valid is a rule rather than a column, and a drafted credit has to meet all of
+ * them at the moment somebody signs it — not at the moment a model proposed it.
+ */
+describe('2.1 · a credit drafted from a SWIFT message', () => {
+  const OWNER: RequestCtx = { companyId: COMPANY, userId: USER, roles: ['owner'] }
+
+  const swiftDraft = (over: Record<string, unknown> = {}) => ({
+    buyerId,
+    number: `LC-DRAFT-${randomUUID().slice(0, 6)}`,
+    value: '244800.00',
+    currency: 'USD',
+    tolerancePct: '3',
+    issueDate: '2026-08-10',
+    latestShipmentDate: '2026-11-18',
+    expiryDate: '2026-12-05',
+    docsRequired: { commercial_invoice: true, bl: true, exp_form: true },
+    ...over,
+  })
+
+  it('becomes a real credit when it is approved', async () => {
+    const payload = swiftDraft()
+    const { id } = await propose(ctx, {
+      moduleId: 'commercial',
+      targetTable: 'lcs',
+      operation: 'insert',
+      payload,
+      zodSchemaKey: 'lc_from_swift_v1',
+      source: 'ai_extraction',
+      fieldConfidence: { number: 0.97, value: 0.94, expiryDate: 0.88 },
+    })
+
+    const result = await approve(OWNER, { pendingChangeId: id })
+    expect(result.status).toBe('committed')
+
+    const [row] = await db.select().from(lcs).where(eq(lcs.number, payload.number as string))
+    expect(row).toBeDefined()
+    expect(row!.value).toBe('244800.00')
+    expect(row!.latestShipmentDate).toBe('2026-11-18')
+    expect(row!.expiryDate).toBe('2026-12-05')
+    // The checklist the bank presentation is built from — kept as a map, so 8.1 can look a
+    // kind up rather than scan a list.
+    expect(row!.docsRequired).toMatchObject({ commercial_invoice: true, bl: true })
+    // ⚖ rule 10: a credit may not come into existence without a row saying who signed it.
+    const audit = await db
+      .select({ action: auditLog.action })
+      .from(auditLog)
+      .where(and(eq(auditLog.targetTable, 'lcs'), eq(auditLog.targetId, row!.id)))
+    expect(audit.some((a) => a.action === 'insert')).toBe(true)
+  })
+
+  it('refuses at APPROVE what it would refuse at the register', async () => {
+    // The dates the wrong way round. The draft is accepted — the extractor read what the
+    // page said — and the rule is applied when a person signs, which is the only moment
+    // anybody could act on it. Failing here rather than at insert is deliberate: a draft
+    // nobody can approve is still visible, and one silently dropped is not.
+    const { id } = await propose(ctx, {
+      moduleId: 'commercial',
+      targetTable: 'lcs',
+      operation: 'insert',
+      payload: swiftDraft({ latestShipmentDate: '2026-11-18', expiryDate: '2026-05-12' }),
+      zodSchemaKey: 'lc_from_swift_v1',
+      source: 'ai_extraction',
+      fieldConfidence: { number: 0.97, expiryDate: 0.61 },
+    })
+
+    await expect(approve(OWNER, { pendingChangeId: id })).rejects.toThrow(
+      /lc_expiry_before_shipment/,
+    )
+  })
+
+  it('refuses a number this company already has', async () => {
+    const payload = swiftDraft()
+    const first = await propose(ctx, {
+      moduleId: 'commercial',
+      targetTable: 'lcs',
+      operation: 'insert',
+      payload,
+      zodSchemaKey: 'lc_from_swift_v1',
+      source: 'ai_extraction',
+      fieldConfidence: { number: 0.97 },
+    })
+    await approve(OWNER, { pendingChangeId: first.id })
+
+    // Two drafts of one bank message — the same advice read twice, which is exactly what
+    // happens when nobody is sure whether the first one went through.
+    const second = await propose(ctx, {
+      moduleId: 'commercial',
+      targetTable: 'lcs',
+      operation: 'insert',
+      payload,
+      zodSchemaKey: 'lc_from_swift_v1',
+      source: 'ai_extraction',
+      fieldConfidence: { number: 0.97 },
+    })
+
+    await expect(approve(OWNER, { pendingChangeId: second.id })).rejects.toThrow(
+      /lc_number_exists/,
+    )
   })
 })

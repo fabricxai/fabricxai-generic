@@ -176,11 +176,18 @@ describe('a kind belongs to a desk', () => {
   })
 
   it('gives each specialist desk its own paper', () => {
-    expect(intakeKindsFor(['hr']).map((k) => k.id)).toEqual(['wage_gazette'])
-    expect(intakeKindsFor(['compliance']).map((k) => k.id)).toEqual(['audit_report'])
-    // Commercial holds the customs paper; the store receives against it (runbook #19).
-    expect(intakeKindsFor(['commercial']).map((k) => k.id)).toEqual(['ud_scan'])
-    expect(intakeKindsFor(['store']).map((k) => k.id)).toEqual(['ud_scan'])
+    // Sorted on both sides — the assertion is about WHICH kinds a desk holds, not about
+    // where they happen to sit in the display list.
+    const idsFor = (role: Parameters<typeof intakeKindsFor>[0][number]) =>
+      intakeKindsFor([role]).map((k) => k.id).sort()
+
+    expect(idsFor('hr')).toEqual(['wage_gazette'])
+    expect(idsFor('compliance')).toEqual(['audit_report'])
+    // Commercial holds the bank's paper AND the customs paper; the store shares only the
+    // customs declaration, because it receives against it (runbook #19). A credit is not
+    // the store's business — it is the factory's exposure at a bank.
+    expect(idsFor('commercial')).toEqual(['lc_swift', 'ud_scan'])
+    expect(idsFor('store')).toEqual(['ud_scan'])
   })
 
   it('gives an owner and an admin everything', () => {

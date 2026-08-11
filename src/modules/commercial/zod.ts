@@ -97,10 +97,62 @@ export const createLcPayload = z.object({
 
 export type CreateLcPayload = z.infer<typeof createLcPayload>
 
+/**
+ * The document kinds a credit can call for.
+ *
+ * Closed, and the same six the LC register offers, because this is what a MODEL fills in:
+ * an open `record<string, boolean>` invites `"full set clean on board bills of lading": true`
+ * — a true statement about the paper and a key the bank-presentation checklist will never
+ * look up, so the requirement silently disappears at the counter. A closed set turns a
+ * document's own wording into this system's vocabulary at the moment of reading, which is
+ * the only moment anybody is checking.
+ */
+export const lcDocKind = z.enum([
+  'commercial_invoice',
+  'packing_list',
+  'bl',
+  'certificate_of_origin',
+  'beneficiary_certificate',
+  'inspection_certificate',
+  'exp_form',
+])
+
+/**
+ * A letter of credit read off a SWIFT MT700 (or the bank's advice of one).
+ *
+ * `createLcPayload` with two differences, both because a MODEL is filling this in rather
+ * than a person at the register:
+ *
+ *  · no `documentId` — offered a uuid field the extractor fills it with whatever id-shaped
+ *    string the page carries (the credit number, the bank's reference), and no paper
+ *    contains a uuid. The intake pipeline attaches the real document itself.
+ *  · `docsRequired` is keyed by a closed enum, for the reason above.
+ *
+ * `buyerId` stays required and arrives from the intake context picker: a credit belonging
+ * to nobody cannot be reconciled against a shipment, and 59/50 name a company, never an id
+ * this system would recognise.
+ */
+export const lcFromSwiftDraft = z.object({
+  buyerId: z.uuid(),
+  number: z.string().min(1).max(60),
+  value: quantity,
+  currency: z.string().length(3),
+  tolerancePct: quantity.default('0'),
+  issueDate: calendarDate.optional(),
+  /** 44C and 31D — the two dates every LC crisis is about. */
+  latestShipmentDate: calendarDate.optional(),
+  expiryDate: calendarDate.optional(),
+  /* `partialRecord`, not `record`: a plain record over an enum demands EVERY key, so a
+     credit calling for four documents would be refused for the three it stays silent on. */
+  docsRequired: z.partialRecord(lcDocKind, z.boolean()).default({}),
+})
+
 export const COMMERCIAL_ZOD_MAP = {
   ud_from_scan_v1: udFromScanDraft,
   ud_override_v1: udOverrideDraft,
+  lc_from_swift_v1: lcFromSwiftDraft,
 } as const
 
+export type LcFromSwiftDraft = z.infer<typeof lcFromSwiftDraft>
 export type CreateUdPayload = z.infer<typeof createUdPayload>
 export type UdOverrideDraft = z.infer<typeof udOverrideDraft>

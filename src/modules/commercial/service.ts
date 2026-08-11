@@ -53,7 +53,13 @@ import {
   type UdStatus,
   UdError,
 } from './ud'
-import { createLcPayload, createUdPayload, udAuthorizedItems, udOverrideDraft } from './zod'
+import {
+  createLcPayload,
+  createUdPayload,
+  lcFromSwiftDraft,
+  udAuthorizedItems,
+  udOverrideDraft,
+} from './zod'
 
 /** ⚖ — compliance-bearing; a customs inspector may ask who drew what, and when. */
 registerAuditedTables('uds', 'ud_consumptions', 'lcs', 'btb_lcs', 'lc_amendments', 'doc_submissions')
@@ -1594,6 +1600,63 @@ export async function createLc(
    *
    * The database keeps the guarantee; this gives it a sentence.
    */
+  return withTenantTx(ctx, async (tx) => {
+    const { lcId, after } = await writeLc(ctx, tx, payload)
+
+    // CLAUDE.md rule 10 names `lcs` explicitly, and this was the one write that skipped it:
+    // a credit could come into existence with an outbox event and no before/after row, so
+    // the question "who entered this value, and when" had no answer (audit BE-B5).
+    await recordChange(ctx, tx, {
+      action: 'insert',
+      targetTable: 'lcs',
+      targetId: lcId,
+      after,
+    })
+
+    return { lcId, number: payload.number }
+  })
+}
+
+/**
+ * The credit itself, written inside somebody else's transaction.
+ *
+ * Two callers with genuinely different surroundings: `createLc`, which opens its own
+ * transaction and records its own audit row, and the `lcs` commit handler, which runs inside
+ * the approve transaction where core writes the audit row from what the handler returns.
+ *
+ * Everything that makes an LC valid lives HERE rather than in either caller — the two dates,
+ * the unique number — because a drafted credit that skipped those checks would be a credit
+ * that a model, not a person, decided was coherent. A draft is reviewed for whether it
+ * matches the paper; it is not a second opinion on whether the rules apply.
+ */
+async function writeLc(
+  ctx: AnyCtx,
+  tx: TenantDb,
+  payload: {
+    buyerId: string
+    number: string
+    value: string
+    currency: string
+    tolerancePct: string
+    issueDate?: string | undefined
+    latestShipmentDate?: string | undefined
+    expiryDate?: string | undefined
+    docsRequired: Record<string, boolean | undefined>
+    documentId?: string | undefined
+  },
+): Promise<{ lcId: string; after: Record<string, unknown> }> {
+  /*
+   * The two dates, checked here rather than only by the CHECK constraint behind them.
+   *
+   * `lcs_expiry_after_latest_shipment` has forbidden this combination since 0008, and the
+   * register's own comment reasons that a screen handling it would be unreachable code. That
+   * was true of every path that READS an LC and false of the one that creates one: a driver
+   * error is not an `AppError`, so the constraint fired as a raw Postgres exception and the
+   * person saw React #441 with no clue which field to fix (live test, Phase 3 — an expiry of
+   * 5 December typed into a browser reading mm/dd, stored as 12 May).
+   *
+   * The database keeps the guarantee; this gives it a sentence.
+   */
   if (
     payload.expiryDate &&
     payload.latestShipmentDate &&
@@ -1605,57 +1668,70 @@ export async function createLc(
     })
   }
 
-  return withTenantTx(ctx, async (tx) => {
-    const [existing] = await tx.select({ id: lcs.id }).from(lcs).where(scoped(lcs, ctx, eq(lcs.number, payload.number)))
-    if (existing) {
-      throw new AppError('conflict', 'commercial.errors.lc_number_exists', {
-        number: payload.number,
-      })
-    }
-
-    const [row] = await tx
-      .insert(lcs)
-      .values({
-        companyId: ctx.companyId,
-        buyerId: payload.buyerId,
-        number: payload.number,
-        value: payload.value,
-        currency: payload.currency,
-        tolerancePct: payload.tolerancePct,
-        issueDate: payload.issueDate ?? null,
-        latestShipmentDate: payload.latestShipmentDate ?? null,
-        expiryDate: payload.expiryDate ?? null,
-        docsRequired: payload.docsRequired,
-        status: 'active',
-        createdBy: ctx.userId,
-      })
-      .returning({ id: lcs.id })
-
-    if (!row) throw new Error('lcs insert returned nothing')
-
-    // CLAUDE.md rule 10 names `lcs` explicitly, and this was the one write that skipped it:
-    // a credit could come into existence with an outbox event and no before/after row, so
-    // the question "who entered this value, and when" had no answer (audit BE-B5).
-    await recordChange(ctx, tx, {
-      action: 'insert',
-      targetTable: 'lcs',
-      targetId: row.id,
-      after: {
-        number: payload.number,
-        value: payload.value,
-        currency: payload.currency,
-        latestShipmentDate: payload.latestShipmentDate ?? null,
-        expiryDate: payload.expiryDate ?? null,
-      },
+  const [existing] = await tx
+    .select({ id: lcs.id })
+    .from(lcs)
+    .where(scoped(lcs, ctx, eq(lcs.number, payload.number)))
+  if (existing) {
+    throw new AppError('conflict', 'commercial.errors.lc_number_exists', {
+      number: payload.number,
     })
+  }
 
-    await emit(ctx, tx, {
-      eventName: COMMERCIAL_EVENTS.lcCreated,
-      payload: { lcId: row.id, number: payload.number, value: payload.value },
-      aggregateTable: 'lcs',
-      aggregateId: row.id,
+  const [row] = await tx
+    .insert(lcs)
+    .values({
+      companyId: ctx.companyId,
+      buyerId: payload.buyerId,
+      number: payload.number,
+      value: payload.value,
+      currency: payload.currency,
+      tolerancePct: payload.tolerancePct,
+      issueDate: payload.issueDate ?? null,
+      latestShipmentDate: payload.latestShipmentDate ?? null,
+      expiryDate: payload.expiryDate ?? null,
+      docsRequired: payload.docsRequired,
+      status: 'active',
+      createdBy: ctx.userId,
     })
+    .returning({ id: lcs.id })
 
-    return { lcId: row.id, number: payload.number }
+  if (!row) throw new Error('lcs insert returned nothing')
+
+  await emit(ctx, tx, {
+    eventName: COMMERCIAL_EVENTS.lcCreated,
+    payload: { lcId: row.id, number: payload.number, value: payload.value },
+    aggregateTable: 'lcs',
+    aggregateId: row.id,
   })
+
+  return {
+    lcId: row.id,
+    after: {
+      number: payload.number,
+      value: payload.value,
+      currency: payload.currency,
+      latestShipmentDate: payload.latestShipmentDate ?? null,
+      expiryDate: payload.expiryDate ?? null,
+    },
+  }
+}
+
+/**
+ * A credit read off a SWIFT message, committed when somebody signs the draft.
+ *
+ * Called by the `lcs` commit handler in `register.ts`, inside the approve transaction, so
+ * the row, its audit entry and the outbox event still commit together. Core writes the audit
+ * from the `after` returned here — which is why this does not write one itself.
+ */
+export async function commitLcFromDraft(
+  ctx: AnyCtx,
+  tx: TenantDb,
+  input: { payload: Record<string, unknown> },
+): Promise<{ rowId: string; after: Record<string, unknown> }> {
+  // Parsed again at approve, not trusted from insert: a schema that has tightened since the
+  // draft was created must reject it now rather than commit stale data (PLAYBOOK §3).
+  const payload = lcFromSwiftDraft.parse(input.payload)
+  const { lcId, after } = await writeLc(ctx, tx, payload)
+  return { rowId: lcId, after }
 }

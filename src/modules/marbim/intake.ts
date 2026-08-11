@@ -115,6 +115,25 @@ export const INTAKE_KINDS: readonly IntakeKind[] = [
     roles: ['commercial', 'store'],
   },
   {
+    /*
+     * The credit itself. Runbook #14: "LCs arrive by hand, not by drop — there is no LC
+     * intake kind (six kinds, SWIFT is not one)", so both credits in the live test were
+     * typed off a bank message, and a transcription typo in one had to be corrected with
+     * psql because the register offers no edit.
+     *
+     * The dates are the reason this is worth reading rather than typing: 44C and 31D are
+     * six-digit SWIFT dates, and every shipment crisis in this product is about them.
+     */
+    id: 'lc_swift',
+    label: 'A letter of credit',
+    hint: 'The SWIFT MT700 or the bank’s advice of it. Drafts the credit, its two dates and the documents it calls for.',
+    moduleId: 'commercial',
+    targetTable: 'lcs',
+    zodSchemaKey: 'lc_from_swift_v1',
+    roles: ['commercial'],
+    context: [{ field: 'buyerId', label: 'Whose credit is this?', source: 'buyers' }],
+  },
+  {
     id: 'tech_pack',
     label: 'A tech pack',
     hint: 'The buyer’s construction sheet. Drafts the bill of materials behind a cost sheet.',

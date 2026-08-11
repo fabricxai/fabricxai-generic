@@ -26,9 +26,32 @@ export const commercialModule = registerModule({
   // `uds`: transcribing a scanned declaration is exactly the kind of tedious, error-prone
   // typing MARBIM should draft and a human should check.
   // `ud_consumptions`: the owner-approved overdraw, and nothing else — see the file note.
-  pendingTargets: ['uds', 'ud_consumptions'],
+  /*
+   * `lcs` joins the list so a credit can arrive by being READ rather than only by being
+   * typed. It is the module's own table (rule 11), and it is the one root record the live
+   * test had to hand-enter twice — runbook #14 records LCs as register-only, and #17
+   * records that a transcription typo in one has no door at all afterwards. A drafted
+   * credit at least meets a second pair of eyes before it exists.
+   */
+  pendingTargets: ['uds', 'ud_consumptions', 'lcs'],
 
   commitHandlers: {
+    /**
+     * A credit signed into existence from a draft.
+     *
+     * Routed through the module rather than core's generic single-row write because
+     * everything that makes an LC valid is a rule, not a column: the number must be unique
+     * in this company, and the expiry cannot fall before the latest shipment date — a
+     * combination the schema forbids with a CHECK, which as a raw driver error would reach
+     * the approver as an unreadable failure at the moment they signed.
+     *
+     * Lazily imported for the same reason as the UD handler below.
+     */
+    lcs: async (ctx, tx, input) => {
+      const { commitLcFromDraft } = await import('./service')
+      return commitLcFromDraft(ctx, tx, { payload: input.payload })
+    },
+
     ud_consumptions: async (ctx, tx, input) => {
       // Resolved lazily. A static `import … from './service'` here makes this file part of
       // the service's evaluation graph, and commercial's service is reached from the store
