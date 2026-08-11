@@ -76,3 +76,20 @@ describe('every chip is a real question, not a leaked key', () => {
     }
   })
 })
+
+describe('the desk queue reads Bangla (adoption plan 5.5)', () => {
+  it('has every desk section key in both locales', () => {
+    // These began life in home-copy.ts as English literals — a copy file the bilingual
+    // ratchet cannot see, which is how the floor's own queue ended up untranslatable.
+    const keys = [
+      'ui.desk.store_to_issue', 'ui.desk.store_awaiting', 'ui.desk.quality_failed',
+      'ui.desk.shipment_no_exp', 'ui.desk.shipment_closing', 'ui.desk.commercial_credits',
+      'ui.desk.commercial_discrepant', 'ui.desk.caps_assigned', 'ui.desk.my_drafts',
+      'ui.desk.calm_receive', 'ui.desk.calm_store',
+    ]
+    for (const key of keys) {
+      expect(bn(key), key).toMatch(/[ঀ-৿]/)
+      expect(en(key), key).not.toMatch(/^ui\./)
+    }
+  })
+})

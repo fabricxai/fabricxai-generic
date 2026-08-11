@@ -118,6 +118,8 @@ export const HOME_COPY = {
   commercialDiscrepant: 'Discrepant presentations aging',
   commercialDiscrepantEmpty: 'Nothing discrepant past the window.',
   commercialDiscrepantRow: 'Bank presentation',
+  capsAssigned: 'Corrective actions assigned to you',
+  capsAssignedEmpty: 'No corrective action is yours.',
   myDrafts: 'My raised drafts',
   myDraftsEmpty: 'Nothing you raised is waiting.',
   deskCalmReceive: 'Receiving',

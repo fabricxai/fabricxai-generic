@@ -2,6 +2,7 @@ import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 
 import { t } from '@/lib/i18n'
+import { tui } from '@/lib/i18n-ui'
 import { requestLocale } from '@/lib/ui-locale'
 import { exceptions, type AnalyticsPolicy } from '@/modules/analytics/queries'
 import { inboxRows } from '@/modules/approvals/queries'
@@ -25,7 +26,7 @@ import {
   HOME_COPY,
   type WorkRow,
 } from './home-copy'
-import { deskCalmLinks, deskRoleFor, deskSections } from './desk-sections'
+import { capsAssignedSection, deskCalmLinks, deskRoleFor, deskSections } from './desk-sections'
 import { HomeView, type HomeSection } from './home-view'
 
 /**
@@ -52,6 +53,8 @@ export default async function HomePage() {
     getPolicy<SamplingPolicy>(ctx, 'sampling'),
   ])
   const locale = await requestLocale(profile?.locale)
+  /** The desks read Bangla; the office sections still use HOME_COPY (adoption plan 5.5). */
+  const words = (key: string, params?: Record<string, unknown>) => tui(locale, key, params)
 
   const drafts = await inboxRows(ctx, { now, limit: 12 }, approvalsPolicy)
 
@@ -95,9 +98,9 @@ export default async function HomePage() {
   ]
 
   if (desk) {
-    sections.push(...(await deskSections(ctx, desk, today)))
+    sections.push(...(await deskSections(ctx, desk, today, words)))
     const calm = sections.every((s) => s.rows.length === 0)
-    return <HomeView sections={sections} calm={calm} calmLinks={deskCalmLinks(desk)} />
+    return <HomeView sections={sections} calm={calm} calmLinks={deskCalmLinks(desk, words)} />
   }
 
   const [buyersBoard, quotes, orders, pp] = await Promise.all([
@@ -262,6 +265,10 @@ export default async function HomePage() {
       })),
     })
   }
+
+  // A CAP assigned to an office role lands here too (adoption plan 5.4) — compliance
+  // reaches whoever owns the fix, wherever they sit.
+  sections.push(await capsAssignedSection(ctx, today, words))
 
   const calm = sections.every((s) => s.rows.length === 0)
   const calmLinks = isOwnerView

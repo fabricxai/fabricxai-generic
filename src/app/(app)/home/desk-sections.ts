@@ -1,12 +1,15 @@
 import { daysBetween } from '@/lib/dates'
 import { myRaisedDrafts } from '@/modules/approvals/queries'
 import { agingDiscrepancies, type BankDocsPolicy } from '@/modules/commercial/service'
+import { capExceptions } from '@/modules/compliance/service'
 import { register } from '@/modules/commercial/queries'
 import type { RequestCtx } from '@/modules/core/ctx'
 import { recentFinalInspections } from '@/modules/quality/queries'
 import { getPolicy } from '@/modules/settings/service'
 import { shipmentBoard } from '@/modules/shipment/queries'
 import { outstandingRequisitions, recentGrns } from '@/modules/store/queries'
+
+import type { Words } from '@/components/shell/nav'
 
 import { capRows, HOME_COPY, type WorkRow } from './home-copy'
 import type { HomeSection } from './home-view'
@@ -36,40 +39,88 @@ export async function deskSections(
   ctx: RequestCtx,
   role: DeskRole,
   today: string,
+  /** The floor reads Bangla; these sections are keyed, not hardcoded (adoption plan 5.5). */
+  t: Words,
 ): Promise<HomeSection[]> {
   const sections: HomeSection[] =
     role === 'store'
-      ? await storeSections(ctx)
+      ? await storeSections(ctx, t)
       : role === 'quality'
-        ? await qualitySections(ctx)
+        ? await qualitySections(ctx, t)
         : role === 'shipment'
-          ? await shipmentSections(ctx, today)
-          : await commercialSections(ctx, today)
+          ? await shipmentSections(ctx, today, t)
+          : await commercialSections(ctx, today, t)
 
-  sections.push(await raisedSection(ctx))
+  sections.push(await capsAssignedSection(ctx, today, t))
+  sections.push(await raisedSection(ctx, t))
   return sections
 }
 
+/**
+ * Corrective actions assigned to THIS person, wherever they sit (adoption plan 5.4).
+ *
+ * Compliance was the most isolated desk in the product: a CAP needs the store to fix a
+ * blocked exit or maintenance to guard a machine, and the only place it appeared was the
+ * compliance screen those people never open. `capExceptions` already computes the deadline
+ * ladder and carries the owner; this puts it where the owner actually looks.
+ *
+ * Filtered to the caller — an unassigned CAP is compliance's problem until somebody owns it,
+ * and showing it to everybody would make the section noise on four desks at once.
+ */
+export async function capsAssignedSection(
+  ctx: RequestCtx,
+  today: string,
+  t: Words,
+): Promise<HomeSection> {
+  const all = await capExceptions(ctx, today)
+  const mine = all.filter((cap) => cap.ownerUserId === ctx.userId)
+  const cap = capRows(mine)
+
+  return {
+    id: 'caps',
+    title: t('ui.desk.caps_assigned'),
+    eyebrow: mine.length > 0 ? `${mine.length}` : undefined,
+    seeAllHref: '/compliance',
+    more: cap.more,
+    empty: t('ui.desk.caps_assigned_empty'),
+    rows: cap.rows.map((row): WorkRow => {
+      const days = daysBetween(today, row.deadline)
+      return {
+        id: row.capId,
+        title: `${row.severity} finding · corrective action`,
+        why:
+          days < 0
+            ? `Overdue by ${Math.abs(days)} day(s) — deadline was ${row.deadline}.`
+            : `Due ${row.deadline} — ${days} day(s) left.`,
+        href: '/compliance',
+        age: days < 0 ? `${Math.abs(days)}d over` : `${days}d`,
+        severity: days < 0 || row.severity === 'critical' ? 'high' : 'medium',
+        cta: HOME_COPY.open,
+      }
+    }),
+  }
+}
+
 /** The links the calm state offers, per desk — their own screens, not the office's. */
-export function deskCalmLinks(role: DeskRole): { href: string; label: string }[] {
+export function deskCalmLinks(role: DeskRole, t: Words): { href: string; label: string }[] {
   switch (role) {
     case 'store':
       return [
-        { href: '/store/receive', label: HOME_COPY.deskCalmReceive },
-        { href: '/store', label: HOME_COPY.deskCalmStore },
+        { href: '/store/receive', label: t('ui.desk.calm_receive') },
+        { href: '/store', label: t('ui.desk.calm_store') },
       ]
     case 'quality':
-      return [{ href: '/quality/inline', label: HOME_COPY.deskCalmInline }]
+      return [{ href: '/quality/inline', label: t('ui.desk.calm_inline') }]
     case 'shipment':
-      return [{ href: '/shipment', label: HOME_COPY.deskCalmShipment }]
+      return [{ href: '/shipment', label: t('ui.desk.calm_shipment') }]
     case 'commercial':
-      return [{ href: '/lcs', label: HOME_COPY.deskCalmLcs }]
+      return [{ href: '/lcs', label: t('ui.desk.calm_lcs') }]
   }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-async function storeSections(ctx: RequestCtx): Promise<HomeSection[]> {
+async function storeSections(ctx: RequestCtx, t: Words): Promise<HomeSection[]> {
   const [outstanding, grns] = await Promise.all([
     outstandingRequisitions(ctx),
     recentGrns(ctx, 25),
@@ -82,11 +133,11 @@ async function storeSections(ctx: RequestCtx): Promise<HomeSection[]> {
   return [
     {
       id: 'issue',
-      title: HOME_COPY.storeToIssue,
+      title: t('ui.desk.store_to_issue'),
       eyebrow: outstanding.length > 0 ? `${outstanding.length} line(s)` : undefined,
       seeAllHref: '/store/issue',
       more: outstandingCap.more,
-      empty: HOME_COPY.storeToIssueEmpty,
+      empty: t('ui.desk.store_to_issue_empty'),
       rows: outstandingCap.rows.map(
         (line): WorkRow => ({
           id: line.requisitionLineId,
@@ -100,11 +151,11 @@ async function storeSections(ctx: RequestCtx): Promise<HomeSection[]> {
     },
     {
       id: 'inspect',
-      title: HOME_COPY.storeAwaitingInspection,
+      title: t('ui.desk.store_awaiting'),
       eyebrow: awaiting.length > 0 ? `${awaiting.length} GRN(s)` : undefined,
       seeAllHref: '/store/rolls',
       more: awaitingCap.more,
-      empty: HOME_COPY.storeAwaitingEmpty,
+      empty: t('ui.desk.store_awaiting_empty'),
       rows: awaitingCap.rows.map(
         (grn): WorkRow => ({
           id: grn.id,
@@ -122,7 +173,7 @@ async function storeSections(ctx: RequestCtx): Promise<HomeSection[]> {
   ]
 }
 
-async function qualitySections(ctx: RequestCtx): Promise<HomeSection[]> {
+async function qualitySections(ctx: RequestCtx, t: Words): Promise<HomeSection[]> {
   const finals = await recentFinalInspections(ctx, 25)
   // A failed lot does not ship until re-inspection — the landing's own warning, as work.
   const failed = finals.filter((row) => row.verdict === 'fail')
@@ -131,11 +182,11 @@ async function qualitySections(ctx: RequestCtx): Promise<HomeSection[]> {
   return [
     {
       id: 'failed',
-      title: HOME_COPY.qualityFailedLots,
+      title: t('ui.desk.quality_failed'),
       eyebrow: failed.length > 0 ? `${failed.length} lot(s)` : undefined,
       seeAllHref: '/quality/final',
       more: failedCap.more,
-      empty: HOME_COPY.qualityFailedEmpty,
+      empty: t('ui.desk.quality_failed_empty'),
       rows: failedCap.rows.map(
         (row): WorkRow => ({
           id: row.id,
@@ -153,7 +204,7 @@ async function qualitySections(ctx: RequestCtx): Promise<HomeSection[]> {
   ]
 }
 
-async function shipmentSections(ctx: RequestCtx, today: string): Promise<HomeSection[]> {
+async function shipmentSections(ctx: RequestCtx, today: string, t: Words): Promise<HomeSection[]> {
   const board = await shipmentBoard(ctx)
   const open = board.filter((row) => !row.actualExFactory)
 
@@ -171,11 +222,11 @@ async function shipmentSections(ctx: RequestCtx, today: string): Promise<HomeSec
   return [
     {
       id: 'exp',
-      title: HOME_COPY.shipmentNoExp,
+      title: t('ui.desk.shipment_no_exp'),
       eyebrow: noExp.length > 0 ? `${noExp.length} shipment(s)` : undefined,
       seeAllHref: '/shipment',
       more: noExpCap.more,
-      empty: HOME_COPY.shipmentNoExpEmpty,
+      empty: t('ui.desk.shipment_no_exp_empty'),
       rows: noExpCap.rows.map(
         (row): WorkRow => ({
           id: row.id,
@@ -189,11 +240,11 @@ async function shipmentSections(ctx: RequestCtx, today: string): Promise<HomeSec
     },
     {
       id: 'closing',
-      title: HOME_COPY.shipmentClosing,
+      title: t('ui.desk.shipment_closing'),
       eyebrow: closing.length > 0 ? `${closing.length} inside 7d` : undefined,
       seeAllHref: '/shipment',
       more: closingCap.more,
-      empty: HOME_COPY.shipmentClosingEmpty,
+      empty: t('ui.desk.shipment_closing_empty'),
       rows: closingCap.rows.map((row): WorkRow => {
         const days = daysBetween(today, row.latestShipmentDate!)
         return {
@@ -210,7 +261,7 @@ async function shipmentSections(ctx: RequestCtx, today: string): Promise<HomeSec
   ]
 }
 
-async function commercialSections(ctx: RequestCtx, today: string): Promise<HomeSection[]> {
+async function commercialSections(ctx: RequestCtx, today: string, t: Words): Promise<HomeSection[]> {
   const policy = await getPolicy<BankDocsPolicy>(ctx, 'commercial')
   const [credits, discrepant] = await Promise.all([
     register(ctx, {
@@ -229,11 +280,11 @@ async function commercialSections(ctx: RequestCtx, today: string): Promise<HomeS
   return [
     {
       id: 'credits',
-      title: HOME_COPY.commercialCredits,
+      title: t('ui.desk.commercial_credits'),
       eyebrow: alerting.length > 0 ? `${alerting.length} credit(s)` : undefined,
       seeAllHref: '/lcs',
       more: alertingCap.more,
-      empty: HOME_COPY.commercialCreditsEmpty,
+      empty: t('ui.desk.commercial_credits_empty'),
       rows: alertingCap.rows.map((row): WorkRow => {
         const worst = row.alerts[0]!
         return {
@@ -248,15 +299,15 @@ async function commercialSections(ctx: RequestCtx, today: string): Promise<HomeS
     },
     {
       id: 'discrepant',
-      title: HOME_COPY.commercialDiscrepant,
+      title: t('ui.desk.commercial_discrepant'),
       eyebrow: discrepant.length > 0 ? `${discrepant.length} aging` : undefined,
       seeAllHref: '/lcs/submissions',
       more: discrepantCap.more,
-      empty: HOME_COPY.commercialDiscrepantEmpty,
+      empty: t('ui.desk.commercial_discrepant_empty'),
       rows: discrepantCap.rows.map(
         (row): WorkRow => ({
           id: row.submissionId,
-          title: HOME_COPY.commercialDiscrepantRow,
+          title: t('ui.desk.commercial_discrepant_row'),
           why: row.notes ?? `Discrepant for ${row.days} day(s) with no note.`,
           href: '/lcs/submissions',
           age: `${row.days}d`,
@@ -285,15 +336,15 @@ function describeLcAlert(alert: { kind: string; [key: string]: unknown }): strin
   }
 }
 
-async function raisedSection(ctx: RequestCtx): Promise<HomeSection> {
+async function raisedSection(ctx: RequestCtx, t: Words): Promise<HomeSection> {
   const drafts = await myRaisedDrafts(ctx, 6)
   const cap = capRows(drafts)
   return {
     id: 'mine',
-    title: HOME_COPY.myDrafts,
+    title: t('ui.desk.my_drafts'),
     eyebrow: drafts.length > 0 ? `${drafts.length}` : undefined,
     more: cap.more,
-    empty: HOME_COPY.myDraftsEmpty,
+    empty: t('ui.desk.my_drafts_empty'),
     rows: cap.rows.map(
       (draft): WorkRow => ({
         id: draft.id,
