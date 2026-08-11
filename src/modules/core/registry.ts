@@ -11,6 +11,7 @@ import type { ZodType } from 'zod'
 
 import type { AnyCtx, Role } from './ctx'
 import { isDevReload } from './dev-reload'
+import type { RefResolver } from './refs'
 import { AppError } from './errors'
 import type { TenantDb } from './tenancy'
 
@@ -62,6 +63,19 @@ export interface ModuleDefinition {
    * gets core's generic single-row write.
    */
   commitHandlers?: Readonly<Record<string, PendingCommitHandler>>
+  /**
+   * How this module turns a human reference into a row id — `{ buyer: … }`, keyed by the
+   * vocabulary a tool asks in rather than by table name.
+   *
+   * Declared here beside `pendingTargets` and `toolPack` because it is the same kind of
+   * statement: what this module lets the rest of the system reach, and by which name. The
+   * resolver runs through the module's own `queries.ts` (rule 11), so a buyer code is still
+   * read by the module that owns buyers.
+   *
+   * See `refs.ts` for why this exists: forty-three tool inputs required a uuid, and a uuid
+   * is the one identifier no screen, document or export in this product ever shows.
+   */
+  refResolvers?: Readonly<Record<string, RefResolver>>
   /**
    * Versioned prompt fragment giving MARBIM this department's craft. Teaches WHEN to
    * call a computation and how to narrate the result — the computation itself stays in
