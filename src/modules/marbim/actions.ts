@@ -15,7 +15,7 @@ import type { AnyCtx } from '@/modules/core/ctx'
 import { buyerAccounts } from '@/modules/buyers/queries'
 import { recentAudits } from '@/modules/compliance/queries'
 
-import { INTAKE_KINDS, intakeKind } from './intake'
+import { intakeKind, intakeKindsFor, mayFileKind } from './intake'
 import { extractorVersionFor } from './marbim'
 import { EXTRACTOR_PROMPT_VERSION } from './providers/gemini'
 import { hasProvider, MODEL_READABLE_MIME, modelForRole } from './provider'
@@ -193,6 +193,9 @@ export async function intakeContext(
 ): Promise<{ field: string; label: string; options: ContextOption[] }[]> {
   const ctx = await requireRole(await headers(), ...ASK_ROLES)
   const kind = intakeKind(kindId)
+  if (!mayFileKind(kind, ctx.roles)) {
+    throw new AppError('forbidden', 'marbim.errors.kind_not_your_desk', { kindId })
+  }
 
   const resolved = []
   for (const field of kind.context ?? []) {
@@ -258,6 +261,14 @@ export async function readDocument(input: {
   const policy = await getPolicy<MarbimPolicy>(ctx, 'marbim')
 
   const kind = intakeKind(input.kindId)
+
+  /*
+   * The wall, not the filter. `listIntakeKinds` decides which chips appear; this decides
+   * what may actually be queued, and a screen is never the thing that decides.
+   */
+  if (!mayFileKind(kind, ctx.roles)) {
+    throw new AppError('forbidden', 'marbim.errors.kind_not_your_desk', { kindId: kind.id })
+  }
 
   /*
    * The one-of-them-is-readable gate, checked before any work is queued.
@@ -352,8 +363,10 @@ export async function readDocument(input: {
 export async function listIntakeKinds(): Promise<
   { id: string; label: string; hint: string; targetTable: string; needsContext: boolean }[]
 > {
-  await requireRole(await headers(), ...INTAKE_ROLES)
-  return INTAKE_KINDS.map((kind) => ({
+  const ctx = await requireRole(await headers(), ...INTAKE_ROLES)
+  // The caller's OWN kinds. Chips that 403 on submit are worse than no chips, and a wage
+  // gazette offered to a merchandiser invites them to file into payroll's inbox.
+  return intakeKindsFor(ctx.roles).map((kind) => ({
     id: kind.id,
     label: kind.label,
     hint: kind.hint,

@@ -20,6 +20,7 @@
  * you — see the note under the list, and `intake.test.ts`, which asserts it. A schema
  * requiring a UUID is asking the paper for something only this system knows.
  */
+import type { Role } from '../core/ctx'
 import { AppError } from '../core/errors'
 import { listModules } from '../core/registry'
 
@@ -49,6 +50,19 @@ export interface IntakeKind {
   moduleId: string
   targetTable: string
   zodSchemaKey: string
+  /**
+   * Whose document this is.
+   *
+   * Not decoration and not merely a filter: `readDocument` refuses a kind the caller's role
+   * does not hold, so the chips a person sees and the drafts they can queue are the same
+   * list. Before this, every role with intake rights could file every kind — a merchandiser
+   * could queue a wage gazette into payroll's approve inbox, which is a department's ledger
+   * being written by somebody with no standing in it.
+   *
+   * Owner and admin are added everywhere by `intakeKindsFor` — supervision, not a
+   * department. Each entry names its own keyholders, the way a sync handler does.
+   */
+  roles: readonly Role[]
   /** Ids the schema requires and no document carries. Empty for most kinds. */
   context?: readonly IntakeContextField[]
 }
@@ -68,6 +82,26 @@ export const INTAKE_KINDS: readonly IntakeKind[] = [
     moduleId: 'orders',
     targetTable: 'orders',
     zodSchemaKey: 'order_from_po_v1',
+    roles: ['merchandiser'],
+    context: [{ field: 'buyerId', label: 'Which buyer sent it?', source: 'buyers' }],
+  },
+  {
+    /*
+     * The document Phase 1 of the live test opens with — and the one kind that was never
+     * here. The runbook's first instruction is "intake → kind 'buyer enquiry'", the chip did
+     * not exist, and the enquiry that starts the whole order-to-cash chain had no door.
+     *
+     * `rfqs` was already a registered pending target with a schema, so this is the entry and
+     * nothing else: the enquiry's buyer is the one id the email cannot carry, and the picker
+     * that answers it is the same one a PO uses.
+     */
+    id: 'buyer_enquiry',
+    label: 'A buyer enquiry',
+    hint: 'The email or sheet a buyer asks for a price with. Drafts the RFQ, its quantities and target price.',
+    moduleId: 'rfq',
+    targetTable: 'rfqs',
+    zodSchemaKey: 'rfq',
+    roles: ['merchandiser'],
     context: [{ field: 'buyerId', label: 'Which buyer sent it?', source: 'buyers' }],
   },
   {
@@ -77,6 +111,8 @@ export const INTAKE_KINDS: readonly IntakeKind[] = [
     moduleId: 'commercial',
     targetTable: 'uds',
     zodSchemaKey: 'ud_from_scan_v1',
+    // Commercial holds the customs paper; the store receives against it (runbook #19).
+    roles: ['commercial', 'store'],
   },
   {
     id: 'tech_pack',
@@ -85,6 +121,7 @@ export const INTAKE_KINDS: readonly IntakeKind[] = [
     moduleId: 'costing',
     targetTable: 'boms',
     zodSchemaKey: 'bom_from_tech_pack_v1',
+    roles: ['merchandiser'],
   },
   {
     id: 'wage_gazette',
@@ -93,6 +130,9 @@ export const INTAKE_KINDS: readonly IntakeKind[] = [
     moduleId: 'workforce',
     targetTable: 'wage_gazettes',
     zodSchemaKey: 'gazette_from_scan_v1',
+    // Wages are hr's ledger. CLAUDE.md rule 9 keeps payroll to hr+owner at the API
+    // boundary; the door that drafts into it should not be wider than the door itself.
+    roles: ['hr'],
   },
   {
     id: 'audit_report',
@@ -101,6 +141,7 @@ export const INTAKE_KINDS: readonly IntakeKind[] = [
     moduleId: 'compliance',
     targetTable: 'findings',
     zodSchemaKey: 'findings_batch_v1',
+    roles: ['compliance'],
     context: [{ field: 'auditId', label: 'Which audit is this the report for?', source: 'audits' }],
   },
   {
@@ -110,6 +151,9 @@ export const INTAKE_KINDS: readonly IntakeKind[] = [
     moduleId: 'quality',
     targetTable: 'measurement_specs',
     zodSchemaKey: 'measurement_spec',
+    // It arrives inside the tech pack a merchandiser files, and it is the chart quality
+    // measures against — both hands touch it, so both can file it.
+    roles: ['merchandiser', 'quality'],
   },
 ] as const
 
@@ -134,6 +178,24 @@ export const INTAKE_KINDS: readonly IntakeKind[] = [
  */
 
 const BY_ID = new Map(INTAKE_KINDS.map((kind) => [kind.id, kind]))
+
+/**
+ * Supervisory roles see every kind.
+ *
+ * Same two `requireRole` treats as supervisory everywhere else. An owner filing a wage
+ * gazette is somebody covering a desk, not a department boundary being crossed.
+ */
+const SUPERVISORY: readonly Role[] = ['owner', 'admin']
+
+/** The kinds a caller holding these roles may file. */
+export function intakeKindsFor(roles: readonly Role[]): readonly IntakeKind[] {
+  if (roles.some((role) => SUPERVISORY.includes(role))) return INTAKE_KINDS
+  return INTAKE_KINDS.filter((kind) => kind.roles.some((role) => roles.includes(role)))
+}
+
+/** Whether this caller may file this kind — the same rule the chips are built from. */
+export const mayFileKind = (kind: IntakeKind, roles: readonly Role[]): boolean =>
+  roles.some((role) => SUPERVISORY.includes(role) || kind.roles.includes(role))
 
 export function intakeKind(id: string): IntakeKind {
   const kind = BY_ID.get(id)

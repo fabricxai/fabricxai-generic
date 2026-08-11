@@ -416,6 +416,8 @@ export const MESSAGES: Catalogue = {
        is the same sentence either way, so it is one key rather than two near-identical ones. */
     'marbim.errors.file_unreadable':
       'MARBIM could not read this file. It reads PDF, JPEG, PNG, WebP, Word, Excel and CSV — if this is one of those, the file may be damaged. For anything else, paste the text on the intake page instead.',
+    'marbim.errors.kind_not_your_desk':
+      'That kind of document belongs to another department, so it cannot be filed from here. Whoever owns that desk can read it in, or an owner can.',
     'marbim.errors.job_not_found': 'That extraction no longer exists.',
     'marbim.errors.job_rejected':
       'That extraction was rejected and will not be retried — what it read did not fit the target.',
@@ -916,6 +918,8 @@ export const MESSAGES: Catalogue = {
       'এই ফ্যাক্টরিতে MARBIM নেই, তাই আপনার ডকুমেন্ট পড়ার কেউ নেই। কিছু জমা হয়নি — আপনি যা লিখেছেন তা এখানেই আছে।',
     'marbim.errors.nothing_to_read':
       'পড়ার মতো কিছু নেই — টেক্সট পেস্ট করুন, অথবা এমন PDF বা ছবি যুক্ত করুন যা model নিজে পড়তে পারে।',
+    'marbim.errors.kind_not_your_desk':
+      'এই ধরনের কাগজ অন্য বিভাগের, তাই এখান থেকে ফাইল করা যাবে না। যাঁর ডেস্ক, তিনি বা ওনার এটি পড়াতে পারবেন।',
     'marbim.errors.file_unreadable':
       'MARBIM এই ফাইলটি পড়তে পারেনি। এটি PDF, JPEG, PNG, WebP, Word, Excel ও CSV পড়তে পারে — এগুলোর একটি হলে ফাইলটি হয়তো নষ্ট। অন্য কিছু হলে intake পাতায় লেখাটি পেস্ট করুন।',
     'marbim.errors.token_ceiling':

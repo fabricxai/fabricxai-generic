@@ -27,7 +27,12 @@ import type { ZodType } from 'zod'
 
 import '@/modules/registry'
 import { getCommitHandler, resolvePendingSchema } from '@/modules/core/registry'
-import { INTAKE_KINDS, assertIntakeKinds } from '@/modules/marbim/intake'
+import {
+  INTAKE_KINDS,
+  assertIntakeKinds,
+  intakeKindsFor,
+  mayFileKind,
+} from '@/modules/marbim/intake'
 
 /**
  * Required UUID-shaped fields, by path.
@@ -140,5 +145,85 @@ describe('MARBIM intake kinds', () => {
         ).toContain(field.field)
       }
     }
+  })
+})
+
+/**
+ * Whose desk each document belongs to.
+ *
+ * Every kind used to be offered to every role with intake rights, so a merchandiser could
+ * file a wage gazette into payroll's approve inbox — a department's ledger drafted by
+ * somebody with no standing in it. The chips and the wall are built from one list here so
+ * they cannot drift: what a person is shown is exactly what they may queue.
+ */
+describe('a kind belongs to a desk', () => {
+  it('every kind names at least one keyholder', () => {
+    // The same rule sync handlers hold to. A kind with no roles is a door anyone with
+    // intake rights can open, which is the state this replaced.
+    for (const kind of INTAKE_KINDS) {
+      expect(kind.roles.length, `${kind.id} has no roles`).toBeGreaterThan(0)
+    }
+  })
+
+  it('shows a merchandiser their own documents and not another desk’s', () => {
+    const ids = intakeKindsFor(['merchandiser']).map((k) => k.id)
+
+    expect(ids).toContain('buyer_enquiry')
+    expect(ids).toContain('buyer_po')
+    expect(ids).toContain('tech_pack')
+    expect(ids).not.toContain('wage_gazette')
+    expect(ids).not.toContain('audit_report')
+  })
+
+  it('gives each specialist desk its own paper', () => {
+    expect(intakeKindsFor(['hr']).map((k) => k.id)).toEqual(['wage_gazette'])
+    expect(intakeKindsFor(['compliance']).map((k) => k.id)).toEqual(['audit_report'])
+    // Commercial holds the customs paper; the store receives against it (runbook #19).
+    expect(intakeKindsFor(['commercial']).map((k) => k.id)).toEqual(['ud_scan'])
+    expect(intakeKindsFor(['store']).map((k) => k.id)).toEqual(['ud_scan'])
+  })
+
+  it('gives an owner and an admin everything', () => {
+    // Supervision, not a department — the same two roles requireRole treats that way.
+    expect(intakeKindsFor(['owner'])).toEqual(INTAKE_KINDS)
+    expect(intakeKindsFor(['admin'])).toEqual(INTAKE_KINDS)
+    // And a supervisory role alongside a narrow one still widens, never narrows.
+    expect(intakeKindsFor(['hr', 'admin'])).toEqual(INTAKE_KINDS)
+  })
+
+  it('offers nothing to a role that files no documents', () => {
+    expect(intakeKindsFor(['planner'])).toEqual([])
+    expect(intakeKindsFor([])).toEqual([])
+  })
+
+  it('answers the wall with the same list it draws the chips from', () => {
+    // `mayFileKind` is what `readDocument` refuses on. If it ever disagreed with
+    // `intakeKindsFor`, a chip would appear that 403s when pressed.
+    for (const roles of [['merchandiser'], ['hr'], ['store'], ['owner'], ['planner']] as const) {
+      const offered = intakeKindsFor(roles)
+      for (const kind of INTAKE_KINDS) {
+        expect(mayFileKind(kind, roles), `${kind.id} for ${roles.join('+')}`).toBe(
+          offered.includes(kind),
+        )
+      }
+    }
+  })
+})
+
+describe('the enquiry that starts the chain', () => {
+  it('exists, drafts an RFQ, and asks who sent it', () => {
+    /*
+     * Phase 1 of the live test opens "intake → kind 'buyer enquiry'" and that chip did not
+     * exist — the document the whole order-to-cash chain starts from had no door, and the
+     * tester met six kinds, none of which was theirs.
+     */
+    const kind = INTAKE_KINDS.find((k) => k.id === 'buyer_enquiry')
+
+    expect(kind).toBeDefined()
+    expect(kind!.moduleId).toBe('rfq')
+    expect(kind!.targetTable).toBe('rfqs')
+    // A buyer's uuid is the one field the email cannot carry — the reason the kinds that
+    // could not ask for one were removed rather than left to fail at zod.
+    expect(kind!.context?.map((c) => c.field)).toEqual(['buyerId'])
   })
 })
