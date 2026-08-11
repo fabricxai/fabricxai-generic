@@ -116,7 +116,7 @@ Legend: 🅗 high · 🅜 medium · S/M/L = hours / day / multi-day
   *Corrected 2026-08-12: `shipment.latest_shipment_alerts` and the board tools EXIST; what
   is owed is the composed readiness panel on the screen, not the tools.*
   *Verify:* a shipment with no EXP shows the checklist red on that row before any submit.
-- [ ] **5.2 🅜 M Quality pre-final readiness strip.** *Corrected 2026-08-12: the tool
+- [x] **5.2 🅜 M Quality pre-final readiness strip.** `dc341f1` — *Corrected 2026-08-12: the tool
   `quality.pre_final_readiness` already EXISTS (my review said Cursor invented it — wrong).*
   What is owed is the order-page strip that renders it, and 1.2's chip already asks it.
   *Verify:* the order that failed the live test's final would have shown red here first.
