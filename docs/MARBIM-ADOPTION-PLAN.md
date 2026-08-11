@@ -120,13 +120,15 @@ Legend: 🅗 high · 🅜 medium · S/M/L = hours / day / multi-day
   `quality.pre_final_readiness` already EXISTS (my review said Cursor invented it — wrong).*
   What is owed is the order-page strip that renders it, and 1.2's chip already asks it.
   *Verify:* the order that failed the live test's final would have shown red here first.
-- [ ] **5.3 🅜 M Discrepancy work-queue.** `agingDiscrepancies` exists (the escalation
+- [x] **5.3 🅜 M Discrepancy work-queue.** *Already built — verified 2026-08-12.*
+  `/lcs/submissions` reads `agingDiscrepancies` and shows each row's age in days against the
+  escalation window ("a discrepancy is a clock, not a status"). Nothing owed. — `agingDiscrepancies` exists (the escalation
   job reads it); give it a screen — age, owner, whose turn.
   *Verify:* a discrepant submission appears with its age; resolving clears it.
-- [ ] **5.4 🅜 M CAP cross-department assignment.** A CAP owned by another department
+- [x] **5.4 🅜 M CAP cross-department assignment.** `311d1cb` — on every composed queue, desk and office, filtered to the owner. — A CAP owned by another department
   appears in that person's "Your work" (depends on 2.2).
   *Verify:* a CAP assigned to store shows on `store@`'s composed queue.
-- [ ] **5.5 🅗 L Bangla floor sweep.** Burn down the `AWAITING_BANGLA` ratchet (141 keys)
+- [x] **5.5 🅗 L Bangla floor sweep.** `311d1cb` — **premise corrected:** the floor modules have ZERO ratchet entries; all 141 are office modules. The real floor gap was `home-copy.ts` English literals, now 24 keyed pairs. Office-module refusal copy remains as the next slice. — Burn down the `AWAITING_BANGLA` ratchet (141 keys)
   floor-screens-first: hourly, endline, issue, lays. Incremental; the ratchet only
   shrinks.
   *Verify:* ratchet count strictly lower each slice; hourly renders fully bn.
