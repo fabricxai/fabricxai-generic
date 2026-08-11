@@ -74,7 +74,27 @@ const registry = new Map<string, ModuleDefinition>()
 export function registerModule(definition: ModuleDefinition): ModuleDefinition {
   const existing = registry.get(definition.id)
   if (existing && existing !== definition) {
-    throw new Error(`module "${definition.id}" is already registered`)
+    /*
+     * Two different modules claiming one id is a permanent bug, and refusing it is the whole
+     * point of this check. A DEV SERVER re-evaluating one module is not that.
+     *
+     * Hot reload replaces a module's evaluated instance while this map — living in a chunk
+     * that did not change — keeps the previous definition object. Same module, same id, new
+     * object identity, and nothing here can tell that apart from a genuine collision. The
+     * result was a `module "marbim" is already registered` overlay after an ordinary edit,
+     * cured only by restarting the server: the exact loop the UI runbook asks somebody to
+     * spend their day in.
+     *
+     * So development replaces and continues. Production boots once and has no hot reload, so
+     * a duplicate there is real; tests run under NODE_ENV=test and keep the throw, which is
+     * what keeps this guard honest rather than merely quiet.
+     */
+    if (process.env.NODE_ENV !== 'development') {
+      throw new Error(`module "${definition.id}" is already registered`)
+    }
+    // Dropped BEFORE the ownership scan below, or the module's own previous entry is found
+    // owning its own pending targets and the re-registration fails as a rule-11 violation.
+    registry.delete(definition.id)
   }
 
   for (const target of definition.pendingTargets) {
@@ -82,7 +102,15 @@ export function registerModule(definition: ModuleDefinition): ModuleDefinition {
     if (!/^[a-z_][a-z0-9_]*$/.test(target)) {
       throw new Error(`module "${definition.id}": "${target}" is not a valid table name`)
     }
-    const owner = [...registry.values()].find((m) => m.pendingTargets.includes(target))
+    /*
+     * Somebody ELSE owning it. A module must not collide with its own previous entry —
+     * re-registering the same definition (two import paths reaching one module, or a dev
+     * server's hot reload) would otherwise find itself in the map and report a rule-11
+     * violation against itself, which reads as a real architectural error and is not one.
+     */
+    const owner = [...registry.values()].find(
+      (m) => m.id !== definition.id && m.pendingTargets.includes(target),
+    )
     if (owner) {
       // One writer module per table (CLAUDE.md rule 11) — two modules drafting into the
       // same table is the bug that makes "who wrote this row?" unanswerable.
