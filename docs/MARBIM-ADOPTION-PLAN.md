@@ -21,7 +21,7 @@ Legend: 🅗 high · 🅜 medium · S/M/L = hours / day / multi-day
 
 ## Phase 1 — Placement (no new machinery; changes every person's morning)
 
-- [ ] **1.1 🅗 S Role-correct landing.** Every role lands on the screen their day starts
+- [x] **1.1 🅗 S Role-correct landing.** `5f5ca4a` — Every role lands on the screen their day starts
   on, not on whatever the sidebar orders first — a storekeeper currently opens an empty
   approve inbox. Storekeeper → receiving, cutting → lays, line supervisor → hourly,
   quality → inline, shipment → board, maintenance → tickets, hr → payroll, compliance →
