@@ -75,7 +75,7 @@ Legend: 🅗 high · 🅜 medium · S/M/L = hours / day / multi-day
   the split before building.**
   *Verify:* integration test — proposer's approve on an ⚖ target refuses with a sentence;
   a second admin's approve commits.
-- [ ] **3.2 🅗 L Approval-rules UI.** Routing lives in seeds and psql; the owner cannot
+- [x] **3.2 🅗 L Approval-rules UI.** `a7176f0` — Settings → Approval routing; no condition field, owner-only, list+add+retire. — Routing lives in seeds and psql; the owner cannot
   tune who signs what. Settings surface over `approval_rules` (module/target/operation →
   roles, count). **Must not offer `condition`** — the engine reads module/target/operation
   only, and a rule that looks like a gate and is not one is the day-0 script's own recorded
