@@ -194,7 +194,7 @@ demand it. **Push is the long pole** — nothing in 4.2+ lands without 4.1.
   hourly client behind a viewport/installed-app check, not a fork.
   *Verify:* the audit's mobile sweep on the new layout (0 hscroll, 0 <44px taps); hour save →
   offline queue → sync round-trip on airplane-mode toggle.
-- [ ] **4.3 🅜 Floor skin 2: store ("the truck app").** Receive/Issue two-button home; challan
+- [x] **4.3 🅜 Floor skin 2: store ("the truck app"). ✅** — Receive · Issue · Rolls tabs on all three screens (rail yields, needed !important against the sidebar's inline display); the UD-balance pill already existed from adoption 2.3 and is noted rather than re-claimed; shade filter reused from 2.7c. Two push producers: GRN inspection verdict to whoever signed for the goods (failures buzz, clean passes stay in-app — a phone that buzzes for routine good news gets muted before the bad news), and requisition-raised to the store role. 390px sweep clean; 18/18 e2e. Receive/Issue two-button home; challan
   photo flow is already built — the work is layout + the UD-balance pill during bonded issues +
   shade colour-coding on roll cards (2.7c's filter reused).
   *Verify:* as 4.2; a bonded issue on mobile shows the balance pill and the gate refusal

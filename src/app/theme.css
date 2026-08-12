@@ -635,8 +635,10 @@ a:hover {
   /* A screen that carries the tab bar has its navigation IN the tab bar — the rail would
      eat half a phone to duplicate it (audit S6, seen the moment 4.2 rendered). Scoped by
      :has so desk screens, which have no tabs, keep the rail as their only map. */
+  /* !important because the sidebar sets display:flex inline — a class rule loses that
+     fight silently, and the rail then eats half the phone with the tabs already there. */
   body:has(.fx-floor-tabs) .fx-sidebar {
-    display: none;
+    display: none !important;
   }
   .fx-floor-tabs {
     display: flex;

@@ -2,6 +2,7 @@ import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 
 import { FloorScreen } from '@/components/fx/floor'
+import { FloorTabs } from '@/components/shell/floor-tabs'
 import { PageHeader } from '@/components/shell/page-shell'
 import { tui } from '@/lib/i18n-ui'
 import { requestLocale } from '@/lib/ui-locale'
@@ -64,6 +65,13 @@ export default async function StoreReceivePage() {
         ownsAmber
       />
       <ReceiveClient items={items} locations={locationRows} uds={uds} />
+      <FloorTabs
+        tabs={[
+          { href: '/store/receive', label: 'Receive' },
+          { href: '/store/issue', label: 'Issue' },
+          { href: '/store/rolls', label: 'Rolls' },
+        ]}
+      />
     </FloorScreen>
   )
 }

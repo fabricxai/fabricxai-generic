@@ -24,6 +24,7 @@ import { recordChange, registerAuditedTables } from '../core/audit'
 import type { AnyCtx, RequestCtx } from '../core/ctx'
 import { AppError, conflict, notFound } from '../core/errors'
 import { assertGate, GATES } from '../core/gates'
+import { notify } from '../core/notifications'
 import { registerSyncHandler } from '../core/offline-sync'
 import { defineStateMachine } from '../core/state-machine'
 import { emit } from '../core/outbox'
@@ -457,6 +458,36 @@ export async function setGrnInspectionStatus(
     before: { inspectionStatus: before.inspectionStatus },
     after: { inspectionStatus: input.status },
   })
+
+  /*
+   * The verdict, to the person who signed for the goods (mobile contract §3 — the Truck
+   * app's first push). The storekeeper receives a consignment and quality inspects it
+   * hours later; until now the verdict lived only on the quality screen the storekeeper
+   * never opens. Failures buzz; a clean pass stays in-app — a phone that buzzes for
+   * routine good news is a phone that gets muted before the bad news arrives.
+   */
+  const [receipt] = await tx
+    .select({ challanNo: grns.challanNo, createdBy: grns.createdBy })
+    .from(grns)
+    .where(scoped(grns, ctx, eq(grns.id, input.grnId)))
+  const failed = input.status === 'failed' || input.status === 'failed_partial'
+  if (receipt?.createdBy) {
+    await notify(ctx, {
+      userId: receipt.createdBy,
+      kind: 'store.grn.inspection',
+      severity: failed ? 'warning' : 'info',
+      titleKey: failed
+        ? 'store.notifications.grn_failed.title'
+        : 'store.notifications.grn_passed.title',
+      params: { challanNo: receipt.challanNo },
+      moduleId: 'store',
+      entityTable: 'grns',
+      entityId: input.grnId,
+      href: '/store',
+      dedupeKey: `grn-inspection:${input.grnId}:${input.status}`,
+      channels: failed ? ['in_app', 'push'] : ['in_app'],
+    })
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -549,6 +580,23 @@ export async function createRequisition(
         unit: line.unit,
       })),
     )
+
+    /*
+     * The store's other buzz (mobile contract §3): a requisition is a merchandiser telling
+     * the store "size this order's material" — work arriving at a desk whose whole day is
+     * physical. Role-addressed: whichever storekeeper is on shift picks it up.
+     */
+    await notify(ctx, {
+      role: 'store',
+      kind: 'store.requisition.raised',
+      titleKey: 'store.notifications.requisition_raised.title',
+      params: { lines: computed.length },
+      moduleId: 'store',
+      entityTable: 'requisitions',
+      entityId: requisition.id,
+      href: '/store/issue',
+      channels: ['in_app', 'push'],
+    })
 
     return { requisitionId: requisition.id, lines: computed.length, source }
   })

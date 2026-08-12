@@ -247,6 +247,11 @@ export const MESSAGES: Catalogue = {
       'A mechanic has taken your ticket and is on the way.',
     'maintenance.notifications.ticket_resolved.title':
       'Your machine ticket is resolved — the line can run.',
+    'store.notifications.grn_failed.title':
+      'Inspection failed on challan {challanNo} — those rolls are locked.',
+    'store.notifications.grn_passed.title': 'Challan {challanNo} passed inspection.',
+    'store.notifications.requisition_raised.title':
+      'Material requested — {lines} line(s) waiting on the store.',
     'production.notifications.runrate_slip.title': 'Line {line} is falling behind the day plan.',
     'production.notifications.runrate_slip.body':
       '{made} made against {expected} planned so far — {behind} pieces behind, more than an hour of work.',
@@ -744,6 +749,11 @@ export const MESSAGES: Catalogue = {
       'একজন মেকানিক আপনার টিকিট নিয়েছেন, আসছেন।',
     'maintenance.notifications.ticket_resolved.title':
       'আপনার মেশিনের টিকিট সমাধান হয়েছে — লাইন চালানো যাবে।',
+    'store.notifications.grn_failed.title':
+      'চালান {challanNo}-এর ইন্সপেকশন ফেল করেছে — ওই রোলগুলো আটকে আছে।',
+    'store.notifications.grn_passed.title': 'চালান {challanNo} ইন্সপেকশনে পাস করেছে।',
+    'store.notifications.requisition_raised.title':
+      'মালামাল চাওয়া হয়েছে — {lines}টি লাইন স্টোরের অপেক্ষায়।',
     'production.notifications.runrate_slip.title': 'লাইন {line} দিনের পরিকল্পনা থেকে পিছিয়ে পড়ছে।',
     'production.notifications.runrate_slip.body':
       'এ পর্যন্ত পরিকল্পিত {expected}-এর বিপরীতে {made} হয়েছে — {behind} পিস পিছিয়ে, এক ঘণ্টার বেশি কাজ।',

@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 
 import { EmptyState } from '@/components/fx/feedback'
 import { FloorScreen } from '@/components/fx/floor'
+import { FloorTabs } from '@/components/shell/floor-tabs'
 import { PageHeader } from '@/components/shell/page-shell'
 import { tui } from '@/lib/i18n-ui'
 import { requestLocale } from '@/lib/ui-locale'
@@ -45,7 +46,14 @@ export default async function StoreRollsPage({
           title={tui(locale, 'ui.store.rolls_empty_title')}
           body={tui(locale, 'ui.store.rolls_empty_body')}
         />
-      </FloorScreen>
+        <FloorTabs
+        tabs={[
+          { href: '/store/receive', label: 'Receive' },
+          { href: '/store/issue', label: 'Issue' },
+          { href: '/store/rolls', label: 'Rolls' },
+        ]}
+      />
+    </FloorScreen>
     )
   }
 
@@ -77,6 +85,13 @@ export default async function StoreRollsPage({
         }))}
         selectedItemId={selected.itemId}
         rolls={rolls}
+      />
+      <FloorTabs
+        tabs={[
+          { href: '/store/receive', label: 'Receive' },
+          { href: '/store/issue', label: 'Issue' },
+          { href: '/store/rolls', label: 'Rolls' },
+        ]}
       />
     </FloorScreen>
   )
