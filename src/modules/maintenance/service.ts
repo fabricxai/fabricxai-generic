@@ -372,6 +372,9 @@ export async function claimTicket(ctx: RequestCtx, input: unknown): Promise<Tick
         entityTable: 'tickets',
         entityId: ticket.id,
         href: '/maintenance',
+        // The Hour app's buzz (mobile contract §3): the supervisor who reported a stopped
+        // line learns a mechanic is coming while still standing at the machine.
+        channels: ['in_app', 'push'],
       })
     }
 
@@ -471,6 +474,25 @@ export async function resolveTicket(ctx: RequestCtx, input: unknown): Promise<Re
         payload: { ticketId: ticket.id, shortfalls },
         aggregateTable: 'tickets',
         aggregateId: ticket.id,
+      })
+    }
+
+    if (ticket.createdBy && ticket.createdBy !== ctx.userId) {
+      /*
+       * Claim already told the reporter help was coming; this closes the loop — a line
+       * supervisor who reported a stoppage learns it is fixed without walking over to
+       * look. Resolve never notified at all before the Hour app needed the buzz.
+       */
+      await notify(ctx, {
+        userId: ticket.createdBy,
+        kind: 'maintenance.ticket.resolved',
+        titleKey: 'maintenance.notifications.ticket_resolved.title',
+        params: {},
+        moduleId: 'maintenance',
+        entityTable: 'tickets',
+        entityId: ticket.id,
+        href: '/maintenance',
+        channels: ['in_app', 'push'],
       })
     }
 

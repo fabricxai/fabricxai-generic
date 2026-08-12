@@ -188,7 +188,7 @@ demand it. **Push is the long pole** — nothing in 4.2+ lands without 4.1.
   push is a second delivery channel for the same rows, not a new event system).
   *Verify:* installable on Android Chrome (Lighthouse PWA pass); a seeded notification reaches a
   subscribed device; unsubscribed devices get nothing; k6 unaffected.
-- [ ] **4.2 🅜 ⏳ Floor skin 1: production ("the hour app").** Role-keyed mobile home (current
+- [x] **4.2 🅜 ⏳ Floor skin 1: production ("the hour app"). ✅** — bottom tab bar (This hour · Endline · Tickets) phones-only via CSS, rail yields behind it; three push producers (run-rate slip fires once per line-day on the an-hour-behind rule, ticket claimed + the resolved notify that never existed); airplane-mode gate passed AND caught a pre-existing defect — router.refresh() offline tore down the screen the save had just succeeded on, fixed at both sites. 18/18 e2e after. Role-keyed mobile home (current
   hour card, their lines only, number pad, downtime long-press). Push: run-rate slip, ticket
   claimed. The existing screens already work at 390px — this is a mobile-first re-layout of the
   hourly client behind a viewport/installed-app check, not a fork.

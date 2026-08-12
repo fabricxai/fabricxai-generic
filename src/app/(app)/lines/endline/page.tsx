@@ -4,6 +4,7 @@ import { eq } from 'drizzle-orm'
 
 import { EmptyState } from '@/components/fx/feedback'
 import { FloorScreen } from '@/components/fx/floor'
+import { FloorTabs } from '@/components/shell/floor-tabs'
 import { PageHeader } from '@/components/shell/page-shell'
 import { tui } from '@/lib/i18n-ui'
 import { requestLocale } from '@/lib/ui-locale'
@@ -78,7 +79,14 @@ export default async function EndlinePage() {
           title={tui(locale, 'ui.production.endline_empty_title')}
           body={tui(locale, 'ui.production.endline_empty_body')}
         />
-      </FloorScreen>
+        <FloorTabs
+        tabs={[
+          { href: '/lines/hourly', label: 'This hour' },
+          { href: '/lines/endline', label: 'Endline' },
+          { href: '/maintenance', label: 'Tickets' },
+        ]}
+      />
+    </FloorScreen>
     )
   }
 
@@ -112,6 +120,13 @@ export default async function EndlinePage() {
             lastWrittenAt: count?.updatedAt?.toISOString() ?? null,
           }
         })}
+      />
+      <FloorTabs
+        tabs={[
+          { href: '/lines/hourly', label: 'This hour' },
+          { href: '/lines/endline', label: 'Endline' },
+          { href: '/maintenance', label: 'Tickets' },
+        ]}
       />
     </FloorScreen>
   )

@@ -20,8 +20,11 @@
  */
 import { and, eq, isNull, sql } from 'drizzle-orm'
 
+import { lines } from '@/modules/planning/schema'
+
 import type { AnyCtx, RequestCtx } from '../core/ctx'
 import { AppError, conflict, notFound } from '../core/errors'
+import { notify } from '../core/notifications'
 import { registerSyncHandler } from '../core/offline-sync'
 import { emit } from '../core/outbox'
 import { scoped } from '../core/scoped'
@@ -172,6 +175,8 @@ export async function recordHourlyOutputsIn(
     ...(payload.entries[0] ? { aggregateId: payload.entries[0].lineId } : {}),
   })
 
+  await warnIfBehindPlan(ctx, tx, payload.entries)
+
   return {
     written: payload.entries.length,
     results: payload.entries.map((entry) => ({
@@ -180,6 +185,73 @@ export async function recordHourlyOutputsIn(
       hourSlot: entry.hourSlot,
       status: 'upserted' as const,
     })),
+  }
+}
+
+/**
+ * The run-rate slip, said while there is still shift left (mobile contract §3 — the Hour
+ * app's first push; also the `runrate_miss` signal the exceptions feed has listed as
+ * "coverage: false" since 11.2 shipped).
+ *
+ * A line is BEHIND when its day so far trails the plan by at least one full hour's target
+ * — "an hour behind" rather than a percentage, because it is the unit the floor already
+ * thinks in and it needs no policy knob nobody will tune. Checked only for lines with a
+ * day plan (a line without one has no rate to slip against), only against hours already
+ * recorded, and said ONCE per line per day: the dedupe key means the 15:00 entry that
+ * confirms the 14:00 slip buzzes nobody twice.
+ *
+ * Push rides the same row the bell shows. A supervisor standing at the machine gets the
+ * buzz; everyone else sees it in-app.
+ */
+async function warnIfBehindPlan(
+  ctx: AnyCtx,
+  tx: TenantDb,
+  entries: readonly { lineId: string; producedOn: string }[],
+): Promise<void> {
+  const lineDays = [...new Map(entries.map((e) => [`${e.lineId}|${e.producedOn}`, e])).values()]
+
+  for (const { lineId, producedOn } of lineDays) {
+    const [plan] = await tx
+      .select({ targetPerHour: dailyLinePlans.targetPerHour })
+      .from(dailyLinePlans)
+      .where(scoped(dailyLinePlans, ctx, and(eq(dailyLinePlans.lineId, lineId), eq(dailyLinePlans.planDate, producedOn))))
+    if (!plan || plan.targetPerHour <= 0) continue
+
+    const recorded = await tx
+      .select({ actual: hourlyOutputs.actual })
+      .from(hourlyOutputs)
+      .where(scoped(hourlyOutputs, ctx, 
+        and(eq(hourlyOutputs.lineId, lineId), eq(hourlyOutputs.producedOn, producedOn)),
+      ))
+
+    const made = recorded.reduce((sum, row) => sum + row.actual, 0)
+    const expected = recorded.length * plan.targetPerHour
+    if (expected - made < plan.targetPerHour) continue
+
+    const [line] = await tx
+      .select({ code: lines.code })
+      .from(lines)
+      .where(scoped(lines, ctx, eq(lines.id, lineId)))
+
+    await notify(ctx, {
+      role: 'production',
+      kind: 'production.runrate.slip',
+      severity: 'warning',
+      titleKey: 'production.notifications.runrate_slip.title',
+      bodyKey: 'production.notifications.runrate_slip.body',
+      params: {
+        line: line?.code ?? 'a line',
+        made,
+        expected,
+        behind: expected - made,
+      },
+      moduleId: 'production',
+      entityTable: 'hourly_outputs',
+      entityId: lineId,
+      href: '/lines/hourly',
+      dedupeKey: `runrate-slip:${lineId}:${producedOn}`,
+      channels: ['in_app', 'push'],
+    })
   }
 }
 

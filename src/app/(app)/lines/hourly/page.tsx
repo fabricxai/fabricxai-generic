@@ -4,6 +4,7 @@ import { and, eq, isNull } from 'drizzle-orm'
 
 import { EmptyState } from '@/components/fx/feedback'
 import { FloorScreen } from '@/components/fx/floor'
+import { FloorTabs } from '@/components/shell/floor-tabs'
 import { PageHeader } from '@/components/shell/page-shell'
 import { DayCatchupButton } from './day-catchup'
 import { tui } from '@/lib/i18n-ui'
@@ -113,7 +114,14 @@ export default async function HourlyPage() {
           title={tui(locale, 'ui.production.hourly_empty_title')}
           body={tui(locale, 'ui.production.hourly_empty_body')}
         />
-      </FloorScreen>
+        <FloorTabs
+        tabs={[
+          { href: '/lines/hourly', label: 'This hour' },
+          { href: '/lines/endline', label: 'Endline' },
+          { href: '/maintenance', label: 'Tickets' },
+        ]}
+      />
+    </FloorScreen>
     )
   }
 
@@ -181,6 +189,13 @@ export default async function HourlyPage() {
           note: s.note,
           startedAt: s.startedAt.toISOString(),
         }))}
+      />
+      <FloorTabs
+        tabs={[
+          { href: '/lines/hourly', label: 'This hour' },
+          { href: '/lines/endline', label: 'Endline' },
+          { href: '/maintenance', label: 'Tickets' },
+        ]}
       />
     </FloorScreen>
   )

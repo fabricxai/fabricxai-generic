@@ -123,8 +123,17 @@ export function HourlyClient({
 
     setSent(t.plural('ui.production.counted_summary', filled.length, { total }))
     setEntries({})
-    if (online) await sync()
-    router.refresh()
+    /*
+     * Refresh only when the write actually reached the server. Offline, the row lives in
+     * the queue and this screen's local state already says so — router.refresh() would
+     * re-fetch a page the network cannot serve and tear down the screen the person just
+     * saved on (found by 4.2's airplane-mode gate; the queue had captured the write, the
+     * person saw a blank page). The later sync is what refreshes the server's view.
+     */
+    if (online) {
+      await sync()
+      router.refresh()
+    }
   }
 
   /**
@@ -141,8 +150,11 @@ export function HourlyClient({
   ) {
     await capture({ moduleId: 'production', ...write })
     setNoted(confirmation)
-    if (online) await sync()
-    router.refresh()
+    // Same rule as the hour save: no refresh against a network that is not there.
+    if (online) {
+      await sync()
+      router.refresh()
+    }
   }
 
   async function logStoppage(line: LineRow, reason: string, note: string, machineId: string) {

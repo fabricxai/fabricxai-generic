@@ -245,6 +245,11 @@ export const MESSAGES: Catalogue = {
       'This credit was issued by a different buyer than that order — a credit cannot pay for goods it was never opened against.',
     'maintenance.notifications.ticket_claimed.title':
       'A mechanic has taken your ticket and is on the way.',
+    'maintenance.notifications.ticket_resolved.title':
+      'Your machine ticket is resolved — the line can run.',
+    'production.notifications.runrate_slip.title': 'Line {line} is falling behind the day plan.',
+    'production.notifications.runrate_slip.body':
+      '{made} made against {expected} planned so far — {behind} pieces behind, more than an hour of work.',
     'commercial.errors.lc_number_exists':
       'A letter of credit with that number is already recorded.',
     /* The schema has forbidden this since 0008, but only as a CHECK — so the refusal
@@ -737,6 +742,11 @@ export const MESSAGES: Catalogue = {
       'কিছু লাইনে consumption নেই, অথচ material লাইনে কিছু না কিছু লাগবেই। টেক প্যাকে সেলাই সুতার পরিমাণ সাধারণত লেখা থাকে না — অনুমোদনের আগে ওই লাইনগুলোতে পরিমাণ বসান।',
     'maintenance.notifications.ticket_claimed.title':
       'একজন মেকানিক আপনার টিকিট নিয়েছেন, আসছেন।',
+    'maintenance.notifications.ticket_resolved.title':
+      'আপনার মেশিনের টিকিট সমাধান হয়েছে — লাইন চালানো যাবে।',
+    'production.notifications.runrate_slip.title': 'লাইন {line} দিনের পরিকল্পনা থেকে পিছিয়ে পড়ছে।',
+    'production.notifications.runrate_slip.body':
+      'এ পর্যন্ত পরিকল্পিত {expected}-এর বিপরীতে {made} হয়েছে — {behind} পিস পিছিয়ে, এক ঘণ্টার বেশি কাজ।',
     'commercial.errors.lc_expiry_before_shipment':
       'এই ক্রেডিটের মেয়াদ তার শেষ শিপমেন্ট তারিখের আগেই শেষ হয়ে যাচ্ছে — অর্থাৎ পণ্য বেরোনোর আগেই ব্যাংকে কাগজ জমা দিতে হবে। মেয়াদ ও শেষ শিপমেন্ট — দুটি তারিখ দেখুন; একটিতে দিন আর মাস উল্টে গেছে।',
     'commercial.errors.lc_order_buyer_mismatch':

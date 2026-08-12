@@ -626,3 +626,31 @@ a:hover {
   /* Momentum without a visible bar on a tablet, which is where this runs. */
   -webkit-overflow-scrolling: touch;
 }
+
+/* ── The floor tab bar (mobile contract 4.2) — phones only ─── */
+.fx-floor-tabs {
+  display: none;
+}
+@media (max-width: 640px) {
+  /* A screen that carries the tab bar has its navigation IN the tab bar — the rail would
+     eat half a phone to duplicate it (audit S6, seen the moment 4.2 rendered). Scoped by
+     :has so desk screens, which have no tabs, keep the rail as their only map. */
+  body:has(.fx-floor-tabs) .fx-sidebar {
+    display: none;
+  }
+  .fx-floor-tabs {
+    display: flex;
+    position: fixed;
+    inset: auto 0 0 0;
+    z-index: 40;
+    background: var(--fx-bg-raised);
+    border-top: 1px solid var(--fx-border-default);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  /* Content must not hide behind the fixed bar. */
+  main:has(~ .fx-floor-tabs),
+  .fx-floor-tabs ~ main,
+  body:has(.fx-floor-tabs) main {
+    padding-bottom: 76px;
+  }
+}
