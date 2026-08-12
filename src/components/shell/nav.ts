@@ -183,12 +183,26 @@ export const NAV: readonly NavItem[] = [
     label: 'Your work',
     href: '/home',
     section: 'work',
-    // Owner / admin see every entry via ALL_ACCESS. The four desks gained their own
-    // composition in adoption plan 2.2; floor roles keep their landing screens (1.1) and
-    // reach this from the sidebar. Cutting/production/maintenance stay off deliberately —
-    // their queue IS their landing screen, and a second, thinner copy of it here would be
-    // two places to check instead of one.
-    roles: ['merchandiser', 'store', 'quality', 'shipment', 'commercial'],
+    // Owner / admin see every entry via ALL_ACCESS. Every desk composes its own queue now
+    // (role audit S1): the earlier decision to keep floor roles off — "their queue IS their
+    // landing" — was right about the queue and wrong about the rest, because the composed
+    // home also carries the cross-desk items their own screens never show (a CAP assigned
+    // to a mechanic, a draft a cutter raised). Landing screens are unchanged; this is the
+    // second stop, not the first. Production stays off: its supervisors live in the hour
+    // screen and its cross-desk load is the ticket loop, which maintenance's home carries.
+    roles: [
+      'merchandiser',
+      'store',
+      'quality',
+      'shipment',
+      'commercial',
+      'procurement',
+      'planner',
+      'cutting',
+      'maintenance',
+      'hr',
+      'compliance',
+    ],
     // Compose-only: no writes originate here.
     writeRoles: [],
   },
@@ -580,6 +594,13 @@ const ROLE_LANDINGS: readonly { role: Role; moduleId: string; href: string }[] =
   { role: 'commercial', moduleId: 'lcs', href: '/lcs' },
   { role: 'planner', moduleId: 'planning', href: '/planning' },
   { role: 'procurement', moduleId: 'procurement', href: '/procurement' },
+  /*
+   * Viewer lands on the one thing it can actually browse (role audit 1.7). Its old landing
+   * was the fallback — first sidebar entry, which is MARBIM — so a buying-house guest given
+   * read access opened onto a chat input instead of the factory. The order book is the
+   * factory, for someone whose whole permission is looking at it.
+   */
+  { role: 'viewer', moduleId: 'orders', href: '/orders' },
 ]
 
 /**

@@ -32,40 +32,40 @@ The highest-leverage fix in the audit: six desks have no composed home, three ha
 The pattern already exists (`src/app/(app)/home/desk-sections.ts` composes store's queue); this
 phase is replication with each desk's own signals, not invention.
 
-- [ ] **1.1 🅗 Desk home: procurement.** Compose from existing queries: urgent PRs
+- [x] **1.1 🅗 Desk home: procurement.** ✅ (this commit) — Compose from existing queries: urgent PRs
   (`daysToNeeded ≤ 7`), overdue POs (`daysToDelivery < 0`), quotes awaiting comparison on quoted
   PRs, GRN receipts pending against issued POs. Add `procurement` to `deskRoleFor` and give the
   role `/home` in `nav.ts` (landing stays `/procurement`).
   *Verify:* signs in as procurement → `/home` shows the three queues with live counts; empty
   tenant shows the calm state with links, not a shell. Browser test in `__tests__/browser/`
   asserting section presence per role.
-- [ ] **1.2 🅗 Desk home: planner.** Queues: runs starting today (allocations with
+- [x] **1.2 🅗 Desk home: planner.** ✅ — Queues: runs starting today (allocations with
   `startDate = today`, status `planned`), lines idle tomorrow (working calendar day with zero
   committed), orders confirmed but unallocated (the picker's own filter, reused).
   *Verify:* as 1.1.
-- [ ] **1.3 🅗 Desk home: cutting.** Queues: orders newly cuttable (PP flipped, rolls issued,
+- [x] **1.3 🅗 Desk home: cutting.** ✅ — Queues: orders newly cuttable (PP flipped, rolls issued,
   no open lay), lays open past N days, cut reports awaiting correction approval.
   *Verify:* as 1.1.
-- [ ] **1.4 🅜 Desk home: maintenance.** Queues: unclaimed tickets (line-down first), PM overdue,
+- [x] **1.4 🅜 Desk home: maintenance.** ✅ — Queues: unclaimed tickets (line-down first), PM overdue,
   tickets claimed by me. This is also the skeleton the mobile ticket app reuses (4.4).
   *Verify:* as 1.1.
-- [ ] **1.5 🅜 Desk home: hr + compliance.** HR: payroll run state (which door of the four is
+- [x] **1.5 🅜 Desk home: hr + compliance.** ✅ — HR: payroll run state (which door of the four is
   next), attendance import gaps (days with no device rows), gazette awaiting activation.
   Compliance: CAPs by deadline, findings with no CAP, audits with no findings logged.
   *Verify:* as 1.1. One commit per desk.
-- [ ] **1.6 🅗 Fill the three empty homes (commercial, quality, shipment).** These roles HAVE
+- [x] **1.6 🅗 Fill the three empty homes.** ✅ — narrower than planned, honestly: all three already composed real sections and the audit had caught their CALM state. Commercial already carried every signal 1.6 named (headroom, countdowns, discrepants). Added quality's genuinely missing one — finished-and-never-inspected, powered by the new finishedQty. Shipment's two existing sections (no-EXP, closing dates) judged sufficient; a stalled-stage queue folds into 2.2's pipeline instead. These roles HAVE
   `/home` and it renders a pointer. Commercial: LC date countdowns (≤7d), BTB headroom below
   threshold, submissions in `preparing`, realizations unposted past N days. Quality: lots newly
   inspectable (finished > 0, never inspected), failed finals awaiting re-inspection, DHU above
   target yesterday. Shipment: shipments by pipeline stage with the stalled one flagged, EXP
   missing on confirmed ex-factory.
   *Verify:* none of the three shows "Nothing waiting" when their board has live work.
-- [ ] **1.7 🅜 Viewer lands on the order book; member's landing explains itself.**
+- [x] **1.7 🅜 Viewer → order book; member told they're waiting.** ✅ —
   `resolveLanding` (or the redirect in `(app)/layout.tsx`): viewer → `/orders`; member keeps
   `/marbim` but the empty surface says *"You don't have a desk yet — ask your admin to assign
   one"* with the admin's name when resolvable.
   *Verify:* both roles' landing asserted in the access/landing test; copy en+bn.
-- [ ] **1.8 🅜 Floor tap targets to ≥44px.** The audited counts: `/quality/final` (6 <38px —
+- [x] **1.8 🅜 Floor tap targets to ≥44px.** ✅ — fixed at the Button component: minHeight follows the density token at EVERY size, not only lg. Re-measured at 390px: 0 sub-44px buttons on quality/final, maintenance, store/receive. The audited counts: `/quality/final` (6 <38px —
   the Inspect/Re-inspect ghosts), `/maintenance` (3 — ticket row actions), owner `/home` "See
   all"/"Open →" links (11 — acceptable on desktop, but the same component serves mobile).
   Fix at the component level (`Button variant="ghost"` minimum hit area via padding, not font),

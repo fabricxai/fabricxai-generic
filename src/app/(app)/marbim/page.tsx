@@ -4,9 +4,11 @@ import { redirect } from 'next/navigation'
 import { randomUUID } from 'node:crypto'
 
 import { marbimEntryFor } from '@/components/shell/marbim-context'
-import { LockedState } from '@/components/fx/feedback'
+import { InlineAlert, LockedState } from '@/components/fx/feedback'
 import { PageHeader } from '@/components/shell/page-shell'
 import { env } from '@/lib/env'
+import { tui } from '@/lib/i18n-ui'
+import { requestLocale } from '@/lib/ui-locale'
 import { getCtx } from '@/modules/core/session'
 
 import { MarbimSurface } from './surface-client'
@@ -36,6 +38,15 @@ export default async function MarbimPage() {
   // Shared with the shell's slide-over, so the two surfaces cannot disagree about what a
   // given role may ask for. See `components/shell/marbim-context`.
   const entry = marbimEntryFor(ctx.roles)
+  const locale = await requestLocale()
+
+  /*
+   * A member has no desk yet, and this page is their entire world — MARBIM and Settings are
+   * all their sidebar offers. Without this banner the landing looked broken rather than
+   * pending ("my account doesn't work" is the message every new signup sent), because
+   * nothing anywhere said the state they were in was WAITING, or on whom (role audit 1.7).
+   */
+  const awaitingDesk = !ctx.roles.some((role) => role !== 'member')
 
   return (
     <div
@@ -56,6 +67,10 @@ export default async function MarbimPage() {
         // The send button owns the amber on this screen.
         ownsAmber={false}
       />
+
+      {awaitingDesk ? (
+        <InlineAlert tone="info">{tui(locale, 'ui.marbim.awaiting_desk')}</InlineAlert>
+      ) : null}
 
       {/*
         * The door intake never had. The whole extraction pipeline — kinds, queue,

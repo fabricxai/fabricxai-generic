@@ -4,10 +4,16 @@ import { agingDiscrepancies, type BankDocsPolicy } from '@/modules/commercial/se
 import { capExceptions } from '@/modules/compliance/service'
 import { register } from '@/modules/commercial/queries'
 import type { RequestCtx } from '@/modules/core/ctx'
-import { recentFinalInspections } from '@/modules/quality/queries'
+import { finalInspectionLots, recentFinalInspections } from '@/modules/quality/queries'
 import { getPolicy } from '@/modules/settings/service'
 import { shipmentBoard } from '@/modules/shipment/queries'
+import { cuttableOrders, recentLays } from '@/modules/cutting/queries'
+import { pmWorklist, ticketBoard } from '@/modules/maintenance/queries'
+import { orderList } from '@/modules/orders/queries'
+import { board } from '@/modules/planning/queries'
+import { openRequisitions, purchaseOrders } from '@/modules/procurement/queries'
 import { outstandingRequisitions, recentGrns } from '@/modules/store/queries'
+import { activeGazette, payrollRunList } from '@/modules/workforce/queries'
 
 import type { Words } from '@/components/shell/nav'
 
@@ -26,10 +32,42 @@ import type { HomeSection } from './home-view'
  * appears here too, because for these roles the answer to "what happened to my correction"
  * lives on no other composed surface.
  */
-export type DeskRole = 'store' | 'quality' | 'shipment' | 'commercial'
+/**
+ * Every desk, now. The first four gained composition in adoption plan 2.2; the role audit
+ * (UI-UX-ROLE-AUDIT S1) found the morning ritual inconsistent — six desks had no `/home` at
+ * all, so a mechanic with a CAP assigned to them had no surface anywhere that would say so.
+ * The earlier reasoning for leaving floor roles off ("their queue IS their landing") was
+ * right about the queue and wrong about the rest: the composed home also carries the
+ * cross-desk items — corrective actions assigned to this person, drafts they raised — that
+ * their own screens never show.
+ */
+export type DeskRole =
+  | 'store'
+  | 'quality'
+  | 'shipment'
+  | 'commercial'
+  | 'procurement'
+  | 'planner'
+  | 'cutting'
+  | 'maintenance'
+  | 'hr'
+  | 'compliance'
+
+const DESK_ROLES = [
+  'store',
+  'quality',
+  'shipment',
+  'commercial',
+  'procurement',
+  'planner',
+  'cutting',
+  'maintenance',
+  'hr',
+  'compliance',
+] as const
 
 export function deskRoleFor(roles: readonly string[]): DeskRole | null {
-  for (const role of ['store', 'quality', 'shipment', 'commercial'] as const) {
+  for (const role of DESK_ROLES) {
     if (roles.includes(role)) return role
   }
   return null
@@ -42,14 +80,19 @@ export async function deskSections(
   /** The floor reads Bangla; these sections are keyed, not hardcoded (adoption plan 5.5). */
   t: Words,
 ): Promise<HomeSection[]> {
-  const sections: HomeSection[] =
-    role === 'store'
-      ? await storeSections(ctx, t)
-      : role === 'quality'
-        ? await qualitySections(ctx, t)
-        : role === 'shipment'
-          ? await shipmentSections(ctx, today, t)
-          : await commercialSections(ctx, today, t)
+  const builders: Record<DeskRole, () => Promise<HomeSection[]>> = {
+    store: () => storeSections(ctx, t),
+    quality: () => qualitySections(ctx, t),
+    shipment: () => shipmentSections(ctx, today, t),
+    commercial: () => commercialSections(ctx, today, t),
+    procurement: () => procurementSections(ctx, t),
+    planner: () => plannerSections(ctx, today, t),
+    cutting: () => cuttingSections(ctx, t),
+    maintenance: () => maintenanceSections(ctx, today, t),
+    hr: () => hrSections(ctx, t),
+    compliance: () => complianceSections(ctx, today, t),
+  }
+  const sections: HomeSection[] = await builders[role]()
 
   sections.push(await capsAssignedSection(ctx, today, t))
   sections.push(await raisedSection(ctx, t))
@@ -115,6 +158,18 @@ export function deskCalmLinks(role: DeskRole, t: Words): { href: string; label: 
       return [{ href: '/shipment', label: t('ui.desk.calm_shipment') }]
     case 'commercial':
       return [{ href: '/lcs', label: t('ui.desk.calm_lcs') }]
+    case 'procurement':
+      return [{ href: '/procurement', label: t('ui.desk.calm_procurement') }]
+    case 'planner':
+      return [{ href: '/planning', label: t('ui.desk.calm_planning') }]
+    case 'cutting':
+      return [{ href: '/cutting', label: t('ui.desk.calm_cutting') }]
+    case 'maintenance':
+      return [{ href: '/maintenance', label: t('ui.desk.calm_maintenance') }]
+    case 'hr':
+      return [{ href: '/workforce', label: t('ui.desk.calm_workforce') }]
+    case 'compliance':
+      return [{ href: '/compliance', label: t('ui.desk.calm_compliance') }]
   }
 }
 
@@ -174,12 +229,45 @@ async function storeSections(ctx: RequestCtx, t: Words): Promise<HomeSection[]> 
 }
 
 async function qualitySections(ctx: RequestCtx, t: Words): Promise<HomeSection[]> {
-  const finals = await recentFinalInspections(ctx, 25)
+  const [finals, lots] = await Promise.all([
+    recentFinalInspections(ctx, 25),
+    finalInspectionLots(ctx),
+  ])
   // A failed lot does not ship until re-inspection — the landing's own warning, as work.
   const failed = finals.filter((row) => row.verdict === 'fail')
   const failedCap = capRows(failed)
 
+  /*
+   * Newly inspectable: pieces have come off finishing and nobody has drawn a sample yet
+   * (role audit 1.6). The inverse of the queue's old defect — it used to offer "Inspect"
+   * on orders with nothing sewn; now that `finishedQty` is real, the same number tells an
+   * inspector where a lot is actually waiting for them.
+   */
+  const inspectable = lots.filter((lot) => lot.finishedQty > 0 && lot.history.length === 0)
+  const inspectableCap = capRows(inspectable)
+
   return [
+    {
+      id: 'inspectable',
+      title: t('ui.desk.quality_inspectable'),
+      eyebrow: inspectable.length > 0 ? `${inspectable.length} lot(s)` : undefined,
+      seeAllHref: '/quality/final',
+      more: inspectableCap.more,
+      empty: t('ui.desk.quality_inspectable_empty'),
+      rows: inspectableCap.rows.map(
+        (row): WorkRow => ({
+          id: row.orderId,
+          title: `${row.poNumber ?? ''} · ${row.styleCode ?? ''}`.trim(),
+          why: t('ui.desk.quality_inspectable_row', {
+            finished: row.finishedQty.toLocaleString(),
+            ordered: (row.contractedQty ?? 0).toLocaleString(),
+          }),
+          href: '/quality/final',
+          severity: 'medium',
+          cta: HOME_COPY.open,
+        }),
+      ),
+    },
     {
       id: 'failed',
       title: t('ui.desk.quality_failed'),
@@ -359,4 +447,318 @@ async function raisedSection(ctx: RequestCtx, t: Words): Promise<HomeSection> {
       }),
     ),
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The six desks the role audit found without a morning (S1)
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function procurementSections(ctx: RequestCtx, t: Words): Promise<HomeSection[]> {
+  const now = new Date()
+  const [prs, pos] = await Promise.all([
+    openRequisitions(ctx, { now }),
+    purchaseOrders(ctx, { now }),
+  ])
+
+  const urgent = prs.filter((pr) => pr.daysToNeeded !== null && pr.daysToNeeded <= 7)
+  const urgentCap = capRows(urgent)
+
+  const overdue = pos.filter((po) => po.daysToDelivery !== null && po.daysToDelivery < 0)
+  const overdueCap = capRows(overdue)
+
+  return [
+    {
+      id: 'urgent-prs',
+      title: t('ui.desk.proc_urgent'),
+      eyebrow: urgent.length > 0 ? `${urgent.length}` : undefined,
+      seeAllHref: '/procurement',
+      more: urgentCap.more,
+      empty: t('ui.desk.proc_urgent_empty'),
+      rows: urgentCap.rows.map((pr): WorkRow => ({
+        id: pr.id,
+        title: pr.prNo,
+        why:
+          pr.daysToNeeded !== null && pr.daysToNeeded < 0
+            ? t('ui.desk.proc_urgent_overdue', { days: Math.abs(pr.daysToNeeded) })
+            : t('ui.desk.proc_urgent_row', { days: pr.daysToNeeded ?? 0 }),
+        href: `/procurement/${pr.id}`,
+        age: pr.daysToNeeded !== null ? `${pr.daysToNeeded}d` : '—',
+        severity: pr.daysToNeeded !== null && pr.daysToNeeded <= 2 ? 'high' : 'medium',
+        cta: HOME_COPY.open,
+      })),
+    },
+    {
+      id: 'overdue-pos',
+      title: t('ui.desk.proc_overdue'),
+      eyebrow: overdue.length > 0 ? `${overdue.length}` : undefined,
+      seeAllHref: '/procurement',
+      more: overdueCap.more,
+      empty: t('ui.desk.proc_overdue_empty'),
+      rows: overdueCap.rows.map((po): WorkRow => ({
+        id: po.id,
+        title: `${po.poNumber} · ${po.supplierName ?? ''}`.trim(),
+        why: t('ui.desk.proc_overdue_row', { days: Math.abs(po.daysToDelivery ?? 0) }),
+        href: '/procurement',
+        age: `${Math.abs(po.daysToDelivery ?? 0)}d over`,
+        severity: 'high',
+        cta: HOME_COPY.open,
+      })),
+    },
+  ]
+}
+
+/**
+ * The planner's morning is three questions the board answers one cell at a time: what starts
+ * today, what has nowhere to run tomorrow, and what is sold but not yet on any line. One
+ * board read over a 30-day horizon answers all three — the horizon is why "unallocated"
+ * here means "no run in the next month", which is the version of the question a planner
+ * actually asks (an order allocated for week six is not this morning's problem).
+ */
+async function plannerSections(ctx: RequestCtx, today: string, t: Words): Promise<HomeSection[]> {
+  const [lines, orders] = await Promise.all([
+    board(ctx, { from: today, days: 30 }),
+    orderList(ctx, { now: new Date() }),
+  ])
+
+  const allocations = lines.flatMap((line) => line.allocations)
+  const startingToday = allocations.filter(
+    (a) => a.startDate === today && (a.status === 'planned' || a.status === 'confirmed'),
+  )
+  const startCap = capRows(startingToday)
+
+  const allocatedOrderIds = new Set(allocations.map((a) => a.orderId))
+  const unallocated = orders.filter(
+    (o) =>
+      (o.status === 'confirmed' || o.status === 'in_production') &&
+      o.contractedQty !== null &&
+      !allocatedOrderIds.has(o.id),
+  )
+  const unallocCap = capRows(unallocated)
+
+  return [
+    {
+      id: 'starting',
+      title: t('ui.desk.plan_starting'),
+      eyebrow: startingToday.length > 0 ? `${startingToday.length}` : undefined,
+      seeAllHref: '/planning',
+      more: startCap.more,
+      empty: t('ui.desk.plan_starting_empty'),
+      rows: startCap.rows.map((a): WorkRow => ({
+        id: a.id,
+        title: `${a.lineCode} · ${a.poNumber ?? a.styleCode ?? ''}`.trim(),
+        why: t('ui.desk.plan_starting_row', { pieces: a.plannedTotal.toLocaleString() }),
+        href: '/planning',
+        age: 'today',
+        severity: 'medium',
+        cta: HOME_COPY.open,
+      })),
+    },
+    {
+      id: 'unallocated',
+      title: t('ui.desk.plan_unallocated'),
+      eyebrow: unallocated.length > 0 ? `${unallocated.length}` : undefined,
+      seeAllHref: '/planning',
+      more: unallocCap.more,
+      empty: t('ui.desk.plan_unallocated_empty'),
+      rows: unallocCap.rows.map((o): WorkRow => ({
+        id: o.id,
+        title: `${o.poNumbers[0] ?? ''} · ${o.styleCode ?? ''}`.trim(),
+        why: t('ui.desk.plan_unallocated_row', {
+          pieces: (o.contractedQty ?? 0).toLocaleString(),
+        }),
+        href: '/planning',
+        age: o.daysToExFactory !== null ? `${o.daysToExFactory}d to ship` : '—',
+        severity: o.health === 'late' || o.health === 'risk' ? 'high' : 'medium',
+        cta: HOME_COPY.open,
+      })),
+    },
+  ]
+}
+
+async function cuttingSections(ctx: RequestCtx, t: Words): Promise<HomeSection[]> {
+  const [cuttable, lays] = await Promise.all([cuttableOrders(ctx), recentLays(ctx, 40)])
+
+  const cuttableCap = capRows(cuttable)
+  const open = lays.filter((lay) => lay.status === 'open')
+  const openCap = capRows(open)
+
+  return [
+    {
+      id: 'cuttable',
+      title: t('ui.desk.cut_ready'),
+      eyebrow: cuttable.length > 0 ? `${cuttable.length}` : undefined,
+      seeAllHref: '/cutting',
+      more: cuttableCap.more,
+      empty: t('ui.desk.cut_ready_empty'),
+      rows: cuttableCap.rows.map((o): WorkRow => ({
+        id: o.orderId,
+        title: `${o.poNumber ?? ''} · ${o.styleCode}`.trim(),
+        why: t('ui.desk.cut_ready_row'),
+        href: '/cutting/lay',
+        age: '—',
+        severity: 'medium',
+        cta: HOME_COPY.open,
+      })),
+    },
+    {
+      id: 'open-lays',
+      title: t('ui.desk.cut_open'),
+      eyebrow: open.length > 0 ? `${open.length}` : undefined,
+      seeAllHref: '/cutting/report',
+      more: openCap.more,
+      empty: t('ui.desk.cut_open_empty'),
+      rows: openCap.rows.map((lay): WorkRow => ({
+        id: lay.id,
+        title: `${lay.layNo} · ${lay.color}`,
+        why: t('ui.desk.cut_open_row'),
+        href: '/cutting/report',
+        age: '—',
+        severity: 'medium',
+        cta: HOME_COPY.open,
+      })),
+    },
+  ]
+}
+
+async function maintenanceSections(
+  ctx: RequestCtx,
+  today: string,
+  t: Words,
+): Promise<HomeSection[]> {
+  const [tickets, pm] = await Promise.all([ticketBoard(ctx, { now: new Date() }), pmWorklist(ctx, today)])
+
+  // Line-down first: an unclaimed ticket from a recorded stoppage is a line making nothing.
+  const unclaimed = [...tickets]
+    .filter((ticket) => ticket.status === 'open')
+    .sort((a, b) => Number(b.fromDowntime) - Number(a.fromDowntime))
+  const unclaimedCap = capRows(unclaimed)
+
+  const overduePm = pm.filter((row) => row.daysOverdue > 0)
+  const pmCap = capRows(overduePm)
+
+  return [
+    {
+      id: 'unclaimed',
+      title: t('ui.desk.maint_unclaimed'),
+      eyebrow: unclaimed.length > 0 ? `${unclaimed.length}` : undefined,
+      seeAllHref: '/maintenance',
+      more: unclaimedCap.more,
+      empty: t('ui.desk.maint_unclaimed_empty'),
+      rows: unclaimedCap.rows.map((ticket): WorkRow => ({
+        id: ticket.id,
+        title: [ticket.lineCode, ticket.machineType].filter(Boolean).join(' · ') || t('ui.desk.maint_unnamed'),
+        why: ticket.fromDowntime
+          ? t('ui.desk.maint_line_down', { minutes: ticket.openMinutes ?? 0 })
+          : t('ui.desk.maint_reported', { hours: ticket.openHours ?? 0 }),
+        href: '/maintenance',
+        age: ticket.openHours !== null ? `${ticket.openHours}h` : '—',
+        severity: ticket.fromDowntime ? 'high' : 'medium',
+        cta: HOME_COPY.open,
+      })),
+    },
+    {
+      id: 'pm-overdue',
+      title: t('ui.desk.maint_pm'),
+      eyebrow: overduePm.length > 0 ? `${overduePm.length}` : undefined,
+      seeAllHref: '/maintenance/pm',
+      more: pmCap.more,
+      empty: t('ui.desk.maint_pm_empty'),
+      rows: pmCap.rows.map((row): WorkRow => ({
+        id: row.scheduleId,
+        title: [row.machineType, row.serial].filter(Boolean).join(' · '),
+        why: t('ui.desk.maint_pm_row', { days: row.daysOverdue }),
+        href: '/maintenance/pm',
+        age: `${row.daysOverdue}d over`,
+        severity: row.daysOverdue > 14 ? 'high' : 'medium',
+        cta: HOME_COPY.open,
+      })),
+    },
+  ]
+}
+
+/**
+ * HR's morning is one question with four doors behind it: where is this month's pay?
+ * The run list already knows — the newest run's status names the next door, and no run at
+ * all for the current period is itself the answer ("nothing computed yet").
+ */
+async function hrSections(ctx: RequestCtx, t: Words): Promise<HomeSection[]> {
+  const [runs, gazette] = await Promise.all([payrollRunList(ctx, 3), activeGazette(ctx)])
+  const latest = runs[0] ?? null
+
+  const rows: WorkRow[] = []
+  if (latest && latest.status !== 'disbursed') {
+    rows.push({
+      id: latest.id,
+      title: t('ui.desk.hr_run_title', { period: latest.period }),
+      why:
+        latest.status === 'draft'
+          ? t('ui.desk.hr_run_draft')
+          : latest.status === 'approved'
+            ? t('ui.desk.hr_run_approved')
+            : t('ui.desk.hr_run_other', { status: latest.status }),
+      href: '/workforce',
+      age: latest.period,
+      severity: 'medium',
+      cta: HOME_COPY.open,
+    })
+  }
+  if (!gazette) {
+    rows.push({
+      id: 'no-gazette',
+      title: t('ui.desk.hr_no_gazette'),
+      why: t('ui.desk.hr_no_gazette_why'),
+      href: '/workforce',
+      age: '—',
+      severity: 'high',
+      cta: HOME_COPY.open,
+    })
+  }
+
+  return [
+    {
+      id: 'payroll',
+      title: t('ui.desk.hr_payroll'),
+      eyebrow: rows.length > 0 ? `${rows.length}` : undefined,
+      seeAllHref: '/workforce',
+      empty: t('ui.desk.hr_payroll_empty'),
+      rows,
+    },
+  ]
+}
+
+async function complianceSections(
+  ctx: RequestCtx,
+  today: string,
+  t: Words,
+): Promise<HomeSection[]> {
+  // ALL open CAPs, not only the caller's — chasing the deadline ladder across owners is the
+  // compliance officer's whole job, and `capsAssignedSection` below already carries "mine".
+  const caps = await capExceptions(ctx, today)
+  const cap = capRows(caps)
+
+  return [
+    {
+      id: 'cap-ladder',
+      title: t('ui.desk.comp_ladder'),
+      eyebrow: caps.length > 0 ? `${caps.length}` : undefined,
+      seeAllHref: '/compliance',
+      more: cap.more,
+      empty: t('ui.desk.comp_ladder_empty'),
+      rows: cap.rows.map((row): WorkRow => {
+        const days = daysBetween(today, row.deadline)
+        return {
+          id: row.capId,
+          title: t('ui.desk.comp_ladder_row', { severity: row.severity }),
+          why:
+            days < 0
+              ? t('ui.desk.comp_overdue', { days: Math.abs(days), deadline: row.deadline })
+              : t('ui.desk.comp_due', { days, deadline: row.deadline }),
+          href: '/compliance',
+          age: days < 0 ? `${Math.abs(days)}d over` : `${days}d`,
+          severity: days < 0 || row.severity === 'critical' ? 'high' : 'medium',
+          cta: HOME_COPY.open,
+        }
+      }),
+    },
+  ]
 }

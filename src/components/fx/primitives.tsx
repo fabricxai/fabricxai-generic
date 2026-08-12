@@ -54,8 +54,15 @@ export function Button({
     cursor: disabled ? 'not-allowed' : 'pointer',
     transition: 'background var(--fx-dur-state), border-color var(--fx-dur-state), color var(--fx-dur-state)',
     width: full ? '100%' : undefined,
-    // Floor screens need a 48px target; desk screens 36px. The token follows density.
-    minHeight: size === 'lg' ? 'var(--fx-tap-min)' : undefined,
+    /*
+     * EVERY size, not only lg (role audit 1.8). Restricting the floor to `lg` assumed
+     * screens would choose the right size, and the audit measured what they actually chose:
+     * six sub-38px Inspect buttons on the final-inspection queue, three on the ticket
+     * board — ghost `md` rows on screens inspectors and mechanics use one-handed. The
+     * token already answers density (36px desk, 48px floor), so the fix is letting it
+     * apply. Desktop rows grow ≤4px; touch rows grow to a target a thumb can hit.
+     */
+    minHeight: 'var(--fx-tap-min)',
   }
 
   const effective = variant === 'primary' && deferAmber ? 'ink' : variant
