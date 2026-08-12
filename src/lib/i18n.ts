@@ -478,6 +478,8 @@ export const MESSAGES: Catalogue = {
     'planning.errors.allocation_done':
       'That allocation is finished. Moving it now would restate capacity the floor has already used.',
     'planning.errors.allocation_not_found': 'That allocation no longer exists.',
+    'commercial.errors.lc_draft_no_buyer':
+      'This credit has no buyer against it. Send the document again and choose whose credit it is.',
     'planning.errors.calendar_no_working_days':
       'No working day falls inside those dates. Pick at least one day of the week the lines run.',
     'planning.errors.calendar_range_backwards': 'The calendar ends before it starts.',
@@ -712,6 +714,8 @@ export const MESSAGES: Catalogue = {
       'LC {lcNumber}: শেষ শিপমেন্টের ({date}) বাকি {daysLeft} দিন',
     'commercial.notifications.lc_countdown_expiry.title':
       'LC {lcNumber}: মেয়াদ শেষের ({date}) বাকি {daysLeft} দিন',
+    'commercial.errors.lc_draft_no_buyer':
+      'এই ক্রেডিটের বিপরীতে কোনো ক্রেতা নেই। ডকুমেন্টটি আবার পাঠান এবং কার ক্রেডিট তা বেছে নিন।',
     'commercial.errors.order_not_found': 'সেই অর্ডারটি আর নেই, তাই ক্রেডিট এটি কভার করতে পারবে না।',
     'approvals.errors.rule_not_found': 'এই রাউটিং নিয়মটি আর নেই, বা আগেই বাতিল হয়েছে।',
     'errors.self_approval':

@@ -1749,6 +1749,22 @@ export async function commitLcFromDraft(
   // Parsed again at approve, not trusted from insert: a schema that has tightened since the
   // draft was created must reject it now rather than commit stale data (PLAYBOOK §3).
   const payload = lcFromSwiftDraft.parse(input.payload)
-  const { lcId, after } = await writeLc(ctx, tx, payload)
+
+  /*
+   * The buyer is optional while a model is reading and required to write.
+   *
+   * `lcFromSwiftDraft` stopped demanding a uuid from the extractor — no page carries one, and
+   * asking produced an invention that failed the whole reading. It arrives instead from the
+   * intake context picker, merged in at confidence 1. If it is missing by the time somebody
+   * approves, the draft is not committable: a credit belonging to nobody cannot be reconciled
+   * against a shipment, which is the reason `createLcPayload` requires it.
+   */
+  if (!payload.buyerId) {
+    throw new AppError('validation_failed', 'commercial.errors.lc_draft_no_buyer', {
+      number: payload.number,
+    })
+  }
+
+  const { lcId, after } = await writeLc(ctx, tx, { ...payload, buyerId: payload.buyerId })
   return { rowId: lcId, after }
 }

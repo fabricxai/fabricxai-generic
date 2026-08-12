@@ -132,19 +132,80 @@ export const lcDocKind = z.enum([
  * to nobody cannot be reconciled against a shipment, and 59/50 name a company, never an id
  * this system would recognise.
  */
+/** "USD 244,800.00" or 244800 → "244800.00". Tolerated on the way in, strict underneath. */
+const transcribedAmount = z.preprocess((value) => {
+  if (typeof value === 'number') return String(value)
+  if (typeof value !== 'string') return value
+  const match = /\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?/.exec(value)
+  if (!match) return value
+  const [whole, fraction = ''] = match[0].replace(/,/g, '').split('.')
+  const trimmed = fraction.length > 2 ? fraction.replace(/0+$/, '') : fraction
+  return trimmed ? `${whole}.${trimmed}` : whole
+}, quantity)
+
+/**
+ * The documents a credit calls for, however the model hands them over.
+ *
+ * 46A is a numbered list on the page — "1. Commercial invoice in triplicate 2. Packing
+ * list…" — and a model reading it returns a list, which a `partialRecord` refuses key by key
+ * ("docsRequired.1 Invalid key in record"). Both shapes are accepted here and normalised to
+ * the map the presentation checklist looks documents up by.
+ *
+ * A name that is not one of the seven kinds is DROPPED rather than kept: the closed set is
+ * this system's vocabulary, and a key nothing will ever look up is a requirement that
+ * silently disappears at the bank counter — see `lcDocKind`.
+ */
+const transcribedDocs = z.preprocess((value) => {
+  const kinds = new Set(lcDocKind.options as readonly string[])
+  if (Array.isArray(value)) {
+    const out: Record<string, boolean> = {}
+    for (const entry of value) {
+      if (typeof entry === 'string' && kinds.has(entry)) out[entry] = true
+      else if (entry && typeof entry === 'object') {
+        const record = entry as Record<string, unknown>
+        const name = typeof record.kind === 'string' ? record.kind : undefined
+        if (name && kinds.has(name)) out[name] = record.required !== false
+      }
+    }
+    return out
+  }
+  if (value && typeof value === 'object') {
+    // A map keyed by position ("1", "2") rather than by kind — same list, different wrapper.
+    const record = value as Record<string, unknown>
+    const out: Record<string, boolean> = {}
+    for (const [key, entry] of Object.entries(record)) {
+      if (kinds.has(key)) out[key] = Boolean(entry)
+      else if (typeof entry === 'string' && kinds.has(entry)) out[entry] = true
+    }
+    return out
+  }
+  return value
+}, z.partialRecord(lcDocKind, z.boolean()).default({}))
+
 export const lcFromSwiftDraft = z.object({
-  buyerId: z.uuid(),
+  /**
+   * OPTIONAL here and required at commit, which is the opposite of how it reads.
+   *
+   * A uuid is the one value no document contains, and asking a model for one under a
+   * structured-output schema does not get an absence — it gets an invention, and the whole
+   * extraction is then thrown away for "buyerId Invalid UUID". This schema had never once
+   * produced a successful reading for that reason: no LC extraction job has ever finished.
+   *
+   * The buyer arrives from the intake context picker and is merged over the model's answer at
+   * confidence 1, because which record in this factory's book "BESTSELLER A/S" maps to is a
+   * judgement a person makes. `createLcPayload` still requires it, so a credit belonging to
+   * nobody cannot be committed.
+   */
+  buyerId: z.uuid().optional().catch(undefined),
   number: z.string().min(1).max(60),
-  value: quantity,
+  value: transcribedAmount,
   currency: z.string().length(3),
-  tolerancePct: quantity.default('0'),
+  tolerancePct: transcribedAmount.default('0'),
   issueDate: calendarDate.optional(),
   /** 44C and 31D — the two dates every LC crisis is about. */
   latestShipmentDate: calendarDate.optional(),
   expiryDate: calendarDate.optional(),
-  /* `partialRecord`, not `record`: a plain record over an enum demands EVERY key, so a
-     credit calling for four documents would be refused for the three it stays silent on. */
-  docsRequired: z.partialRecord(lcDocKind, z.boolean()).default({}),
+  docsRequired: transcribedDocs,
 })
 
 export const COMMERCIAL_ZOD_MAP = {
