@@ -221,29 +221,28 @@ async function seedPendingChanges(ctx: SeedContext): Promise<number> {
 
   const drafts: {
     key: string
-    status: 'pending' | 'rejected'
+    status: 'committed' | 'rejected'
     fieldConfidence: Record<string, number>
     source: 'ai_extraction' | 'user_draft'
   }[] = [
+    /*
+     * These land TERMINAL, not pending, and that changed after a live run.
+     *
+     * `core` registers no pending targets, so a `seed_demo_rows` draft can never be
+     * approved — approving one throws "That module is not registered", which is correct and
+     * useless. Seeded as `pending`, they sat at the TOP of every factory's approve inbox
+     * (oldest first) above the real work, and the first thing a new approver did was click
+     * Approve on one and get a sentence about module registration.
+     *
+     * The screen still gets its demo: a committed row and a rejected one show what the two
+     * ends of the flow look like, including the reviewer's reason, without putting a
+     * permanently broken button in front of somebody's morning.
+     */
     {
       key: 'pending-high',
-      status: 'pending' as const,
+      status: 'committed' as const,
       fieldConfidence: { buyer_po_no: 0.97, quantity: 0.93, unit_price: 0.88 },
       source: 'ai_extraction' as const,
-    },
-    {
-      key: 'pending-low',
-      status: 'pending' as const,
-      // The one a merchandiser should actually look at.
-      fieldConfidence: { buyer_po_no: 0.99, quantity: 0.42, unit_price: 0.55 },
-      source: 'ai_extraction' as const,
-    },
-    {
-      key: 'human-draft',
-      status: 'pending' as const,
-      // A person typed this. No confidence, because there is no extractor to ask.
-      fieldConfidence: {},
-      source: 'user_draft' as const,
     },
     {
       key: 'rejected',
@@ -283,9 +282,13 @@ async function seedPendingChanges(ctx: SeedContext): Promise<number> {
       extractorVersion: draft.source === 'ai_extraction' ? 'seed-extractor-v1' : null,
       status: draft.status,
       createdBy: ownerId,
-      reviewedBy: draft.status === 'rejected' ? ownerId : null,
-      reviewedAt: draft.status === 'rejected' ? new Date() : null,
+      // Both states are decided, so both carry a reviewer — a committed row with no
+      // reviewer means something specific in this system (a rule auto-approved it), and
+      // seeding that by accident would misreport the correction telemetry.
+      reviewedBy: ownerId,
+      reviewedAt: new Date(),
       reviewNote: draft.status === 'rejected' ? 'Quantity does not match the PO scan' : null,
+      committedAt: draft.status === 'committed' ? new Date() : null,
     })
 
     n += 1

@@ -125,6 +125,13 @@ const HISTORY_BUDGET_CHARS = 12_000
  */
 const TARGET_NOTES: Record<string, readonly string[]> = {
   orders: [
+    'PO NUMBERS: capture EVERY reference the document gives, not just the one labelled',
+    '"PO No". A buyer\'s order often carries two — the buyer\'s own number, and a supplier',
+    'reference it asks to be quoted on invoices and shipping documents ("supplier ref to',
+    'quote on docs", "please quote", "our ref"). Both go in `poNumbers`. The one the buyer',
+    'asks to be quoted is what the bank matches the export documents against, so dropping',
+    'it is how a set of documents gets refused at presentation for naming the wrong order.',
+    '',
     'A STYLE is one garment the buyer is buying — one style code, one description, one',
     'unit price. A purchase order usually has exactly one, occasionally two or three.',
     'The table of quantities per colour and size is NOT a list of styles: it is that one',

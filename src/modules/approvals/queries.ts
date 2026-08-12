@@ -66,12 +66,43 @@ function titleFor(draft: {
   return `${verb} · ${table}`
 }
 
-const REFERENCE_KEYS = ['buyer_po_no', 'buyerPoNo', 'po_number', 'poNumber', 'order_id', 'orderId']
+/**
+ * What a draft calls itself, in the words printed on the paper behind it.
+ *
+ * The list used to hold six keys, none of which a real module uses. A genuine order drafted
+ * from a buyer's PO therefore reached the approver as "New · orders" with no reference at
+ * all — while the SEEDED demo rows, which are unapprovable fixtures, showed `PO-1000`
+ * because they happened to use `buyer_po_no`. The demo data read better than the real thing,
+ * which is how nobody noticed.
+ *
+ * Ordered most-specific first: an order names itself by PO, a GRN by the challan it came in
+ * on, an inspection by its own number. The first one present wins, and nothing invents a
+ * reference from an id — a uuid in this column would be worse than the blank it replaced.
+ */
+const REFERENCE_KEYS = [
+  'poNumbers', 'poNumber', 'po_number', 'buyer_po_no', 'buyerPoNo',
+  'challanNo', 'challan_no',
+  'inspectionNo', 'requestNo', 'layNo', 'cartonNo', 'code', 'number',
+  'styleCode', 'employeeNo',
+]
 
+/**
+ * The first identifier the payload carries, as a person would read it.
+ *
+ * Arrays are unwrapped: `orders.poNumbers` is `["PO-BF-2044"]` and a check for `typeof v ===
+ * 'string'` silently skipped every order ever drafted. A multi-PO order shows the first and
+ * says how many more, because the row has one line and the detail panel has the rest.
+ */
 function referenceFor(payload: Record<string, unknown>): string | null {
   for (const key of REFERENCE_KEYS) {
     const v = payload[key]
     if (typeof v === 'string' && v.length > 0) return v
+    if (Array.isArray(v)) {
+      const first = v.find((entry) => typeof entry === 'string' && entry.length > 0)
+      if (typeof first === 'string') {
+        return v.length > 1 ? `${first} +${v.length - 1}` : first
+      }
+    }
   }
   return null
 }
