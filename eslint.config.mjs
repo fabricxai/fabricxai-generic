@@ -217,6 +217,12 @@ export default tseslint.config(
       'src/modules/core/delivery.ts',
       'src/modules/core/offline-sync.ts',
       'src/modules/core/job-runs.ts',
+      // Seed scripts run on a direct connection, which in production may carry BYPASSRLS —
+      // the exact case where the predicate in the SQL is the only wall left. The kit's
+      // document numbers exist in more than one tenant, so an unscoped read here picked
+      // the wrong tenant's rows.
+      'scripts/seed-kit-materials.ts',
+      'scripts/seed-running-factory.ts',
     ],
     rules: { 'fabricxai/require-tenant-predicate': 'error' },
   },

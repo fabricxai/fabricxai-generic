@@ -46,6 +46,7 @@ import { companies, roles as rolesTable } from '@/db/schema/core'
 import { factoryToday, shiftFactoryDate } from '@/lib/dates'
 import { buyers } from '@/modules/buyers/schema'
 import type { RequestCtx } from '@/modules/core/ctx'
+import { scoped, tenantEq } from '@/modules/core/scoped'
 import { withTenantRead, withTenantTx } from '@/modules/core/tenancy'
 import { orders, orderStyles } from '@/modules/orders/schema'
 import {
@@ -296,7 +297,7 @@ async function shippingPhase(ctx: RequestCtx, order: OrderRef, allLines: LineRef
     tx
       .select({ id: finishingOutputs.id })
       .from(finishingOutputs)
-      .where(eq(finishingOutputs.orderId, order.id)),
+      .where(scoped(finishingOutputs, ctx, eq(finishingOutputs.orderId, order.id))),
   )
   if (alreadyShipped) {
     console.log('[running] DENIM-2251 · shipping already seeded, left alone')
@@ -451,7 +452,7 @@ async function actualizePastMilestones(
       tx
         .select({ id: orders.id })
         .from(orders)
-        .where(sql`${orders.poNumbers} @> ARRAY[${po}]::text[]`),
+        .where(scoped(orders, ctx, sql`${orders.poNumbers} @> ARRAY[${po}]::text[]`)),
     )
     if (!order) continue
 
@@ -459,7 +460,7 @@ async function actualizePastMilestones(
       tx
         .select({ id: tnaMilestones.id, name: tnaMilestones.name, planned: tnaMilestones.plannedDate })
         .from(tnaMilestones)
-        .where(and(eq(tnaMilestones.orderId, order.id), sql`${tnaMilestones.actualDate} is null`)),
+        .where(scoped(tnaMilestones, ctx, and(eq(tnaMilestones.orderId, order.id), sql`${tnaMilestones.actualDate} is null`))),
     )
 
     for (const [i, m] of due.entries()) {
@@ -493,7 +494,7 @@ async function sampleExists(ctx: RequestCtx, requestNo: string): Promise<boolean
     tx
       .select({ id: sampleRequests.id })
       .from(sampleRequests)
-      .where(eq(sampleRequests.requestNo, requestNo)),
+      .where(scoped(sampleRequests, ctx, eq(sampleRequests.requestNo, requestNo))),
   )
   return Boolean(row)
 }
@@ -517,7 +518,9 @@ async function issueFabricFor(ctx: RequestCtx, orderId: string, want: number): P
       .innerJoin(grnLines, eq(rolls.grnLineId, grnLines.id))
       .innerJoin(grns, eq(grnLines.grnId, grns.id))
       .where(
-        and(
+        scoped(
+          rolls,
+          ctx,
           eq(rolls.status, 'in_stock'),
           eq(grns.bonded, false),
           sql`not exists (select 1 from ${issueLines} il where il.roll_id = ${rolls.id})`,
@@ -542,6 +545,7 @@ async function main(): Promise<void> {
     const [company] = await db
       .select({ id: companies.id, name: companies.name })
       .from(companies)
+      // eslint-disable-next-line fabricxai/require-tenant-predicate -- this IS the tenant resolution; there is no companyId until it returns
       .where(eq(companies.slug, SLUG))
     if (!company) throw new Error(`no company with slug "${SLUG}"`)
 
@@ -627,7 +631,7 @@ async function main(): Promise<void> {
         tx
           .select({ id: orders.id })
           .from(orders)
-          .where(sql`${orders.poNumbers} @> ARRAY[${p.po}]::text[]`),
+          .where(scoped(orders, ctx, sql`${orders.poNumbers} @> ARRAY[${p.po}]::text[]`)),
       )
       if (existing) {
         console.log(`[running] ${p.po} already there, left alone`)
@@ -666,7 +670,7 @@ async function main(): Promise<void> {
         tx
           .select({ id: orderStyles.id })
           .from(orderStyles)
-          .where(eq(orderStyles.orderId, created.orderId)),
+          .where(scoped(orderStyles, ctx, eq(orderStyles.orderId, created.orderId))),
       )
 
       const cells = Object.entries(p.grid).flatMap(([color, qtys]) =>
@@ -717,7 +721,8 @@ async function main(): Promise<void> {
       tx
         .select({ id: orders.id, po: orders.poNumbers, styleId: orderStyles.id, styleCode: orderStyles.styleCode })
         .from(orders)
-        .innerJoin(orderStyles, eq(orderStyles.orderId, orders.id)),
+        .innerJoin(orderStyles, eq(orderStyles.orderId, orders.id))
+        .where(tenantEq(orders, ctx)),
     )
     const byPo = (po: string) => {
       const row = found.find((o) => (o.po as string[]).includes(po))
@@ -726,7 +731,7 @@ async function main(): Promise<void> {
     }
 
     const lineRows = await withTenantRead(ctx, (tx) =>
-      tx.select({ id: lines.id, code: lines.code }).from(lines).where(eq(lines.isActive, true)),
+      tx.select({ id: lines.id, code: lines.code }).from(lines).where(scoped(lines, ctx, eq(lines.isActive, true))),
     )
 
     await samplingPhase(ctx, byPo('JKT-2210'))

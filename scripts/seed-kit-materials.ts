@@ -61,6 +61,7 @@ import {
   openBtb,
 } from '@/modules/commercial/service'
 import type { RequestCtx } from '@/modules/core/ctx'
+import { scoped, tenantEq } from '@/modules/core/scoped'
 import { withTenantRead } from '@/modules/core/tenancy'
 import { orders, orderStyles } from '@/modules/orders/schema'
 import {
@@ -229,6 +230,7 @@ async function main(): Promise<void> {
     const [company] = await db
       .select({ id: companies.id, name: companies.name })
       .from(companies)
+      // eslint-disable-next-line fabricxai/require-tenant-predicate -- this IS the tenant resolution; there is no companyId until it returns
       .where(eq(companies.slug, SLUG))
     if (!company) throw new Error(`no company with slug "${SLUG}"`)
 
@@ -290,7 +292,7 @@ async function bookDenimOrder(ctx: RequestCtx): Promise<Map<string, string>> {
     tx
       .select({ id: orders.id, po: orders.poNumbers })
       .from(orders)
-      .where(sql`${orders.poNumbers} && ARRAY['PO-BF-2044','PO-BF-2051']::text[]`),
+      .where(scoped(orders, ctx, sql`${orders.poNumbers} && ARRAY['PO-BF-2044','PO-BF-2051']::text[]`)),
   )
 
   const byPo = new Map<string, string>()
@@ -300,7 +302,7 @@ async function bookDenimOrder(ctx: RequestCtx): Promise<Map<string, string>> {
 
   if (!byPo.has('PO-BF-2051')) {
     const [buyer] = await withTenantRead(ctx, (tx) =>
-      tx.select({ id: buyers.id }).from(buyers).where(eq(buyers.code, 'HM')),
+      tx.select({ id: buyers.id }).from(buyers).where(scoped(buyers, ctx, eq(buyers.code, 'HM'))),
     )
     if (!buyer) throw new Error('buyer HM missing — run seed-running-factory first')
 
@@ -336,7 +338,7 @@ async function bookDenimOrder(ctx: RequestCtx): Promise<Map<string, string>> {
     }
 
     const [style] = await withTenantRead(ctx, (tx) =>
-      tx.select({ id: orderStyles.id }).from(orderStyles).where(eq(orderStyles.orderId, created.orderId)),
+      tx.select({ id: orderStyles.id }).from(orderStyles).where(scoped(orderStyles, ctx, eq(orderStyles.orderId, created.orderId))),
     )
 
     const grid: Record<string, Record<string, number>> = {
@@ -366,7 +368,7 @@ async function moneyRails(ctx: RequestCtx, orderIds: Map<string, string>): Promi
 
   for (const lc of KIT_LCS) {
     const [found] = await withTenantRead(ctx, (tx) =>
-      tx.select({ id: lcs.id }).from(lcs).where(eq(lcs.number, lc.number)),
+      tx.select({ id: lcs.id }).from(lcs).where(scoped(lcs, ctx, eq(lcs.number, lc.number))),
     )
     if (found) {
       lcIds.set(lc.number, found.id)
@@ -374,7 +376,7 @@ async function moneyRails(ctx: RequestCtx, orderIds: Map<string, string>): Promi
     }
 
     const [buyer] = await withTenantRead(ctx, (tx) =>
-      tx.select({ id: buyers.id }).from(buyers).where(eq(buyers.code, lc.buyer)),
+      tx.select({ id: buyers.id }).from(buyers).where(scoped(buyers, ctx, eq(buyers.code, lc.buyer))),
     )
     if (!buyer) throw new Error(`buyer ${lc.buyer} missing`)
 
@@ -406,7 +408,7 @@ async function moneyRails(ctx: RequestCtx, orderIds: Map<string, string>): Promi
 
   for (const btb of KIT_BTBS) {
     const [found] = await withTenantRead(ctx, (tx) =>
-      tx.select({ id: btbLcs.id }).from(btbLcs).where(eq(btbLcs.number, btb.number)),
+      tx.select({ id: btbLcs.id }).from(btbLcs).where(scoped(btbLcs, ctx, eq(btbLcs.number, btb.number))),
     )
     if (found) continue
 
@@ -416,7 +418,7 @@ async function moneyRails(ctx: RequestCtx, orderIds: Map<string, string>): Promi
     let supplierId: string | undefined
     if (btb.supplier) {
       const [row] = await withTenantRead(ctx, (tx) =>
-        tx.select({ id: suppliers.id }).from(suppliers).where(eq(suppliers.name, btb.supplier!)),
+        tx.select({ id: suppliers.id }).from(suppliers).where(scoped(suppliers, ctx, eq(suppliers.name, btb.supplier!))),
       )
       supplierId = row?.id
     }
@@ -444,7 +446,7 @@ async function declarations(ctx: RequestCtx): Promise<Map<string, string>> {
 
   for (const ud of KIT_UDS) {
     const [found] = await withTenantRead(ctx, (tx) =>
-      tx.select({ id: uds.id }).from(uds).where(eq(uds.number, ud.number)),
+      tx.select({ id: uds.id }).from(uds).where(scoped(uds, ctx, eq(uds.number, ud.number))),
     )
     if (found) {
       ids.set(ud.number, found.id)
@@ -477,7 +479,7 @@ async function supplierList(ctx: RequestCtx): Promise<Map<string, string>> {
 
   for (const s of KIT_SUPPLIERS) {
     const [found] = await withTenantRead(ctx, (tx) =>
-      tx.select({ id: suppliers.id }).from(suppliers).where(eq(suppliers.code, s.code)),
+      tx.select({ id: suppliers.id }).from(suppliers).where(scoped(suppliers, ctx, eq(suppliers.code, s.code))),
     )
     if (found) {
       ids.set(s.name, found.id)
@@ -529,7 +531,7 @@ async function supplierOrders(
   const policy = await getPolicy<ProcurementPolicy>(ctx, 'procurement')
 
   const [btb5120] = await withTenantRead(ctx, (tx) =>
-    tx.select({ id: btbLcs.id }).from(btbLcs).where(eq(btbLcs.number, 'BTB-5120-01')),
+    tx.select({ id: btbLcs.id }).from(btbLcs).where(scoped(btbLcs, ctx, eq(btbLcs.number, 'BTB-5120-01'))),
   )
 
   const plan = [
@@ -557,7 +559,7 @@ async function supplierOrders(
 
   for (const po of plan) {
     const [found] = await withTenantRead(ctx, (tx) =>
-      tx.select({ id: supplierPos.id }).from(supplierPos).where(eq(supplierPos.poNumber, po.poNumber)),
+      tx.select({ id: supplierPos.id }).from(supplierPos).where(scoped(supplierPos, ctx, eq(supplierPos.poNumber, po.poNumber))),
     )
     if (found) {
       ids.set(po.poNumber, found.id)
@@ -604,7 +606,7 @@ async function receipts(
   refs: { udIds: Map<string, string>; itemIds: Map<string, string>; poIds: Map<string, string> },
 ): Promise<void> {
   const locationRows = await withTenantRead(ctx, (tx) =>
-    tx.select({ id: locations.id, kind: locations.kind }).from(locations),
+    tx.select({ id: locations.id, kind: locations.kind }).from(locations).where(tenantEq(locations, ctx)),
   )
   const bonded = locationRows.find((l) => l.kind === 'bonded')?.id
   const general = locationRows.find((l) => l.kind === 'general')?.id
@@ -671,7 +673,7 @@ async function receipts(
 
   for (const grn of plan) {
     const [found] = await withTenantRead(ctx, (tx) =>
-      tx.select({ id: grns.id }).from(grns).where(eq(grns.challanNo, grn.challanNo)),
+      tx.select({ id: grns.id }).from(grns).where(scoped(grns, ctx, eq(grns.challanNo, grn.challanNo))),
     )
     if (found) continue
 
@@ -700,7 +702,7 @@ async function receipts(
  */
 async function fourPoint(ctx: RequestCtx): Promise<void> {
   const [grn] = await withTenantRead(ctx, (tx) =>
-    tx.select({ id: grns.id }).from(grns).where(eq(grns.challanNo, 'FS-INV-7741')),
+    tx.select({ id: grns.id }).from(grns).where(scoped(grns, ctx, eq(grns.challanNo, 'FS-INV-7741'))),
   )
   if (!grn) return
 
@@ -710,12 +712,12 @@ async function fourPoint(ctx: RequestCtx): Promise<void> {
       .select({ id: rolls.id, rollNo: rolls.rollNo })
       .from(rolls)
       .innerJoin(grnLines, eq(grnLines.id, rolls.grnLineId))
-      .where(eq(grnLines.grnId, grn.id)),
+      .where(scoped(rolls, ctx, eq(grnLines.grnId, grn.id))),
   )
 
   const { fabricInspections } = await import('@/modules/quality/schema')
   const already = await withTenantRead(ctx, (tx) =>
-    tx.select({ id: fabricInspections.id }).from(fabricInspections).where(eq(fabricInspections.grnId, grn.id)),
+    tx.select({ id: fabricInspections.id }).from(fabricInspections).where(scoped(fabricInspections, ctx, eq(fabricInspections.grnId, grn.id))),
   )
   if (already.length > 0) return
 
@@ -781,7 +783,7 @@ async function firstIssue(
     tx
       .select({ id: rolls.id, rollNo: rolls.rollNo, qty: rolls.qty, unit: rolls.unit, status: rolls.status })
       .from(rolls)
-      .where(and(eq(rolls.itemId, itemId), inArray(rolls.rollNo, [...shadeA]))),
+      .where(scoped(rolls, ctx, and(eq(rolls.itemId, itemId), inArray(rolls.rollNo, [...shadeA])))),
   )
 
   const free = picked.filter((r) => r.status === 'in_stock')
@@ -835,7 +837,7 @@ async function phase3Fixtures(ctx: RequestCtx, orderIds: Map<string, string>): P
 
   // ── the PP verdict that opens cutting ──
   const [existingPp] = await withTenantRead(ctx, (tx) =>
-    tx.select({ id: sampleRequests.id }).from(sampleRequests).where(eq(sampleRequests.requestNo, 'SR-2610-PP')),
+    tx.select({ id: sampleRequests.id }).from(sampleRequests).where(scoped(sampleRequests, ctx, eq(sampleRequests.requestNo, 'SR-2610-PP'))),
   )
   if (!existingPp) {
     const { sampleRequestId } = await createSampleRequest(ctx, {
@@ -869,14 +871,14 @@ async function phase3Fixtures(ctx: RequestCtx, orderIds: Map<string, string>): P
 
   // ── the marker and the open lay ──
   const [existingLay] = await withTenantRead(ctx, (tx) =>
-    tx.select({ id: lays.id }).from(lays).where(eq(lays.layNo, 'LAY-32')),
+    tx.select({ id: lays.id }).from(lays).where(scoped(lays, ctx, eq(lays.layNo, 'LAY-32'))),
   )
   if (!existingLay) {
     const [style] = await withTenantRead(ctx, (tx) =>
-      tx.select({ id: orderStyles.id }).from(orderStyles).where(eq(orderStyles.orderId, orderId)),
+      tx.select({ id: orderStyles.id }).from(orderStyles).where(scoped(orderStyles, ctx, eq(orderStyles.orderId, orderId))),
     )
     let [marker] = await withTenantRead(ctx, (tx) =>
-      tx.select({ id: markers.id }).from(markers).where(eq(markers.code, 'ST-2610-A')),
+      tx.select({ id: markers.id }).from(markers).where(scoped(markers, ctx, eq(markers.code, 'ST-2610-A'))),
     )
     if (!marker) {
       const created = await createMarker(ctx, {
@@ -891,7 +893,7 @@ async function phase3Fixtures(ctx: RequestCtx, orderIds: Map<string, string>): P
     }
 
     const kitRolls = await withTenantRead(ctx, (tx) =>
-      tx.select({ id: rolls.id, rollNo: rolls.rollNo }).from(rolls).where(inArray(rolls.rollNo, ['R-P-04', 'R-P-05'])),
+      tx.select({ id: rolls.id, rollNo: rolls.rollNo }).from(rolls).where(scoped(rolls, ctx, inArray(rolls.rollNo, ['R-P-04', 'R-P-05']))),
     )
     await createLay(ctx, {
       orderId,
@@ -911,11 +913,11 @@ async function phase3Fixtures(ctx: RequestCtx, orderIds: Map<string, string>): P
     tx
       .select({ id: docSubmissions.id })
       .from(docSubmissions)
-      .where(eq(docSubmissions.invoicedAmount, '122400.00')),
+      .where(scoped(docSubmissions, ctx, eq(docSubmissions.invoicedAmount, '122400.00'))),
   )
   if (!existingSub) {
     const [lc] = await withTenantRead(ctx, (tx) =>
-      tx.select({ id: lcs.id }).from(lcs).where(eq(lcs.number, 'LC-4471')),
+      tx.select({ id: lcs.id }).from(lcs).where(scoped(lcs, ctx, eq(lcs.number, 'LC-4471'))),
     )
     if (lc) {
       const { submissionId } = await openSubmission(ctx, {
