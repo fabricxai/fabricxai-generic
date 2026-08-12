@@ -47,6 +47,7 @@ import {
 } from './schema'
 import {
   allocationPayload,
+  lineCalendarRangePayload,
   linePayload,
   smvRecordPayload,
   type AllocationPayload,
@@ -202,6 +203,120 @@ export async function upsertLine(
 
     if (!row) throw new Error('lines upsert returned nothing')
     return { lineId: row.id, floorId, created: !before }
+  })
+}
+
+/**
+ * Say when a set of lines is working.
+ *
+ * **Nothing in the product wrote `line_calendars`.** Only the seed and the tests did, which
+ * meant a factory that set up its own lines through the setup screen got eight lines with no
+ * working days at all — and the planning board, whose every cell is read from this table,
+ * drew a permanently blank grid. Booking anything on it then reported "these pieces have
+ * nowhere to be made", correctly and unhelpfully, because there was no screen anywhere that
+ * could tell the system a line works on Sundays (order-journey walk, stage 6).
+ *
+ * Capacity is what this table is: `shift_minutes` minus planned downtime, times manpower, is
+ * the minutes a line can earn in a day, and every overload decision on the board is that
+ * number against the SMV of what is on it.
+ *
+ * A day already on the calendar is UPDATED rather than duplicated — re-running a month with a
+ * corrected shift length is the normal way this gets used, and the unique index on
+ * (line, date) would otherwise turn a correction into an error.
+ */
+export async function setLineCalendar(
+  ctx: RequestCtx,
+  input: unknown,
+): Promise<{ lineDays: number; from: string; to: string }> {
+  const payload = lineCalendarRangePayload.parse(input)
+
+  if (payload.to < payload.from) {
+    throw new AppError('validation_failed', 'planning.errors.calendar_range_backwards', {
+      from: payload.from,
+      to: payload.to,
+    })
+  }
+  if (payload.plannedDowntimeMinutes >= payload.shiftMinutes) {
+    // The check constraint says the same thing; this gives it a sentence rather than a
+    // driver error somebody has to decode.
+    throw new AppError('validation_failed', 'planning.errors.downtime_exceeds_shift', {
+      shiftMinutes: payload.shiftMinutes,
+      plannedDowntimeMinutes: payload.plannedDowntimeMinutes,
+    })
+  }
+
+  const working = new Set(payload.weekdays)
+  const dates: string[] = []
+  const cursor = new Date(`${payload.from}T00:00:00Z`)
+  const end = new Date(`${payload.to}T00:00:00Z`)
+  // A year at a time, which is more than any factory plans and short of a runaway loop.
+  while (cursor <= end && dates.length <= 400) {
+    // getUTCDay is 0..6 from Sunday; ISO is 1..7 from Monday.
+    const iso = cursor.getUTCDay() === 0 ? 7 : cursor.getUTCDay()
+    if (working.has(iso)) dates.push(cursor.toISOString().slice(0, 10))
+    cursor.setUTCDate(cursor.getUTCDate() + 1)
+  }
+
+  if (dates.length === 0) {
+    throw new AppError('validation_failed', 'planning.errors.calendar_no_working_days', {
+      from: payload.from,
+      to: payload.to,
+    })
+  }
+
+  return withTenantTx(ctx, async (tx) => {
+    const owned = await tx
+      .select({ id: lines.id })
+      .from(lines)
+      .where(scoped(lines, ctx, inArray(lines.id, payload.lineIds)))
+
+    if (owned.length !== payload.lineIds.length) {
+      throw notFound('planning.errors.line_not_found', {
+        requested: payload.lineIds.length,
+        found: owned.length,
+      })
+    }
+
+    const rows = owned.flatMap((line) =>
+      dates.map((calendarDate) => ({
+        companyId: ctx.companyId,
+        lineId: line.id,
+        calendarDate,
+        shiftMinutes: payload.shiftMinutes,
+        plannedDowntimeMinutes: payload.plannedDowntimeMinutes,
+        manpower: payload.manpower ?? null,
+      })),
+    )
+
+    for (let i = 0; i < rows.length; i += 500) {
+      await tx
+        .insert(lineCalendars)
+        .values(rows.slice(i, i + 500))
+        .onConflictDoUpdate({
+          target: [lineCalendars.lineId, lineCalendars.calendarDate],
+          set: {
+            shiftMinutes: payload.shiftMinutes,
+            plannedDowntimeMinutes: payload.plannedDowntimeMinutes,
+            manpower: payload.manpower ?? null,
+            updatedAt: new Date(),
+          },
+        })
+    }
+
+    await recordChange(ctx, tx, {
+      action: 'update',
+      targetTable: 'line_calendars',
+      targetId: payload.lineIds[0]!,
+      after: {
+        lines: payload.lineIds.length,
+        from: payload.from,
+        to: payload.to,
+        days: dates.length,
+        shiftMinutes: payload.shiftMinutes,
+      },
+    })
+
+    return { lineDays: rows.length, from: payload.from, to: payload.to }
   })
 }
 

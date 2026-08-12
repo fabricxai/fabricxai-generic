@@ -10,10 +10,13 @@ import { PageHeader } from '@/components/shell/page-shell'
 import { canWrite, NAV } from '@/components/shell/nav'
 import { getCtx } from '@/modules/core/session'
 import { companyProfile } from '@/modules/settings/service'
-import { board, openScenarios, type BoardLine } from '@/modules/planning/queries'
+import { orderList } from '@/modules/orders/queries'
+import { board, openScenarios, smvByStyle, type BoardLine } from '@/modules/planning/queries'
 import { factoryToday } from '@/lib/dates'
 
 import { RunActions } from './allocation-actions'
+import { NewAllocationButton } from './new-allocation'
+import { WorkingWeekButton } from './working-week'
 
 /**
  * 5.2 Planning Board.
@@ -32,9 +35,11 @@ export default async function PlanningPage() {
   if (!ctx) redirect('/login')
 
   const from = factoryToday()
-  const [lines, scenarios] = await Promise.all([
+  const [lines, scenarios, orders, smvs] = await Promise.all([
     board(ctx, { from, days: WINDOW_DAYS }),
     openScenarios(ctx),
+    orderList(ctx, { now: new Date() }),
+    smvByStyle(ctx),
   ])
 
   const profile = await companyProfile(ctx)
@@ -45,6 +50,14 @@ export default async function PlanningPage() {
   )
 
   const dates = lines[0]?.days.map((d) => d.date) ?? []
+
+  /*
+   * Every line blank for the whole window. Distinct from "this line is off on Friday": it
+   * means nobody has told the system when any of them work, and until this said so the board
+   * looked like a factory with nothing booked rather than one that cannot book anything.
+   */
+  const noCalendar =
+    lines.length > 0 && lines.every((l) => l.days.every((d) => d.availableMinutes === 0))
 
   // Committed on a day the line is not working at all — the loudest kind of wrong.
   const onNonWorkingDays = lines.flatMap((l) =>
@@ -63,9 +76,44 @@ export default async function PlanningPage() {
         title={lines.length === 0 ? 'No lines' : `${lines.length} lines`}
         meta={scenarios.length > 0 ? `${scenarios.length} draft scenarios` : undefined}
         ownsAmber
+        actions={
+          mayWrite ? (
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <WorkingWeekButton
+              today={from}
+              covered={lines.filter((l) => l.days.some((d) => d.availableMinutes > 0)).length}
+              lines={lines.map((l) => ({ id: l.lineId, code: l.code, name: l.name }))}
+            />
+            <NewAllocationButton
+              today={from}
+              lines={lines.map((l) => ({ id: l.lineId, code: l.code, name: l.name }))}
+              /* Only orders there is something to make. A cancelled or shipped order on the
+                 picker is a planner reading five names to find the two that are work. */
+              orders={orders
+                .filter((o) => o.contractedQty && o.status !== 'cancelled' && o.status !== 'closed')
+                .map((o) => ({
+                  orderId: o.id,
+                  orderStyleId: o.orderStyleId,
+                  label: `${o.poNumbers[0] ?? '—'} · ${o.styleCode ?? '—'} · ${(o.contractedQty ?? 0).toLocaleString()} pcs`,
+                  qty: o.contractedQty ?? 0,
+                  styleCode: o.styleCode,
+                  smv: o.styleCode ? (smvs.get(o.styleCode) ?? null) : null,
+                }))}
+            />
+            </div>
+          ) : undefined
+        }
       />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+        {noCalendar ? (
+          <InlineAlert tone="warning">
+            None of these lines has a working day set in this window, so every square is
+            empty and nothing can be planned onto them. Set the working week — which days
+            they run, how long the shift is — and the board fills in.
+          </InlineAlert>
+        ) : null}
+
         {onNonWorkingDays.length > 0 ? (
           <InlineAlert tone="danger">
             {onNonWorkingDays.length} line-{onNonWorkingDays.length === 1 ? 'day is' : 'days are'}{' '}
@@ -202,7 +250,7 @@ export default async function PlanningPage() {
                         >
                           overloaded on purpose:{' '}
                           {a.acceptedViolations
-                            .map((v) => `${v.date}${v.reason ? ` (${v.reason})` : ''}`)
+                            .map((v) => String(v.facts.date ?? '—'))
                             .join(', ')}
                         </span>
                       ) : null}
@@ -233,8 +281,12 @@ export default async function PlanningPage() {
 }
 
 function LineRow({ line }: { line: BoardLine }) {
+  // The dates a planner signed off. `facts.date` is where the violation carries it — the
+  // cell shades differently for a day somebody chose to overload than for one that just is.
   const accepted = new Set(
-    line.allocations.flatMap((a) => a.acceptedViolations.map((v) => v.date)),
+    line.allocations.flatMap((a) =>
+      a.acceptedViolations.map((v) => String(v.facts.date ?? '')).filter(Boolean),
+    ),
   )
 
   return (

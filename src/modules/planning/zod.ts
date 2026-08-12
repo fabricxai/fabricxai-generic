@@ -55,6 +55,29 @@ export const linePayload = z.object({
   isActive: z.boolean().default(true),
 })
 
+/**
+ * When a set of lines is working, over a stretch of dates.
+ *
+ * A range and a working week rather than a row per day, because that is how a factory
+ * actually decides it: six days, Friday off, eight hours, an hour of it planned downtime for
+ * changeover and maintenance. Expanding that into dates is arithmetic, and asking a planner
+ * to enter ninety rows to say it is how a calendar never gets entered at all.
+ *
+ * `weekdays` is ISO — 1 is Monday, 7 is Sunday. Bangladesh's weekend is Friday, so the
+ * default working week here is 1–4 and 6–7, which is not a detail to leave to a US-shaped
+ * default of Saturday-Sunday.
+ */
+export const lineCalendarRangePayload = z.object({
+  lineIds: z.array(z.uuid()).min(1),
+  from: isoDate,
+  to: isoDate,
+  /** ISO weekday numbers the line works. */
+  weekdays: z.array(z.number().int().min(1).max(7)).min(1),
+  shiftMinutes: z.number().int().min(1).max(1440),
+  plannedDowntimeMinutes: z.number().int().min(0).default(0),
+  manpower: z.number().int().positive().optional(),
+})
+
 export const smvRecordPayload = z.object({
   styleCode: z.string().min(1),
   smv: decimal(6),
@@ -68,7 +91,12 @@ export const learningCurvePointPayload = z.object({
   efficiencyPct: pct,
 })
 
-export const lineCalendarPayload = z.object({
+/**
+ * One line, one day. Kept for the day-level correction a supervisor makes — a line that
+ * worked an extra shift, or lost one — alongside `lineCalendarRangePayload`, which is how a
+ * working week is set in the first place.
+ */
+export const lineCalendarDayPayload = z.object({
   lineId: z.string().uuid(),
   calendarDate: isoDate,
   shiftMinutes: z.number().int().min(1).max(1440),

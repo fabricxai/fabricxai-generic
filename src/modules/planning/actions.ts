@@ -15,6 +15,7 @@ import {
   proposeScenarioApply as proposeScenarioApplyIn,
   recordSmv as recordSmvIn,
   setAllocationStatus as setAllocationStatusIn,
+  setLineCalendar as setLineCalendarIn,
   upsertLine,
   type AllocateResult,
   type AllocationStatus,
@@ -74,6 +75,33 @@ export async function saveLine(input: {
   const ctx = await requireRole(await headers(), ...WRITERS, 'owner', 'admin')
   return surfaced(async () => {
     const result = await upsertLine(ctx, input)
+    refresh()
+    return result
+  })
+}
+
+/**
+ * Say when these lines work.
+ *
+ * The board reads every cell from `line_calendars` and nothing in the product wrote it —
+ * so a factory that drew its own lines had a grid that was blank forever and an overload
+ * check that refused everything, both correctly, and no screen anywhere that could fix it.
+ *
+ * Owner and admin alongside the planner, for the same reason `saveLine` has them: setting
+ * the working week is part of drawing the factory's shape on its first morning.
+ */
+export async function setLineCalendar(input: {
+  lineIds: string[]
+  from: string
+  to: string
+  weekdays: number[]
+  shiftMinutes: number
+  plannedDowntimeMinutes?: number
+  manpower?: number
+}): Promise<{ lineDays: number; from: string; to: string } | ActionFailure> {
+  const ctx = await requireRole(await headers(), ...WRITERS, 'owner', 'admin')
+  return surfaced(async () => {
+    const result = await setLineCalendarIn(ctx, input)
     refresh()
     return result
   })

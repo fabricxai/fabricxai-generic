@@ -16,7 +16,7 @@ import { scoped } from '@/modules/core/scoped'
 import { withTenantRead } from '@/modules/core/tenancy'
 import { orderStyles, orders } from '@/modules/orders/schema'
 
-import { allocations, lineCalendars, lines, scenarios } from './schema'
+import { allocations, lineCalendars, lines, scenarios, smvRecords } from './schema'
 
 /**
  * `allocations.accepted_violations` — the overloads a planner signed off.
@@ -24,11 +24,22 @@ import { allocations, lineCalendars, lines, scenarios } from './schema'
  * Parsed at the boundary because an unreadable entry would silently turn an
  * accepted overload back into an alarm, and a board that cries wolf about a
  * decision already taken is one planners stop reading.
+ *
+ * **This is a `PlanningViolation`, and it used to be described here as something else.** The
+ * schema asked for `{ date, reason?, kind? }`; `allocate` writes `{ code, messageKey, facts }`
+ * with the date inside `facts`. So every accepted overload failed to parse, every one of them
+ * counted into `acceptedUnreadable`, and the board reported "12 accepted overloads could not
+ * be read — this run may be over-committed without it showing" about a run whose overloads
+ * were recorded perfectly well.
+ *
+ * The whole premise of this module's board is the distinction between an overload taken on
+ * purpose and one taken by accident. It had never once been able to draw it (found by walking
+ * the planning board as a planner and booking a run over capacity on purpose).
  */
 const acceptedViolation = z.object({
-  date: z.string(),
-  reason: z.string().optional(),
-  kind: z.string().optional(),
+  code: z.string(),
+  messageKey: z.string(),
+  facts: z.record(z.string(), z.union([z.string(), z.number()])).default({}),
 })
 
 /**
@@ -65,7 +76,7 @@ export interface AllocationRow {
   plannedTotal: number
   status: string
   /** Overloads the planner accepted deliberately. */
-  acceptedViolations: { date: string; reason?: string; kind?: string }[]
+  acceptedViolations: { code: string; messageKey: string; facts: Record<string, string | number> }[]
   acceptedUnreadable: number
 }
 
@@ -248,5 +259,39 @@ export async function lineIdByCode(ctx: AnyCtx, code: string): Promise<string | 
       .where(scoped(lines, ctx, sql`lower(${lines.code}) = lower(${code})`))
       .limit(1)
     return row?.id ?? null
+  })
+}
+
+/**
+ * The latest SMV on record for each style, keyed by style code.
+ *
+ * For the planning board, which has to tell a planner which orders it can actually schedule.
+ * An order whose style nobody has timed is one `allocate` will refuse, and the honest place
+ * to say so is before they fill the form — not after.
+ *
+ * Latest wins: an industrial engineer's study supersedes the estimate a planner typed when
+ * they first needed a date, and `measured_at` (falling back to when the row was written)
+ * is what orders them.
+ */
+export async function smvByStyle(ctx: AnyCtx): Promise<Map<string, string>> {
+  return withTenantRead(ctx, async (tx) => {
+    const rows = await tx
+      .select({
+        styleCode: smvRecords.styleCode,
+        smv: smvRecords.smv,
+        measuredAt: smvRecords.measuredAt,
+        createdAt: smvRecords.createdAt,
+      })
+      .from(smvRecords)
+      .where(scoped(smvRecords, ctx))
+
+    const latest = new Map<string, { smv: string; at: string }>()
+    for (const row of rows) {
+      const at = row.measuredAt ?? row.createdAt.toISOString().slice(0, 10)
+      const held = latest.get(row.styleCode)
+      if (!held || at >= held.at) latest.set(row.styleCode, { smv: row.smv, at })
+    }
+
+    return new Map([...latest].map(([code, held]) => [code, held.smv]))
   })
 }

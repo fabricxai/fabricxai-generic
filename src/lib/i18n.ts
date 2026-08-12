@@ -478,6 +478,11 @@ export const MESSAGES: Catalogue = {
     'planning.errors.allocation_done':
       'That allocation is finished. Moving it now would restate capacity the floor has already used.',
     'planning.errors.allocation_not_found': 'That allocation no longer exists.',
+    'planning.errors.calendar_no_working_days':
+      'No working day falls inside those dates. Pick at least one day of the week the lines run.',
+    'planning.errors.calendar_range_backwards': 'The calendar ends before it starts.',
+    'planning.errors.downtime_exceeds_shift':
+      'Planned downtime has to be less than the shift, or the line earns nothing.',
     'planning.errors.line_inactive': 'That line is not active.',
     'planning.errors.line_needs_floor':
       'A line belongs to a floor, and a floor to a factory unit. Name an existing floor or describe a new one.',
@@ -929,6 +934,11 @@ export const MESSAGES: Catalogue = {
     // The first planning refusal to reach the floor in Bangla. The rest of that module's
     // errors are still on AWAITING_BANGLA — a planner reads English today, an operator
     // being told a line cannot be created should not have to.
+    'planning.errors.calendar_no_working_days':
+      'ওই তারিখগুলোর মধ্যে কোনো কর্মদিবস পড়ে না। সপ্তাহের অন্তত একটি দিন বেছে নিন যেদিন লাইন চলে।',
+    'planning.errors.calendar_range_backwards': 'ক্যালেন্ডার শুরুর আগেই শেষ হয়ে যাচ্ছে।',
+    'planning.errors.downtime_exceeds_shift':
+      'পরিকল্পিত ডাউনটাইম শিফটের চেয়ে কম হতে হবে, নাহলে লাইন কিছুই তৈরি করতে পারে না।',
     'planning.errors.line_needs_floor':
       'লাইন একটি ফ্লোরের অধীনে থাকে, আর ফ্লোর থাকে একটি ইউনিটের অধীনে। আগের কোনো ফ্লোর বেছে নিন, নয়তো নতুন ফ্লোরের তথ্য দিন।',
     'production.errors.count_exceeds_checked':

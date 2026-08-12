@@ -34,6 +34,13 @@ export interface OrderListRow {
   id: string
   poNumbers: string[]
   buyerName: string | null
+  /**
+   * The headline style's id. Needed by anything that acts ON the style rather than merely
+   * naming it — the planning board books a line against a style, and without this an
+   * allocation was written with no style at all and the board printed "style not set" for
+   * work it had just planned.
+   */
+  orderStyleId: string | null
   styleCode: string | null
   description: string | null
   contractedQty: number | null
@@ -103,6 +110,7 @@ export async function orderList(ctx: AnyCtx, input: { now: Date } = { now: new D
     const [styles, milestones] = await Promise.all([
       tx
         .select({
+          id: orderStyles.id,
           orderId: orderStyles.orderId,
           styleCode: orderStyles.styleCode,
           description: orderStyles.description,
@@ -131,6 +139,7 @@ export async function orderList(ctx: AnyCtx, input: { now: Date } = { now: new D
         id: row.id,
         poNumbers: row.poNumbers ?? [],
         buyerName: row.buyerName,
+        orderStyleId: style?.id ?? null,
         styleCode: style?.styleCode ?? null,
         description: style?.description ?? null,
         contractedQty: style?.contractedQty ?? null,
