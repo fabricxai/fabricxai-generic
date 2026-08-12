@@ -15,6 +15,7 @@ import { and, desc, eq, inArray, isNotNull, lte } from 'drizzle-orm'
 import type { AnyCtx, RequestCtx } from '../core/ctx'
 import { AppError, conflict, notFound } from '../core/errors'
 import type { GateResult } from '../core/gates'
+import { notify } from '../core/notifications'
 import { emit } from '../core/outbox'
 import { defineStateMachine } from '../core/state-machine'
 import { scoped } from '../core/scoped'
@@ -661,6 +662,31 @@ async function recordFeedbackIn(
       aggregateTable: 'sample_requests',
       aggregateId: request.id,
     })
+
+    /*
+     * The Table app's buzz (mobile contract §3): a PP verdict is the gate the cutting
+     * floor waits behind, and the cutter learns it today by somebody walking over. An
+     * approval says "you can start"; a rejection says "you still cannot" — both are the
+     * cutter's news, so both go, worded by verdict.
+     */
+    if (request.type === 'pp') {
+      await notify(ctx, {
+        role: 'cutting',
+        kind: 'sampling.pp.verdict',
+        severity: payload.verdict === 'rejected' ? 'warning' : 'info',
+        titleKey:
+          payload.verdict === 'rejected'
+            ? 'sampling.notifications.pp_rejected.title'
+            : 'sampling.notifications.pp_approved.title',
+        params: { styleCode: request.styleCode },
+        moduleId: 'sampling',
+        entityTable: 'sample_requests',
+        entityId: request.id,
+        href: '/cutting',
+        dedupeKey: `pp-verdict:${request.id}:${nextRound}`,
+        channels: ['in_app', 'push'],
+      })
+    }
   }
 
   if (request.type === 'pp' && !decision.passed && wasOpen) {

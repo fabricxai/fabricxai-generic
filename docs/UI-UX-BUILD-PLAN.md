@@ -199,7 +199,7 @@ demand it. **Push is the long pole** — nothing in 4.2+ lands without 4.1.
   shade colour-coding on roll cards (2.7c's filter reused).
   *Verify:* as 4.2; a bonded issue on mobile shows the balance pill and the gate refusal
   full-screen.
-- [ ] **4.4 🅜 Floor skins 3–5: quality, maintenance, cutting.** In that order (tap volume).
+- [x] **4.4 🅜 Floor skins 3–5: quality, maintenance, cutting. ✅** — nine screens tabbed (Walk·4-point·Final / Tickets·PM·Registry / Queue·Lay·Report), swept to literally zero sub-44px taps — which meant finishing 1.8 properly: the back-link, breadcrumbs, and two raw text-buttons were never Buttons and had escaped the component fix. Three push producers: line-down ticket to the maintenance role (critical), PP verdict to cutting worded by verdict (a rejection is also the cutter's news), first-pieces-off-finishing to quality once per order. DEFERRED with reasons: repeat-defect push (needs the runs-analysis job) and PM-overdue push (needs a scheduled task; the scheduler's health-classification harness makes that its own slice). In that order (tap volume).
   Quality: defect-tile walk with live DHU dial. Maintenance: ticket claim/resolve with photo —
   reuses 1.4's queue. Cutting: queue cards with gate state, lay + report.
   *Verify:* per-skin as 4.2. One session each once 4.2's pattern exists.

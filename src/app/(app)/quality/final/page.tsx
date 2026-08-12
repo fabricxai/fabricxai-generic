@@ -4,6 +4,7 @@ import { asc, eq } from 'drizzle-orm'
 
 import { EmptyState } from '@/components/fx/feedback'
 import { FloorScreen } from '@/components/fx/floor'
+import { FloorTabs } from '@/components/shell/floor-tabs'
 import { PageHeader } from '@/components/shell/page-shell'
 import { tui } from '@/lib/i18n-ui'
 import { requestLocale } from '@/lib/ui-locale'
@@ -72,7 +73,14 @@ export default async function FinalInspectionPage() {
           title={tui(locale, 'ui.quality.final_empty_title')}
           body={tui(locale, 'ui.quality.final_empty_body')}
         />
-      </FloorScreen>
+        <FloorTabs
+        tabs={[
+          { href: '/quality/inline', label: 'Walk' },
+          { href: '/quality/fabric', label: '4-point' },
+          { href: '/quality/final', label: 'Final' },
+        ]}
+      />
+    </FloorScreen>
     )
   }
 
@@ -96,6 +104,13 @@ export default async function FinalInspectionPage() {
         ownsAmber
       />
       <FinalClient lots={lots.map((l) => ({ ...l, history: l.history.map(toWire) }))} defects={codes} />
+      <FloorTabs
+        tabs={[
+          { href: '/quality/inline', label: 'Walk' },
+          { href: '/quality/fabric', label: '4-point' },
+          { href: '/quality/final', label: 'Final' },
+        ]}
+      />
     </FloorScreen>
   )
 }

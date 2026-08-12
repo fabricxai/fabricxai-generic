@@ -5,6 +5,8 @@ import { Breadcrumbs, StatTile } from '@/components/fx/data'
 import { EmptyState } from '@/components/fx/feedback'
 import { Figure } from '@/components/fx/format'
 import { SectionHeading } from '@/components/fx/signature'
+import { FloorScreen } from '@/components/fx/floor'
+import { FloorTabs } from '@/components/shell/floor-tabs'
 import { PageHeader } from '@/components/shell/page-shell'
 import { getCtx } from '@/modules/core/session'
 import { assignableLines, registry } from '@/modules/maintenance/queries'
@@ -42,7 +44,7 @@ export default async function MachinesPage() {
   const noSerial = machines.filter((m) => !m.serial)
 
   return (
-    <>
+    <FloorScreen>
       <div style={{ marginBottom: 18 }}>
         <Breadcrumbs
           trail={[{ label: 'Maintenance', href: '/maintenance' }, { label: 'Machine registry' }]}
@@ -115,6 +117,13 @@ export default async function MachinesPage() {
           <MachineRegistry machines={machines} lines={lines} />
         </section>
       </div>
-    </>
+      <FloorTabs
+        tabs={[
+          { href: '/maintenance', label: 'Tickets' },
+          { href: '/maintenance/pm', label: 'PM' },
+          { href: '/maintenance/machines', label: 'Registry' },
+        ]}
+      />
+    </FloorScreen>
   )
 }

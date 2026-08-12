@@ -640,6 +640,13 @@ a:hover {
   body:has(.fx-floor-tabs) .fx-sidebar {
     display: none !important;
   }
+  /* Breadcrumb links are 13px text on desktop, which is fine for a mouse and a miss for a
+     thumb — same density rule as every Button, applied only where thumbs are. */
+  .fx-breadcrumbs a {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--fx-tap-min);
+  }
   .fx-floor-tabs {
     display: flex;
     position: fixed;

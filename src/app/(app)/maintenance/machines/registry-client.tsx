@@ -391,6 +391,10 @@ const control: React.CSSProperties = {
 }
 
 const linkButton: React.CSSProperties = {
+  // A text link is still a tap target — density-sized like every Button (plan 1.8/4.4).
+  minHeight: 'var(--fx-tap-min)',
+  display: 'inline-flex',
+  alignItems: 'center',
   background: 'transparent',
   border: 'none',
   padding: 0,

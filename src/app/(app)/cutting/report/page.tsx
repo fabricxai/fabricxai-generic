@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 
 import { EmptyState } from '@/components/fx/feedback'
 import { FloorScreen } from '@/components/fx/floor'
+import { FloorTabs } from '@/components/shell/floor-tabs'
 import { PageHeader } from '@/components/shell/page-shell'
 import { tui } from '@/lib/i18n-ui'
 import { requestLocale } from '@/lib/ui-locale'
@@ -51,7 +52,14 @@ export default async function CutReportPage({
           title={tui(locale, 'ui.cutting.report_empty_title')}
           body={tui(locale, 'ui.cutting.report_empty_body')}
         />
-      </FloorScreen>
+        <FloorTabs
+        tabs={[
+          { href: '/cutting', label: 'Queue' },
+          { href: '/cutting/lay', label: 'Lay' },
+          { href: '/cutting/report', label: 'Report' },
+        ]}
+      />
+    </FloorScreen>
     )
   }
 
@@ -82,6 +90,13 @@ export default async function CutReportPage({
         lay={lay}
         openLays={open.map((l) => ({ id: l.id, layNo: l.layNo, color: l.color }))}
         tolerancePct={policy.tolerancePct}
+      />
+      <FloorTabs
+        tabs={[
+          { href: '/cutting', label: 'Queue' },
+          { href: '/cutting/lay', label: 'Lay' },
+          { href: '/cutting/report', label: 'Report' },
+        ]}
       />
     </FloorScreen>
   )

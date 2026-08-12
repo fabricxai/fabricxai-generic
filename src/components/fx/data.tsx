@@ -357,6 +357,7 @@ export function Tabs<T extends string>({
 export function Breadcrumbs({ trail }: { trail: readonly { label: string; href?: string }[] }) {
   return (
     <nav
+      className="fx-breadcrumbs"
       aria-label="Breadcrumb"
       style={{
         display: 'flex',

@@ -247,6 +247,14 @@ export const MESSAGES: Catalogue = {
       'A mechanic has taken your ticket and is on the way.',
     'maintenance.notifications.ticket_resolved.title':
       'Your machine ticket is resolved — the line can run.',
+    'maintenance.notifications.ticket_opened.title':
+      'A line is down — an unclaimed machine ticket is waiting.',
+    'sampling.notifications.pp_approved.title':
+      'PP approved on {styleCode} — cutting can start.',
+    'sampling.notifications.pp_rejected.title':
+      'PP rejected on {styleCode} — cutting stays closed.',
+    'quality.notifications.lot_inspectable.title':
+      '{poNumber} has {pieces} pieces off finishing — a sample can be drawn.',
     'store.notifications.grn_failed.title':
       'Inspection failed on challan {challanNo} — those rolls are locked.',
     'store.notifications.grn_passed.title': 'Challan {challanNo} passed inspection.',
@@ -749,6 +757,14 @@ export const MESSAGES: Catalogue = {
       'একজন মেকানিক আপনার টিকিট নিয়েছেন, আসছেন।',
     'maintenance.notifications.ticket_resolved.title':
       'আপনার মেশিনের টিকিট সমাধান হয়েছে — লাইন চালানো যাবে।',
+    'maintenance.notifications.ticket_opened.title':
+      'একটি লাইন বন্ধ — মেশিনের একটি টিকিট কেউ নেয়নি।',
+    'sampling.notifications.pp_approved.title':
+      '{styleCode}-এর PP অনুমোদিত — কাটিং শুরু করা যাবে।',
+    'sampling.notifications.pp_rejected.title':
+      '{styleCode}-এর PP প্রত্যাখ্যাত — কাটিং বন্ধই থাকছে।',
+    'quality.notifications.lot_inspectable.title':
+      '{poNumber}-এর {pieces} পিস ফিনিশিং থেকে এসেছে — স্যাম্পল নেওয়া যায়।',
     'store.notifications.grn_failed.title':
       'চালান {challanNo}-এর ইন্সপেকশন ফেল করেছে — ওই রোলগুলো আটকে আছে।',
     'store.notifications.grn_passed.title': 'চালান {challanNo} ইন্সপেকশনে পাস করেছে।',

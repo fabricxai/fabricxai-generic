@@ -8,6 +8,7 @@ import { Badge } from '@/components/fx/primitives'
 import { SectionHeading } from '@/components/fx/signature'
 import { Ident } from '@/components/fx/format'
 import { TicketActions } from '@/components/fx/ticket-actions'
+import { FloorTabs } from '@/components/shell/floor-tabs'
 import { PageHeader } from '@/components/shell/page-shell'
 import { getCtx } from '@/modules/core/session'
 import {
@@ -302,11 +303,21 @@ export default async function MaintenancePage() {
           )}
         </section>
       </div>
+      <FloorTabs
+        tabs={[
+          { href: '/maintenance', label: 'Tickets' },
+          { href: '/maintenance/pm', label: 'PM' },
+          { href: '/maintenance/machines', label: 'Registry' },
+        ]}
+      />
     </FloorScreen>
   )
 }
 
 const sectionLink: React.CSSProperties = {
+  minHeight: 'var(--fx-tap-min)',
+  display: 'inline-flex',
+  alignItems: 'center',
   font: "400 13px/1.4 var(--fx-font-sans)",
   color: 'var(--fx-text-secondary)',
 }

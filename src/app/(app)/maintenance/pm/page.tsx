@@ -5,6 +5,8 @@ import { Breadcrumbs, StatTile } from '@/components/fx/data'
 import { EmptyState, InlineAlert } from '@/components/fx/feedback'
 import { Figure } from '@/components/fx/format'
 import { SectionHeading } from '@/components/fx/signature'
+import { FloorScreen } from '@/components/fx/floor'
+import { FloorTabs } from '@/components/shell/floor-tabs'
 import { PageHeader } from '@/components/shell/page-shell'
 import { getCtx } from '@/modules/core/session'
 import { pmWorklist, registry } from '@/modules/maintenance/queries'
@@ -55,7 +57,7 @@ export default async function PmPage() {
   const noChecklist = due.filter((d) => d.checklist.length === 0)
 
   return (
-    <>
+    <FloorScreen>
       <div style={{ marginBottom: 18 }}>
         <Breadcrumbs
           trail={[
@@ -165,6 +167,13 @@ export default async function PmPage() {
           </div>
         </section>
       </div>
-    </>
+      <FloorTabs
+        tabs={[
+          { href: '/maintenance', label: 'Tickets' },
+          { href: '/maintenance/pm', label: 'PM' },
+          { href: '/maintenance/machines', label: 'Registry' },
+        ]}
+      />
+    </FloorScreen>
   )
 }

@@ -278,6 +278,26 @@ export async function openTicketFromDowntime(
       aggregateId: row.id,
     })
 
+    /*
+     * The Ticket app's loud buzz (mobile contract §3): a line-down ticket is a line making
+     * nothing, and a mechanic who hears about it in the corridor an hour later is the
+     * exact failure the auto-ticket exists to prevent. Role-addressed — whoever is on
+     * shift claims it, and claim already notifies the reporter back.
+     */
+    await notify(ctx, {
+      role: 'maintenance',
+      kind: 'maintenance.ticket.opened',
+      severity: 'critical',
+      titleKey: 'maintenance.notifications.ticket_opened.title',
+      params: {},
+      moduleId: 'maintenance',
+      entityTable: 'tickets',
+      entityId: row.id,
+      href: '/maintenance',
+      dedupeKey: `ticket-opened:${row.id}`,
+      channels: ['in_app', 'push'],
+    })
+
     return { ticketId: row.id, status: 'open' as const, created: true }
   })
 }

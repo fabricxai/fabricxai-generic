@@ -8,6 +8,7 @@ import { FloorScreen } from '@/components/fx/floor'
 import { Badge } from '@/components/fx/primitives'
 import { Eyebrow, SectionHeading } from '@/components/fx/signature'
 import { Ident } from '@/components/fx/format'
+import { FloorTabs } from '@/components/shell/floor-tabs'
 import { PageHeader } from '@/components/shell/page-shell'
 import type { Locale } from '@/lib/i18n'
 import { tui } from '@/lib/i18n-ui'
@@ -362,6 +363,13 @@ export default async function CuttingPage() {
           )}
         </section>
       </div>
+      <FloorTabs
+        tabs={[
+          { href: '/cutting', label: 'Queue' },
+          { href: '/cutting/lay', label: 'Lay' },
+          { href: '/cutting/report', label: 'Report' },
+        ]}
+      />
     </FloorScreen>
   )
 }

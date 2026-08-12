@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 
 import { EmptyState } from '@/components/fx/feedback'
 import { FloorScreen } from '@/components/fx/floor'
+import { FloorTabs } from '@/components/shell/floor-tabs'
 import { PageHeader } from '@/components/shell/page-shell'
 import { tui } from '@/lib/i18n-ui'
 import { requestLocale } from '@/lib/ui-locale'
@@ -56,7 +57,14 @@ export default async function FabricInspectionPage() {
           title={tui(locale, 'ui.quality.fabric_empty_title')}
           body={tui(locale, 'ui.quality.fabric_empty_body')}
         />
-      </FloorScreen>
+        <FloorTabs
+        tabs={[
+          { href: '/quality/inline', label: 'Walk' },
+          { href: '/quality/fabric', label: '4-point' },
+          { href: '/quality/final', label: 'Final' },
+        ]}
+      />
+    </FloorScreen>
     )
   }
 
@@ -87,6 +95,13 @@ export default async function FabricInspectionPage() {
         // Knit composites grade greige on the machine, so the store gate does not apply and
         // this screen should not imply that production is waiting on it.
         mandatory={woven}
+      />
+      <FloorTabs
+        tabs={[
+          { href: '/quality/inline', label: 'Walk' },
+          { href: '/quality/fabric', label: '4-point' },
+          { href: '/quality/final', label: 'Final' },
+        ]}
       />
     </FloorScreen>
   )

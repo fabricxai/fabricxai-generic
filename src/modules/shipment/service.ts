@@ -26,6 +26,7 @@ import { recordChange, registerAuditedTables } from '../core/audit'
 import type { AnyCtx, RequestCtx } from '../core/ctx'
 import { AppError, conflict, notFound } from '../core/errors'
 import { assertGate, GATES } from '../core/gates'
+import { notify } from '../core/notifications'
 import { emit } from '../core/outbox'
 import { defineStateMachine } from '../core/state-machine'
 import { scoped } from '../core/scoped'
@@ -178,6 +179,30 @@ async function recordFinishingOutputIn(
     },
     aggregateTable: 'finishing_outputs',
     aggregateId: row.id,
+  })
+
+  /*
+   * The Walk app's buzz (mobile contract §3): the FIRST pieces off finishing are what turn
+   * an order from "nothing to sample" into a lot an inspector can draw from — the exact
+   * boundary the final-inspection queue now sizes by. Once per order, by dedupe key: the
+   * second day's output is not news, the first carton's worth is.
+   */
+  const { orders: ordersTable } = await import('@/modules/orders/schema')
+  const [order] = await tx
+    .select({ poNumbers: ordersTable.poNumbers })
+    .from(ordersTable)
+    .where(scoped(ordersTable, ctx, eq(ordersTable.id, payload.orderId)))
+  await notify(ctx, {
+    role: 'quality',
+    kind: 'quality.lot.inspectable',
+    titleKey: 'quality.notifications.lot_inspectable.title',
+    params: { poNumber: order?.poNumbers?.[0] ?? '', pieces: totalQty },
+    moduleId: 'quality',
+    entityTable: 'finishing_outputs',
+    entityId: payload.orderId,
+    href: '/quality/final',
+    dedupeKey: `lot-inspectable:${payload.orderId}`,
+    channels: ['in_app', 'push'],
   })
 
   return { finishingOutputId: row.id, totalQty }

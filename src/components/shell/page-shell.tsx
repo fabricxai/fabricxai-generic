@@ -131,6 +131,11 @@ export function PageHeader({
                 font: '500 13px/1 var(--fx-font-sans)',
                 color: 'var(--fx-text-secondary)',
                 textDecoration: 'none',
+                // A thumb target on phones, a text link on desktop — the density token
+                // resolves the difference (plan 4.4's sweep found it at 13px).
+                minHeight: 'var(--fx-tap-min)',
+                display: 'inline-flex',
+                alignItems: 'center',
               }}
             >
               ← {back.label}

@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 
 import { EmptyState, InlineAlert } from '@/components/fx/feedback'
 import { FloorScreen } from '@/components/fx/floor'
+import { FloorTabs } from '@/components/shell/floor-tabs'
 import { PageHeader } from '@/components/shell/page-shell'
 import { tui } from '@/lib/i18n-ui'
 import { requestLocale } from '@/lib/ui-locale'
@@ -52,7 +53,14 @@ export default async function StartLayPage({
           title={tui(locale, 'ui.cutting.lay_empty_title')}
           body={tui(locale, 'ui.cutting.lay_empty_body')}
         />
-      </FloorScreen>
+        <FloorTabs
+        tabs={[
+          { href: '/cutting', label: 'Queue' },
+          { href: '/cutting/lay', label: 'Lay' },
+          { href: '/cutting/report', label: 'Report' },
+        ]}
+      />
+    </FloorScreen>
     )
   }
 
@@ -104,6 +112,13 @@ export default async function StartLayPage({
         markers={markerRows}
         rolls={rolls}
         blocked={!gate.passed}
+      />
+      <FloorTabs
+        tabs={[
+          { href: '/cutting', label: 'Queue' },
+          { href: '/cutting/lay', label: 'Lay' },
+          { href: '/cutting/report', label: 'Report' },
+        ]}
       />
     </FloorScreen>
   )
