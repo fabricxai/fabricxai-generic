@@ -41,6 +41,8 @@ interface Lot {
   buyerName: string | null
   styleCode: string | null
   contractedQty: number | null
+  /** Pieces off finishing — the lot an inspection is actually drawn from. */
+  finishedQty: number
   majorAql: string | null
   minorAql: string | null
   history: History[]
@@ -140,7 +142,16 @@ export function FinalClient({
 
   function open(next: Lot) {
     setLot(next)
-    const prefilled = next.contractedQty ?? 0
+    /*
+     * The lot is what is FINISHED, not what was ordered.
+     *
+     * This prefilled the contracted quantity, and the AQL sample size is computed from the
+     * lot size — so an inspection of the first 1,050 pieces off finishing was being sized as
+     * if 18,000 were on the floor, which draws a bigger sample than the lot contains and
+     * accepts on a plan nobody agreed to. Contracted is the fallback for an order whose
+     * finishing has not been recorded here at all.
+     */
+    const prefilled = next.finishedQty > 0 ? next.finishedQty : (next.contractedQty ?? 0)
     setLotQty(prefilled > 0 ? String(prefilled) : '')
     const already = next.history.length + (filedHere[next.orderId] ?? 0)
     setInspectionNo(`FI-${next.poNumber ?? next.orderId.slice(0, 6)}-${already + 1}`)
@@ -614,7 +625,13 @@ export function FinalClient({
               >
                 {l.buyerName ?? 'no buyer'}
                 {l.styleCode ? ` · ${l.styleCode}` : ''}
-                {l.contractedQty ? ` · ${l.contractedQty.toLocaleString()} pcs` : ''}
+                {/* Finished over contracted. An inspector needs to know there is a lot to
+                    sample before they walk to it — the queue used to show only what was
+                    ordered, so an order with nothing sewn read exactly like one ready to
+                    inspect. */}
+                {l.finishedQty > 0
+                  ? ` · ${l.finishedQty.toLocaleString()} of ${(l.contractedQty ?? 0).toLocaleString()} finished`
+                  : ' · nothing finished yet'}
               </span>
             </span>
 
@@ -647,7 +664,11 @@ export function FinalClient({
             </span>
 
             <span style={{ textAlign: 'right' }}>
-              <Button variant="ghost" disabled={!l.majorAql} onClick={() => open(l)}>
+              <Button
+                variant="ghost"
+                disabled={!l.majorAql || l.finishedQty === 0}
+                onClick={() => open(l)}
+              >
                 {last ? t('ui.quality.reinspect') : t('ui.quality.inspect')}
               </Button>
             </span>

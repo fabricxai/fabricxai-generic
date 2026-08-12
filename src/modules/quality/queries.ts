@@ -443,6 +443,18 @@ export interface FinalInspectionLot {
   buyerName: string | null
   styleCode: string | null
   contractedQty: number | null
+  /**
+   * Pieces actually finished and available to inspect.
+   *
+   * A final inspection is a sample drawn from a physical lot. The queue used to list every
+   * confirmed order — so an order booked ten minutes ago, with nothing cut and nothing sewn,
+   * sat there offering "Inspect" beside its 18,000 contracted pieces (order-journey walk,
+   * stage 9). An inspector who takes that up is looking for a carton that does not exist.
+   *
+   * Zero is a real answer and the row stays: the order IS in the queue, it just has nothing
+   * in it yet, and saying so is more use than hiding it.
+   */
+  finishedQty: number
   /** From the buyer's terms. Null means there is no contract to inspect against. */
   majorAql: string | null
   minorAql: string | null
@@ -519,6 +531,21 @@ export async function finalInspectionLots(ctx: AnyCtx): Promise<FinalInspectionL
       .orderBy(desc(finalInspections.inspectedAt)),
   )
 
+  // What is physically finished per order — the lot an inspection would actually be drawn
+  // from. One grouped read rather than one per order.
+  const { finishingOutputs } = await import('@/modules/shipment/schema')
+  const finished = await withTenantRead(ctx, (tx) =>
+    tx
+      .select({
+        orderId: finishingOutputs.orderId,
+        qty: sql<string>`coalesce(sum(${finishingOutputs.totalQty}), 0)`,
+      })
+      .from(finishingOutputs)
+      .where(scoped(finishingOutputs, ctx, inArray(finishingOutputs.orderId, rows.map((r) => r.orderId))))
+      .groupBy(finishingOutputs.orderId),
+  )
+  const finishedByOrder = new Map(finished.map((f) => [f.orderId, Number(f.qty)]))
+
   const lots: FinalInspectionLot[] = []
   for (const row of rows) {
     const terms = row.buyerId
@@ -533,6 +560,7 @@ export async function finalInspectionLots(ctx: AnyCtx): Promise<FinalInspectionL
       buyerName: row.buyerName,
       styleCode: row.styleCode,
       contractedQty: row.contractedQty,
+      finishedQty: finishedByOrder.get(row.orderId) ?? 0,
       majorAql: terms?.aqlLevel ?? null,
       // A buyer who sets only one level is setting the MAJOR one; minor falls back to the
       // common 4.0 pairing rather than to the major level, which would be far stricter than
