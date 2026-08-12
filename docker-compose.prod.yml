@@ -91,6 +91,10 @@ x-app-env: &app-env
   # assistant button and /marbim do exactly one thing, ask the reason model, so a
   # Gemini-only deployment ships a copilot that renders perfectly and fails on every
   # question (plan 6.4).
+  # Web push (mobile contract 4.1) — all three or none; absent = push disabled.
+  VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+  VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+  VAPID_SUBJECT: ${VAPID_SUBJECT:-}
   MARBIM_ENABLED: ${MARBIM_ENABLED:-false}
   # Models by role. Absent from this file until now, which meant `MARBIM_MODEL_EXTRACT` in
   # .env.production was read by NOTHING: compose never passed it, so `env.ts` fell through to

@@ -650,6 +650,37 @@ export const processedEvents = pgTable(
  * `dedupe_key` makes notification-producing jobs safely re-runnable: the nightly TNA
  * scan can emit "milestone X at risk" every night without stacking duplicates.
  */
+/**
+ * A device that asked to be pushed to (mobile contract §2, plan 4.1).
+ *
+ * Addressing, not money — no audit registration. One row per browser/device endpoint; the
+ * unique index on the endpoint means re-subscribing the same device updates rather than
+ * duplicates, and the delivery helper prunes rows the push service reports gone (404/410).
+ * Push is a second delivery channel for `notifications` rows, never its own event system.
+ */
+export const pushSubscriptions = pgTable(
+  'push_subscriptions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    companyId: uuid('company_id')
+      .notNull()
+      .references(() => companies.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    /** The push service URL — unique per device+browser profile. */
+    endpoint: text('endpoint').notNull(),
+    /** The browser's p256dh/auth key pair, exactly as PushSubscription.toJSON() gives it. */
+    keys: jsonb('keys').notNull(),
+    userAgent: text('user_agent'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('push_subscriptions_endpoint_key').on(t.endpoint),
+    index('push_subscriptions_company_user_idx').on(t.companyId, t.userId),
+  ],
+)
+
 export const notifications = pgTable(
   'notifications',
   {

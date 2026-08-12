@@ -74,6 +74,32 @@ export async function notify(ctx: AnyCtx, input: NotifyInput): Promise<{ id: str
       .returning({ id: notifications.id })
 
     return inserted[0] ?? null
+  }).then(async (row) => {
+    /*
+     * The push bridge (mobile contract §2). AFTER the transaction, best-effort, and only
+     * when the caller asked for the channel — the in-app row is already committed, so a
+     * vendor outage, missing VAPID keys or a dead device can delay a buzz but never lose a
+     * notification. The payload is built from the same key+params the bell renders, in
+     * English: push has no per-device locale, and en is the catalogue every key must have.
+     */
+    if (row && input.channels?.includes('push')) {
+      try {
+        const { deliverPush } = await import('@/lib/push')
+        const { t } = await import('@/lib/i18n')
+        await deliverPush(ctx, {
+          ...(input.userId ? { userId: input.userId } : { role: input.role! }),
+          payload: {
+            title: t('en', input.titleKey, input.params ?? {}),
+            ...(input.bodyKey ? { body: t('en', input.bodyKey, input.params ?? {}) } : {}),
+            ...(input.href ? { href: input.href } : {}),
+            tag: input.dedupeKey ?? row.id,
+          },
+        })
+      } catch {
+        // Best-effort by contract. The in-app row is the record; the buzz is a courtesy.
+      }
+    }
+    return row
   })
 }
 

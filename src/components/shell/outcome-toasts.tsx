@@ -122,7 +122,11 @@ export function OutcomeToasts() {
                   style={{
                     alignSelf: 'flex-start',
                     font: "500 12px/1.2 var(--fx-font-sans)",
-                    color: 'var(--fx-accent-pressed)',
+                    // text-primary, not accent-pressed: amber at 12px on the toast's tinted
+                    // ground measures 2.73:1 — the axe gate (4.1's non-regression run) wants
+                    // 4.5:1, and an "ask why" a refused person cannot read is not an escape
+                    // hatch. The underline keeps it reading as a link without the colour.
+                    color: 'var(--fx-text-primary)',
                     background: 'transparent',
                     border: 'none',
                     padding: 0,

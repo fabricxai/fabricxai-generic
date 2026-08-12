@@ -181,7 +181,7 @@ demand it. **Push is the long pole** — nothing in 4.2+ lands without 4.1.
   HANDOFF-equivalent for new surface area — the audit's §3 is the draft; this makes it the
   agreement.
   *Verify:* reviewed and ticked here before any 4.x code.
-- [ ] **4.1 🅗 ⏳ PWA base + push infrastructure.** Manifest + service worker + install prompt
+- [x] **4.1 🅗 ⏳ PWA base + push infrastructure. ✅** — manifest + SW (shell-only cache proven at runtime: 22 assets cached, zero data paths), kill-switch NEXT_PUBLIC_PWA=off self-unregisters, push_subscriptions with the shared-tablet upsert rule, notify()→web-push bridge (best-effort by construction, disabled without VAPID), all-or-none VAPID enforced at boot and passed through compose. Non-regression: 18/18 desktop e2e — which caught a pre-existing axe failure (Badge accent tone 2.73:1), fixed per the theme's own ink-on-amber doctrine. Manifest + service worker + install prompt
   (cache-first shell, network-first data); web-push subscription storage (per user+device,
   tenant-scoped table, ⚖ not needed — it's addressing, not money) and a `notifications`-to-push
   bridge in the worker (the in-app notification table already exists and is read by `/home` —

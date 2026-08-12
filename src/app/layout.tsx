@@ -6,6 +6,8 @@ import { requestLocale } from '@/lib/ui-locale'
 
 import './globals.css'
 
+import { PwaRegistration } from '@/components/shell/pwa'
+
 // UI and headings, 400/500/600/700 per the type scale.
 const jakarta = Plus_Jakarta_Sans({
   subsets: ['latin'],
@@ -71,7 +73,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             never sees a light flash on the way in. */}
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
       </head>
-      <body>{children}</body>
+      <body><PwaRegistration />
+        {children}</body>
     </html>
   )
 }

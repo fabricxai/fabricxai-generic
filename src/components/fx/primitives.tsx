@@ -229,7 +229,11 @@ export function Badge({
     warning: { fg: 'var(--fx-warning)', bg: 'transparent' },
     danger: { fg: 'var(--fx-danger)', bg: 'transparent' },
     info: { fg: 'var(--fx-info)', bg: 'transparent' },
-    accent: { fg: 'var(--fx-accent-pressed)', bg: 'var(--fx-accent-subtle)' },
+    // Ink on the amber ground, per the theme's own doctrine ("text on amber is ALWAYS
+    // ink") — accent-pressed at 11px measured 2.73:1 against accent-subtle, and the axe
+    // gate wants 4.5:1. Found by 4.1's non-regression e2e run, present since the Badge
+    // was born: the badge stayed amber, its words became readable.
+    accent: { fg: 'var(--fx-accent-on)', bg: 'var(--fx-accent-subtle)' },
   }
   const t = tones[tone]
 

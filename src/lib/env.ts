@@ -105,6 +105,12 @@ const baseSchema = z.object({
    */
   MARBIM_ENABLED: bool.default(false),
 
+  // Web push (mobile contract §2). All three or none: a half-configured VAPID pair would
+  // subscribe devices nothing can ever send to. Absent = push disabled, app unchanged.
+  VAPID_PUBLIC_KEY: z.string().min(1).optional(),
+  VAPID_PRIVATE_KEY: z.string().min(1).optional(),
+  VAPID_SUBJECT: z.string().startsWith('mailto:').optional(),
+
   // Email: transactional only, never self-hosted SMTP in prod. Dev uses Mailpit.
   RESEND_API_KEY: z.string().min(1).optional(),
   SMTP_HOST: z.string().min(1).optional(),
@@ -152,6 +158,18 @@ const baseSchema = z.object({
  * same argument that put the four custom lint rules under a RuleTester.
  */
 export const envSchema = baseSchema.superRefine((env, ctx) => {
+  // All-or-none VAPID, in every environment: a half-configured pair subscribes devices
+  // that nothing can ever send to, and that failure surfaces weeks later as "push never
+  // arrives" rather than at boot where it is fixable.
+  const vapid = [env.VAPID_PUBLIC_KEY, env.VAPID_PRIVATE_KEY, env.VAPID_SUBJECT]
+  if (vapid.some(Boolean) && !vapid.every(Boolean)) {
+    ctx.addIssue({
+      code: 'custom',
+      message:
+        'VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY and VAPID_SUBJECT are all-or-none — set the three or unset the three.',
+    })
+  }
+
   if (env.NODE_ENV !== 'production') return
 
   // ── A working mail path, by either route ────────────────────────────────────
