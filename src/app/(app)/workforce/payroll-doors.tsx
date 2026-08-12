@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useRef, useState, useTransition } from 'react'
 
 import { InlineAlert, Modal } from '@/components/fx/feedback'
+import { ReadIntoForm, type ReadFields } from '@/components/shell/read-into-form'
 import { DateInput, TextInput } from '@/components/fx/forms'
 import { Button } from '@/components/fx/primitives'
 import { actionErrorMessage } from '@/lib/action-error'
@@ -43,6 +44,35 @@ export function GazetteDoor() {
   const [version, setVersion] = useState('')
   const [effectiveFrom, setEffectiveFrom] = useState('')
   const [rows, setRows] = useState<GradeRow[]>([blankGrade('1'), blankGrade('2'), blankGrade('3'), blankGrade('4')])
+
+  /**
+   * The gazette notification, into the grade table.
+   *
+   * This is the single most tedious retype in the building — seven grades times five
+   * allowances off a government notice, and every figure of it decides somebody's pay. The
+   * grades replace the four blank rows rather than appending to them, because a gazette
+   * naming seven grades should produce seven, not seven plus four empties.
+   */
+  function fill(read: ReadFields) {
+    const v = read.values
+    const str = (x: unknown) => (x === null || x === undefined ? '' : String(x))
+    if (v.version !== undefined) setVersion(str(v.version))
+    if (v.effectiveFrom !== undefined) setEffectiveFrom(str(v.effectiveFrom))
+    const grades = Array.isArray(v.grades) ? (v.grades as Record<string, unknown>[]) : []
+    if (grades.length > 0) {
+      setRows(
+        grades.map((g, i) => ({
+          key: `read-${i}`,
+          grade: str(g.grade),
+          basic: str(g.basic),
+          houseRent: str(g.houseRent),
+          medical: str(g.medical),
+          transport: str(g.transport),
+          food: str(g.food),
+        })),
+      )
+    }
+  }
 
   const ready =
     version.trim() !== '' &&
@@ -90,6 +120,8 @@ export function GazetteDoor() {
 
       <Modal open={open} onClose={() => setOpen(false)} title="Record a wage gazette">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <ReadIntoForm kindId="wage_gazette" prompt="the gazette notification" onFilled={fill} />
+
           <div
             className="fx-stack-tablet"
             style={{ display: 'grid', gridTemplateColumns: '1fr 170px', gap: 12 }}

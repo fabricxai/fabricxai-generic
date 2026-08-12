@@ -27,7 +27,16 @@ export const auditInput = z.object({
 
 /** What MARBIM extracts from an audit report: the findings, never the corrective actions. */
 export const findingsBatchDraft = z.object({
-  auditId: z.uuid(),
+  /**
+   * OPTIONAL for the same reason `lcFromSwiftDraft.buyerId` is: no audit report carries this
+   * system's id for the audit it belongs to, and a structured-output schema that demands one
+   * gets an invention rather than an absence — which fails the whole reading.
+   *
+   * The queued path supplies it from the intake picker. The inline path is used from the
+   * dialog that CREATES the audit, so it does not have one yet and the findings attach to
+   * the audit that dialog is about to write.
+   */
+  auditId: z.uuid().optional().catch(undefined),
   findings: z
     .array(
       z.object({

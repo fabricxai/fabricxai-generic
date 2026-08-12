@@ -65,6 +65,21 @@ export interface IntakeKind {
   roles: readonly Role[]
   /** Ids the schema requires and no document carries. Empty for most kinds. */
   context?: readonly IntakeContextField[]
+  /**
+   * This kind fills a form and is never queued.
+   *
+   * Most kinds arrive as a document with nobody standing over it: they are read into a
+   * `pending_change` and somebody approves them. A few are the opposite — the person is at
+   * the screen, holding the paper, about to save it themselves. A delivery challan is the
+   * clearest case: a receipt is not a thing to approve after the fact, because the goods are
+   * on the floor or they are not, and the storekeeper next to the truck is the one who knows.
+   *
+   * Marked, not merely unused, because it changes what is TRUE of the kind. It has no
+   * proposable target and therefore no commit handler, so `readDocument` refuses it rather
+   * than queueing a job that could only ever die at `propose`, and the intake screen does not
+   * offer a chip that leads nowhere.
+   */
+  fillsFormOnly?: boolean
 }
 
 /**
@@ -103,6 +118,25 @@ export const INTAKE_KINDS: readonly IntakeKind[] = [
     zodSchemaKey: 'rfq',
     roles: ['merchandiser'],
     context: [{ field: 'buyerId', label: 'Which buyer sent it?', source: 'buyers' }],
+  },
+  {
+    /*
+     * The highest-volume retype in the building, and the one the screen was already halfway
+     * to doing. `/store/receive` has photographed the challan since it was built — uploaded
+     * it, filed it against the GRN — and then asked the storekeeper to type what was in the
+     * photograph. Every delivery, every day, standing next to a truck.
+     *
+     * Items are read as text, never as ids: a challan names material the way the supplier
+     * writes it, and the screen matches that against the master list.
+     */
+    id: 'delivery_challan',
+    label: 'A delivery challan',
+    hint: 'The delivery note that came with the goods. Drafts the receipt, its lines and any rolls.',
+    moduleId: 'store',
+    targetTable: 'grns',
+    zodSchemaKey: 'grn_from_challan_v1',
+    roles: ['store', 'procurement'],
+    fillsFormOnly: true,
   },
   {
     id: 'ud_scan',
@@ -206,14 +240,39 @@ const BY_ID = new Map(INTAKE_KINDS.map((kind) => [kind.id, kind]))
  */
 const SUPERVISORY: readonly Role[] = ['owner', 'admin']
 
-/** The kinds a caller holding these roles may file. */
+/**
+ * The kinds a caller holding these roles may FILE — that is, send to the approve inbox.
+ *
+ * Form-filling kinds are excluded whoever is asking: they have no proposable target and
+ * `readDocument` refuses them, so offering one as a chip on the intake screen would be a
+ * door onto a wall. They are reached from their own dialog instead, which is the whole point
+ * of them.
+ */
 export function intakeKindsFor(roles: readonly Role[]): readonly IntakeKind[] {
-  if (roles.some((role) => SUPERVISORY.includes(role))) return INTAKE_KINDS
-  return INTAKE_KINDS.filter((kind) => kind.roles.some((role) => roles.includes(role)))
+  const fileable = INTAKE_KINDS.filter((kind) => !kind.fillsFormOnly)
+  if (roles.some((role) => SUPERVISORY.includes(role))) return fileable
+  return fileable.filter((kind) => kind.roles.some((role) => roles.includes(role)))
 }
 
-/** Whether this caller may file this kind — the same rule the chips are built from. */
+/**
+ * Whether this caller may FILE this kind — the same rule the chips are built from.
+ *
+ * A form-filling kind cannot be filed by anybody: it has no proposable target, so there is
+ * no inbox for it to land in. Answering `false` for everyone keeps this the exact
+ * counterpart of `intakeKindsFor` — the wall and the chips are one rule, which is the only
+ * way a screen and its submit cannot disagree.
+ */
 export const mayFileKind = (kind: IntakeKind, roles: readonly Role[]): boolean =>
+  !kind.fillsFormOnly && roles.some((role) => SUPERVISORY.includes(role) || kind.roles.includes(role))
+
+/**
+ * Whether this caller may READ this kind into their own form.
+ *
+ * The same desk rule, without the filing question. Reading a challan into the receive screen
+ * is the storekeeper's own work — it proposes nothing and needs no inbox — so the only thing
+ * that matters is whether this is their department's paper.
+ */
+export const mayReadKind = (kind: IntakeKind, roles: readonly Role[]): boolean =>
   roles.some((role) => SUPERVISORY.includes(role) || kind.roles.includes(role))
 
 export function intakeKind(id: string): IntakeKind {
@@ -238,7 +297,9 @@ export function assertIntakeKinds(): void {
     if (!definition) {
       throw new Error(`intake kind "${kind.id}" names module "${kind.moduleId}", which is not registered`)
     }
-    if (!definition.pendingTargets.includes(kind.targetTable)) {
+    // A form-filling kind proposes nothing, so it needs no proposable target — see
+    // `fillsFormOnly`. It still has to name a real schema, checked below.
+    if (!kind.fillsFormOnly && !definition.pendingTargets.includes(kind.targetTable)) {
       throw new Error(
         `intake kind "${kind.id}" drafts into "${kind.targetTable}", which ${kind.moduleId} has not registered as a pending target`,
       )

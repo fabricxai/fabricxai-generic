@@ -4,6 +4,7 @@ import { factoryToday } from '@/lib/dates'
 import { useEffect, useRef, useState } from 'react'
 
 import { InlineAlert } from '@/components/fx/feedback'
+import { ReadIntoForm, type ReadFields } from '@/components/shell/read-into-form'
 import { SyncPill } from '@/components/fx/floor'
 import { useT } from '@/components/fx/locale'
 import { Button } from '@/components/fx/primitives'
@@ -32,6 +33,54 @@ interface LocationOption {
   code: string
   name: string
   kind: string
+}
+
+/**
+ * The supplier's words for a material against this factory's own list.
+ *
+ * Exact code, then exact name, then the same WORDS in any order — because a challan writes
+ * "Cotton Yarn 30/1 Combed" for the item somebody set up as "30/1 combed cotton yarn", and
+ * those are the same thing to everyone except a string comparison. Overlap alone is not
+ * enough: "cotton yarn" would then match every cotton item in the store, so the match has to
+ * be the whole token set, both ways.
+ *
+ * No match returns null and the screen SAYS so. A near-miss silently resolved to the wrong
+ * item is a receipt against the wrong material, which is worse than a question.
+ */
+function matchItem(
+  items: readonly { id: string; code: string; name: string }[],
+  code: string,
+  name: string,
+): { id: string; code: string; name: string } | null {
+  const tokens = (value: string) =>
+    new Set(
+      value
+        .toLowerCase()
+        .replace(/[^a-z0-9/.]+/g, ' ')
+        .split(' ')
+        .filter(Boolean),
+    )
+
+  const wantedCode = code.trim().toLowerCase()
+  if (wantedCode) {
+    const byCode = items.find((i) => i.code.toLowerCase() === wantedCode)
+    if (byCode) return byCode
+  }
+
+  const wantedName = name.trim().toLowerCase()
+  if (!wantedName) return null
+
+  const exact = items.find((i) => i.name.toLowerCase() === wantedName)
+  if (exact) return exact
+
+  const wanted = tokens(wantedName)
+  const sameWords = items.find((i) => {
+    const mine = tokens(i.name)
+    if (mine.size !== wanted.size) return false
+    for (const token of wanted) if (!mine.has(token)) return false
+    return true
+  })
+  return sameWords ?? null
 }
 
 interface RollDraft {
@@ -104,6 +153,8 @@ export function ReceiveClient({
   const [rolls, setRolls] = useState<RollDraft[]>([])
   const [received, setReceived] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
+  /** What the reading could not match to the master list, said plainly rather than dropped. */
+  const [readNote, setReadNote] = useState<string | null>(null)
 
   // The challan itself. The paper in the storekeeper's hand is the document a supplier
   // will invoice against and a customs officer may ask for, and the typed fields are a
@@ -233,6 +284,87 @@ export function ReceiveClient({
     setPhotoState('idle')
   }
 
+  /**
+   * The challan, read off the photograph the screen was already taking.
+   *
+   * This form has photographed the challan since it was built, attached it to the GRN, and
+   * then asked the storekeeper to type what was in the photograph — every delivery, every
+   * day, on a tablet, next to a truck. One drop now does both: the paper is kept as evidence
+   * (a supplier invoices against it and customs may ask for it) and the fields fill in.
+   *
+   * Items are matched by CODE first, then by name, against this factory's master list —
+   * a challan says "30/1 combed cotton yarn", never a uuid. A line that matches nothing is
+   * SAID, not silently dropped: an unmatched material is usually an item nobody has set up
+   * yet, and the storekeeper needs to know which one before they save a receipt missing it.
+   *
+   * Bonded and the UD are never read. Whether a receipt is duty-free is a customs position
+   * rather than a line on a delivery note, and getting it wrong in either direction is a
+   * legal problem, not a typing one — the storekeeper says so, deliberately, every time.
+   */
+  function fillFromChallan(read: ReadFields) {
+    const v = read.values
+    const str = (x: unknown) => (x === null || x === undefined ? '' : String(x))
+
+    setChallanPhoto(read.document)
+    if (v.challanNo !== undefined) setChallanNo(str(v.challanNo))
+    if (v.receivedAt !== undefined) setReceivedAt(str(v.receivedAt))
+
+    const lines = Array.isArray(v.lines) ? (v.lines as Record<string, unknown>[]) : []
+    const first = lines[0]
+    if (!first) return
+
+    /*
+     * Several lines of the SAME material are lots, not materials.
+     *
+     * A yarn challan routinely lists one material three times — three lots off three
+     * different machines, each with its own weight — and the kit's own says exactly that:
+     * "3 lots, 10,600 kg reconciles". Treating those as three separate deliveries would have
+     * the storekeeper receive a third of the truck and believe they were done. Summed when
+     * they agree on the material; kept separate when they do not.
+     */
+    const sameMaterial = lines.every(
+      (line) => str(line.itemName).trim().toLowerCase() === str(first.itemName).trim().toLowerCase(),
+    )
+    const lots = sameMaterial ? lines : [first]
+
+    const match = matchItem(items, str(first.itemCode), str(first.itemName))
+    if (match) setItemId(match.id)
+
+    const total = lots.reduce((sum, line) => sum + (Number(str(line.qty)) || 0), 0)
+    if (total > 0) setQty(String(total))
+
+    const readRolls = Array.isArray(first.rolls) ? (first.rolls as Record<string, unknown>[]) : []
+    if (readRolls.length > 0) {
+      setRolls(
+        readRolls.map((roll, i) => ({
+          key: `read-${i}`,
+          rollNo: str(roll.rollNo),
+          qty: str(roll.qty),
+          lot: str(roll.lot),
+          dyeLot: str(roll.lot),
+          shadeGroup: str(roll.shadeGroup),
+        })),
+      )
+    }
+
+    const notes: string[] = []
+    if (!match) {
+      notes.push(
+        `The challan says “${str(first.itemName)}”, which is not on the item list — pick the right item, or add it in factory setup first.`,
+      )
+    }
+    if (lines.length > 1 && sameMaterial) {
+      notes.push(`It lists ${lines.length} lots of the same material, added up to ${total}.`)
+    } else if (lines.length > 1) {
+      // One GRN, one item on this screen. Saying so beats filling the first line and letting
+      // somebody believe the whole delivery is entered.
+      notes.push(
+        `It lists ${lines.length} different materials. The first is filled in — receive it, then repeat for the rest.`,
+      )
+    }
+    setReadNote(notes.length > 0 ? notes.join(' ') : null)
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 26 }}>
       <SyncPill online={online} queued={queued} syncing={syncing} onSync={() => void sync()} />
@@ -287,6 +419,9 @@ export function ReceiveClient({
           if (file) void capturePhoto(file)
         }}
       />
+
+      <ReadIntoForm kindId="delivery_challan" prompt="the challan" onFilled={fillFromChallan} />
+      {readNote ? <InlineAlert tone="warning">{readNote}</InlineAlert> : null}
 
       <div
         style={{

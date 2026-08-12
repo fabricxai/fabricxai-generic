@@ -478,6 +478,10 @@ export const MESSAGES: Catalogue = {
     'planning.errors.allocation_done':
       'That allocation is finished. Moving it now would restate capacity the floor has already used.',
     'planning.errors.allocation_not_found': 'That allocation no longer exists.',
+    'marbim.errors.kind_is_inline_only':
+      'That document is read straight into its own screen, not sent to the approve inbox. Open the screen it belongs to and drop it there.',
+    'compliance.errors.findings_no_audit':
+      'These findings are not attached to an audit. Log the audit first, then send the report again.',
     'commercial.errors.lc_draft_no_buyer':
       'This credit has no buyer against it. Send the document again and choose whose credit it is.',
     'planning.errors.calendar_no_working_days':
@@ -714,6 +718,10 @@ export const MESSAGES: Catalogue = {
       'LC {lcNumber}: শেষ শিপমেন্টের ({date}) বাকি {daysLeft} দিন',
     'commercial.notifications.lc_countdown_expiry.title':
       'LC {lcNumber}: মেয়াদ শেষের ({date}) বাকি {daysLeft} দিন',
+    'marbim.errors.kind_is_inline_only':
+      'এই ডকুমেন্টটি সরাসরি তার নিজের স্ক্রিনে পড়া হয়, approve inbox-এ যায় না। সংশ্লিষ্ট স্ক্রিন খুলে সেখানে দিন।',
+    'compliance.errors.findings_no_audit':
+      'এই ফাইন্ডিংগুলো কোনো অডিটের সঙ্গে যুক্ত নয়। আগে অডিটটি লগ করুন, তারপর রিপোর্টটি আবার পাঠান।',
     'commercial.errors.lc_draft_no_buyer':
       'এই ক্রেডিটের বিপরীতে কোনো ক্রেতা নেই। ডকুমেন্টটি আবার পাঠান এবং কার ক্রেডিট তা বেছে নিন।',
     'commercial.errors.order_not_found': 'সেই অর্ডারটি আর নেই, তাই ক্রেডিট এটি কভার করতে পারবে না।',

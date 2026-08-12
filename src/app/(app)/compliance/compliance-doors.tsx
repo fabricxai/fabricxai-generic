@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 
 import { InlineAlert, Modal } from '@/components/fx/feedback'
+import { ReadIntoForm, type ReadFields } from '@/components/shell/read-into-form'
 import { DateInput, TextInput } from '@/components/fx/forms'
 import { Button } from '@/components/fx/primitives'
 import { actionErrorMessage } from '@/lib/action-error'
@@ -38,6 +39,38 @@ export function LogAuditButton() {
   const [auditor, setAuditor] = useState('')
   const [auditedOn, setAuditedOn] = useState(factoryToday())
   const [findings, setFindings] = useState<FindingDraft[]>([blankFinding()])
+
+  /**
+   * The findings out of the report, which is the whole of the tedium.
+   *
+   * A BSCI or RSC report runs to fifty pages and lists thirty findings, and somebody types
+   * them at six in the evening — exactly the work a person does badly and a reader does well.
+   * The regime, the auditor and the date stay with the person: those are on the cover and
+   * take five seconds, and the model has nothing to add to them.
+   *
+   * CAPs are not read and never will be. A corrective action names an owner and a deadline,
+   * and that is an assignment of responsibility no model gets to make.
+   */
+  function fill(read: ReadFields) {
+    const str = (x: unknown) => (x === null || x === undefined ? '' : String(x))
+    const rows = Array.isArray(read.values.findings)
+      ? (read.values.findings as Record<string, unknown>[])
+      : []
+    if (rows.length > 0) {
+      setFindings(
+        rows.map((row, i) => ({
+          key: `read-${i}`,
+          severity: (['critical', 'major', 'minor', 'observation'] as const).includes(
+            row.severity as 'critical',
+          )
+            ? (row.severity as FindingDraft['severity'])
+            : 'observation',
+          clause: str(row.sourcePage ? `p.${String(row.sourcePage)}` : ''),
+          description: str(row.text),
+        })),
+      )
+    }
+  }
 
   const filled = findings.filter((f) => f.description.trim())
   const ready = auditor.trim() !== '' && auditedOn !== '' && filled.length > 0
@@ -81,6 +114,8 @@ export function LogAuditButton() {
 
       <Modal open={open} onClose={() => setOpen(false)} title="Log an audit and its findings">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <ReadIntoForm kindId="audit_report" prompt="the audit report" onFilled={fill} />
+
           {noted ? <InlineAlert tone="success">{noted}</InlineAlert> : null}
 
           <div

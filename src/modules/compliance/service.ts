@@ -196,6 +196,17 @@ export async function commitFindingsBatch(
 ): Promise<{ rowId: string; after: Record<string, unknown> }> {
   const payload = findingsBatchDraft.parse(input.payload)
 
+  /*
+   * The audit is optional while a model is reading and required to write — the same shape as
+   * `commitLcFromDraft`. A batch of findings belonging to no audit is a list of complaints
+   * with nothing to attach them to, and no report carries this system's id for one.
+   */
+  if (!payload.auditId) {
+    throw new AppError('validation_failed', 'compliance.errors.findings_no_audit', {
+      findings: payload.findings.length,
+    })
+  }
+
   // Read the parent under tenant scope. Postgres runs FK checks with RLS bypassed, so the
   // foreign key alone would happily attach these findings to another factory's audit.
   const [audit] = await tx.select().from(audits).where(scoped(audits, ctx, eq(audits.id, payload.auditId)))

@@ -159,7 +159,77 @@ export const stockAdjustmentDraft = z.object({
   note: z.string().min(10, 'an adjustment needs a stated reason'),
 })
 
+/**
+ * A delivery challan, as a model reads it off a photograph.
+ *
+ * The receive screen has photographed the challan since it was built — uploaded it, stored
+ * it against the GRN, shown its filename — and never once read it. The storekeeper takes the
+ * picture and then types what is in the picture. This is the single highest-volume retype in
+ * the building: every delivery, every day, on a tablet, standing next to a truck.
+ *
+ * ## Codes, not ids
+ *
+ * `grnReceipt` names items by uuid because that is what the database needs. A challan names
+ * them the way the supplier writes them — "30/1 combed cotton yarn", sometimes a code the
+ * factory shares with them, never a uuid. So this reads `itemCode` and `itemName` as text and
+ * the screen resolves them against the master list, showing what it matched. A model asked
+ * for a uuid invents one; a model asked what the paper says reads what the paper says.
+ *
+ * ## What it does not read
+ *
+ * The bonded flag and the UD. Whether a receipt is duty-free is a customs position, not a
+ * line on a delivery note, and reading it wrong in either direction is a legal problem rather
+ * than a typing one — the storekeeper says so, deliberately, every time.
+ */
+/**
+ * "10,600 KG" or 10600 → "10600". Tolerated on the way in, strict underneath.
+ *
+ * A challan writes quantities the way a person writes them, with thousands separators and
+ * the unit alongside. The strict `quantity` regex refuses all of that, and refusing the whole
+ * reading over a comma is how an extractor gets a reputation for not working.
+ */
+const transcribedQty = z.preprocess((value) => {
+  if (typeof value === 'number') return String(value)
+  if (typeof value !== 'string') return value
+  const match = /\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?/.exec(value)
+  if (!match) return value
+  const [whole, fraction = ''] = match[0].replace(/,/g, '').split('.')
+  const trimmed = fraction.length > 2 ? fraction.slice(0, 2) : fraction
+  return trimmed ? `${whole}.${trimmed}` : whole
+}, quantity)
+
+export const grnFromChallanDraft = z.object({
+  challanNo: z.string().min(1),
+  receivedAt: calendarDate.optional(),
+  /** What the supplier calls itself on its own paper — matched against the supplier list. */
+  supplierName: z.string().optional(),
+  lines: z
+    .array(
+      z.object({
+        /** The code if the challan prints one — many do, shared with the supplier. */
+        itemCode: z.string().optional(),
+        /** What the paper calls the material. Always present; the code often is not. */
+        itemName: z.string().min(1),
+        qty: transcribedQty,
+        unit: z.string().min(1).max(20),
+        /** Rolls or bales listed individually, when the challan itemises them. */
+        rolls: z
+          .array(
+            z.object({
+              rollNo: z.string().min(1),
+              qty: transcribedQty,
+              lot: z.string().optional(),
+              shadeGroup: z.string().optional(),
+            }),
+          )
+          .default([]),
+      }),
+    )
+    .min(1),
+})
+
 export const STORE_ZOD_MAP = {
+  grn_from_challan_v1: grnFromChallanDraft,
   stock_adjustment_v1: stockAdjustmentDraft,
 } as const
 

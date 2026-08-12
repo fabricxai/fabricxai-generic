@@ -26,12 +26,13 @@ import { describe, expect, it } from 'vitest'
 import type { ZodType } from 'zod'
 
 import '@/modules/registry'
-import { getCommitHandler, resolvePendingSchema } from '@/modules/core/registry'
+import { getCommitHandler, resolvePendingSchema, resolveReadSchema } from '@/modules/core/registry'
 import {
   INTAKE_KINDS,
   assertIntakeKinds,
   intakeKindsFor,
   mayFileKind,
+  mayReadKind,
 } from '@/modules/marbim/intake'
 
 /**
@@ -75,6 +76,18 @@ function requiredUuidPaths(schema: ZodType, path = ''): string[] {
   return []
 }
 
+/**
+ * How a kind's own schema is reached.
+ *
+ * A queued kind proposes, so it resolves through the proposable-target gate. A form-filling
+ * kind writes nothing and has no proposable target, so it resolves by name — and the test
+ * has to ask the same way the code does, or it is testing a rule the product does not have.
+ */
+const schemaOf = (kind: (typeof INTAKE_KINDS)[number]) =>
+  kind.fillsFormOnly
+    ? resolveReadSchema(kind.moduleId, kind.zodSchemaKey)
+    : resolvePendingSchema(kind.moduleId, kind.targetTable, kind.zodSchemaKey)
+
 describe('MARBIM intake kinds', () => {
   it('every kind names a registered module, target and schema', () => {
     expect(() => assertIntakeKinds()).not.toThrow()
@@ -83,7 +96,7 @@ describe('MARBIM intake kinds', () => {
   it.each(INTAKE_KINDS.map((kind) => [kind.id, kind] as const))(
     '%s can actually be completed from a document',
     (_id, kind) => {
-      const schema = resolvePendingSchema(kind.moduleId, kind.targetTable, kind.zodSchemaKey)
+      const schema = schemaOf(kind)
 
       // A declared context field is an id the PERSON picks, so the document not carrying it
       // is fine. Anything left over is a field nobody can supply.
@@ -115,7 +128,12 @@ describe('MARBIM intake kinds', () => {
   it.each(INTAKE_KINDS.map((kind) => [kind.id, kind] as const))(
     '%s produces a draft that can actually be committed',
     (_id, kind) => {
-      const schema = resolvePendingSchema(kind.moduleId, kind.targetTable, kind.zodSchemaKey)
+      // A form-filling kind is never committed by core: the person presses their own
+      // screen's save, which goes through the module's ordinary action. There is no generic
+      // write to refuse its field names.
+      if (kind.fillsFormOnly) return
+
+      const schema = schemaOf(kind)
       const fields = Object.keys(
         (schema as unknown as { shape?: Record<string, unknown> }).shape ?? {},
       )
@@ -135,7 +153,7 @@ describe('MARBIM intake kinds', () => {
     // adds a key the schema does not know, and zod rejects the whole draft as invalid —
     // while the required id it was meant to fill is still missing.
     for (const kind of INTAKE_KINDS) {
-      const schema = resolvePendingSchema(kind.moduleId, kind.targetTable, kind.zodSchemaKey)
+      const schema = schemaOf(kind)
       const shape = (schema as unknown as { shape?: Record<string, unknown> }).shape ?? {}
 
       for (const field of kind.context ?? []) {
@@ -190,12 +208,26 @@ describe('a kind belongs to a desk', () => {
     expect(idsFor('store')).toEqual(['ud_scan'])
   })
 
-  it('gives an owner and an admin everything', () => {
+  it('gives an owner and an admin everything that can be filed', () => {
     // Supervision, not a department — the same two roles requireRole treats that way.
-    expect(intakeKindsFor(['owner'])).toEqual(INTAKE_KINDS)
-    expect(intakeKindsFor(['admin'])).toEqual(INTAKE_KINDS)
+    // Form-filling kinds are absent for everyone: there is no inbox for them to land in,
+    // so a chip offering one would be a door onto a wall.
+    const fileable = INTAKE_KINDS.filter((kind) => !kind.fillsFormOnly)
+    expect(intakeKindsFor(['owner'])).toEqual(fileable)
+    expect(intakeKindsFor(['admin'])).toEqual(fileable)
     // And a supervisory role alongside a narrow one still widens, never narrows.
-    expect(intakeKindsFor(['hr', 'admin'])).toEqual(INTAKE_KINDS)
+    expect(intakeKindsFor(['hr', 'admin'])).toEqual(fileable)
+  })
+
+  it('a form-filling kind cannot be filed by anybody, and is readable by its desk', () => {
+    const challan = INTAKE_KINDS.find((kind) => kind.id === 'delivery_challan')!
+    expect(challan.fillsFormOnly).toBe(true)
+    // Not even an owner — this is not a permission, it is an absence of anywhere to send it.
+    expect(mayFileKind(challan, ['owner'])).toBe(false)
+    expect(mayFileKind(challan, ['store'])).toBe(false)
+    // The storekeeper reads it into their own screen, which is the whole point of it.
+    expect(mayReadKind(challan, ['store'])).toBe(true)
+    expect(mayReadKind(challan, ['merchandiser'])).toBe(false)
   })
 
   it('offers nothing to a role that files no documents', () => {

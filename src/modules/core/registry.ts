@@ -160,5 +160,35 @@ export function resolvePendingSchema(moduleId: string, targetTable: string, zodS
   return schema
 }
 
+/**
+ * The schema behind a document READING, which is not a write.
+ *
+ * `resolvePendingSchema` refuses a target that is not a registered pending target, and that
+ * gate is exactly right for what it governs: rule 3 says an AI writes only through
+ * `pending_changes`, into a table its module has declared. It has nothing to say about
+ * reading.
+ *
+ * Filling a form in front of the person who will then press save writes nothing at all — the
+ * writer is the human, through the module's own action, with its own role wall. Requiring a
+ * `pendingTarget` for that would mean declaring a table proposable in order to be allowed to
+ * read a delivery note into a form, which then demands a commit handler for a draft nobody
+ * will ever raise. A receipt is not a thing to approve after the fact: the goods are on the
+ * floor or they are not, and the person standing next to them is the one who knows.
+ *
+ * The module must still NAME the schema. What a reading is parsed into stays the module's
+ * decision, not the reader's.
+ */
+export function resolveReadSchema(moduleId: string, zodSchemaKey: string) {
+  const definition = registry.get(moduleId)
+  if (!definition) {
+    throw new AppError('validation_failed', 'errors.unknown_module', { moduleId })
+  }
+  const schema = definition.zodMap[zodSchemaKey]
+  if (!schema) {
+    throw new AppError('validation_failed', 'errors.unknown_schema', { moduleId, zodSchemaKey })
+  }
+  return schema
+}
+
 /** Test-only: the registry is module-global, so suites must be able to reset it. */
 export const __resetRegistry = (): void => registry.clear()

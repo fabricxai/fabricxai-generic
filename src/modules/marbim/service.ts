@@ -12,7 +12,7 @@
  * uploading a tech pack should not be watching a spinner that might end in a 504.
  */
 import { and, desc, eq, gte, sql } from 'drizzle-orm'
-import { z } from 'zod'
+import { z, type ZodType } from 'zod'
 
 import { extractDocumentText } from '@/lib/document-text'
 import { consume } from '@/lib/rate-limit'
@@ -124,6 +124,31 @@ const HISTORY_BUDGET_CHARS = 12_000
  * is the kind that has to be prevented at the instruction.
  */
 const TARGET_NOTES: Record<string, readonly string[]> = {
+  grns: [
+    'This is a DELIVERY CHALLAN — a supplier\'s note of what was sent, usually a phone',
+    'photograph of a carbon-copy pad, often handwritten, sometimes at an angle.',
+    '',
+    'ITEMS: read what the paper calls the material into `itemName`, word for word. Do not',
+    'translate it into a code, a category or a tidier name — the receiving screen matches',
+    'it against this factory\'s own list and shows the storekeeper what it matched, and a',
+    '"helpful" rewording is what makes that match silently wrong. If the challan ALSO',
+    'prints a code, put that in `itemCode`; many do, shared with the supplier.',
+    '',
+    'QUANTITIES: the figure and its unit as printed — "10,600" and "KG". Bangladeshi',
+    'challans write kg, yds, pcs, cone, dozen. Do not convert between them, ever.',
+    '',
+    'ROLLS: only when the challan itemises them individually, which fabric deliveries',
+    'usually do and yarn or trims never do. A roll line has its own number and its own',
+    'quantity; a lot or batch number often covers several rolls at once.',
+    '',
+    'Do NOT read: whether the goods are bonded, and any UD or bond-licence number that',
+    'appears. Duty-free status is a customs position a storekeeper states deliberately,',
+    'not a line to be transcribed off a delivery note.',
+    '',
+    'A challan number is whatever the pad prints — "Challan No", "CH", "DN", or just a',
+    'number beside the date. If two numbers appear, the one the supplier calls their',
+    'challan or delivery number is the one, not their invoice number.',
+  ],
   lcs: [
     'DOCUMENTS REQUIRED (field 46A) is a numbered list written in bank prose, and',
     '`docsRequired` is a fixed vocabulary of seven kinds. Map each line onto ONE of:',
@@ -482,9 +507,17 @@ export interface ExtractionOutcome {
 export interface ReadDocumentInput {
   moduleId: string
   targetTable: string
-  /** Which of the module's draft schemas the reading is parsed against. Never optional —
-   *  `resolvePendingSchema` refuses without it, and a reading with no schema is a blob. */
-  zodSchemaKey: string
+  /**
+   * What the reading is parsed into, resolved by the CALLER.
+   *
+   * The queued path resolves it through `resolvePendingSchema`, which refuses a table the
+   * module has not declared proposable — right, because that path proposes. The inline path
+   * resolves it through `resolveReadSchema`, which asks only that the module named the
+   * schema, because filling somebody's form is not a write and the proposable-target gate
+   * has nothing to say about it. Passing the schema in is what keeps those two rules where
+   * they belong instead of in here.
+   */
+  schema: ZodType
   sourceText?: string | undefined
   sourceDocumentId?: string | undefined
   /** Ids the person chose. Merged over the model's reading and scored 1. */
@@ -518,7 +551,7 @@ export async function readDocumentInto(
   ctx: AnyCtx,
   input: ReadDocumentInput,
 ): Promise<ReadDocumentResult> {
-  const schema = resolvePendingSchema(input.moduleId, input.targetTable, input.zodSchemaKey)
+  const schema = input.schema
   let source = input.sourceText ?? ''
 
   /*
@@ -704,7 +737,7 @@ export async function runExtraction(
     const { payload, fieldConfidence, model } = await readDocumentInto(ctx, {
       moduleId: job.moduleId,
       targetTable: job.targetTable,
-      zodSchemaKey: job.zodSchemaKey,
+      schema: resolvePendingSchema(job.moduleId, job.targetTable, job.zodSchemaKey),
       ...(job.sourceText ? { sourceText: job.sourceText } : {}),
       ...(job.sourceDocumentId ? { sourceDocumentId: job.sourceDocumentId } : {}),
       ...(job.contextValues ? { contextValues: job.contextValues } : {}),

@@ -9,7 +9,7 @@ import { consume } from '@/lib/rate-limit'
 import { surfaced, type ActionFailure } from '@/lib/action-failure'
 import { requireRole } from '@/modules/core/session'
 import { companyProfile, getPolicy } from '@/modules/settings/service'
-import { listModules } from '@/modules/core/registry'
+import { listModules, resolveReadSchema } from '@/modules/core/registry'
 import { TEXT_EXTRACTABLE_MIME } from '@/lib/document-text'
 
 import { AppError } from '@/modules/core/errors'
@@ -17,7 +17,7 @@ import type { AnyCtx } from '@/modules/core/ctx'
 import { buyerAccounts } from '@/modules/buyers/queries'
 import { recentAudits } from '@/modules/compliance/queries'
 
-import { intakeKind, intakeKindsFor, mayFileKind } from './intake'
+import { intakeKind, intakeKindsFor, mayFileKind, mayReadKind } from './intake'
 import { extractorVersionFor } from './marbim'
 import { EXTRACTOR_PROMPT_VERSION } from './providers/gemini'
 import { hasProvider, MODEL_READABLE_MIME, modelForRole } from './provider'
@@ -285,6 +285,17 @@ export async function readDocument(input: {
   }
 
   /*
+   * A form-filling kind has no proposable target, so queueing it would create a job that can
+   * only die at `propose` — after the upload, after the wait, in a status list. Refused at
+   * the door, the same way an unreadable file is.
+   */
+  if (kind.fillsFormOnly) {
+    throw new AppError('validation_failed', 'marbim.errors.kind_is_inline_only', {
+      kindId: kind.id,
+    })
+  }
+
+  /*
    * The one-of-them-is-readable gate, checked before any work is queued.
    *
    * A file-only submission is only accepted when the file can actually be read — by the
@@ -415,7 +426,9 @@ export async function readIntoForm(input: {
 
     const kind = intakeKind(input.kindId)
     // The wall, not the filter — same as the queued path. A screen never decides this.
-    if (!mayFileKind(kind, ctx.roles)) {
+    // `mayReadKind`, because a form-filling kind is unfileable by everybody and reading one
+    // is exactly what this action is for.
+    if (!mayReadKind(kind, ctx.roles)) {
       throw new AppError('forbidden', 'marbim.errors.kind_not_your_desk', { kindId: kind.id })
     }
 
@@ -479,7 +492,9 @@ export async function readIntoForm(input: {
     const read = await readDocumentInto(ctx, {
       moduleId: kind.moduleId,
       targetTable: kind.targetTable,
-      zodSchemaKey: kind.zodSchemaKey,
+      // `resolveReadSchema`, not `resolvePendingSchema`: this fills a form and proposes
+      // nothing, so the proposable-target gate is not the one that applies.
+      schema: resolveReadSchema(kind.moduleId, kind.zodSchemaKey),
       ...(sourceText ? { sourceText } : {}),
       ...(input.documentId ? { sourceDocumentId: input.documentId } : {}),
       ...(Object.keys(contextValues).length > 0 ? { contextValues } : {}),

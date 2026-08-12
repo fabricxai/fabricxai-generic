@@ -6,7 +6,7 @@ import { InlineAlert } from '@/components/fx/feedback'
 import { MarbimMark, type MarkState } from '@/components/fx/mark'
 import { actionErrorMessage } from '@/lib/action-error'
 import { unwrap } from '@/lib/action-failure'
-import { uploadDocument } from '@/lib/upload-document'
+import { uploadDocument, type UploadedDocument } from '@/lib/upload-document'
 import { readIntoForm } from '@/modules/marbim/actions'
 
 /**
@@ -46,6 +46,15 @@ export interface ReadFields {
   values: Record<string, unknown>
   confidence: Record<string, number | null>
   model: string
+  /**
+   * The document as it was stored, so a caller that also wants to KEEP it does not make the
+   * person attach it twice.
+   *
+   * The store's receive screen is the case this exists for: it has always photographed the
+   * challan as evidence — a supplier will invoice against that paper and a customs officer
+   * may ask for it — and now the same photograph fills the form. One drop, both jobs.
+   */
+  document: UploadedDocument
 }
 
 export function ReadIntoForm({
@@ -97,7 +106,7 @@ export function ReadIntoForm({
           confidence[field.name] = field.confidence
         }
 
-        onFilled({ values, confidence, model: result.model })
+        onFilled({ values, confidence, model: result.model, document: uploaded })
         setRead({ count: result.fields.length, model: result.model })
       } catch (error) {
         setFailure(actionErrorMessage(error, 'That document could not be read.'))
