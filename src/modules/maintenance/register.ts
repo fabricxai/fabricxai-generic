@@ -10,6 +10,7 @@
 import { registerModule } from '../core/registry'
 
 import { maintenanceToolPack } from './tools'
+import { MAINTENANCE_ZOD_MAP } from './zod'
 
 export const maintenanceModule = registerModule({
   id: 'maintenance',
@@ -18,7 +19,7 @@ export const maintenanceModule = registerModule({
 
   /** Read-only — everything this module writes is somebody standing at a machine. */
   toolPack: maintenanceToolPack,
-  zodMap: {},
+  zodMap: MAINTENANCE_ZOD_MAP,
 
   approvalDefaults: { requiredRoles: ['owner', 'admin', 'maintenance'] },
 

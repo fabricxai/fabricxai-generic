@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
 import { InlineAlert } from '@/components/fx/feedback'
+import { ReadIntoForm, type ReadFields } from '@/components/shell/read-into-form'
 import { SyncPill } from '@/components/fx/floor'
 import { useT } from '@/components/fx/locale'
 import { Button } from '@/components/fx/primitives'
@@ -41,6 +42,54 @@ export function ReportClient({
     Object.fromEntries(lay.cells.map((cell) => [cell.size, String(cell.expected)])),
   )
   const [filed, setFiled] = useState<string | null>(null)
+  const [readNote, setReadNote] = useState<string | null>(null)
+
+  /**
+   * The cut sheet off the table.
+   *
+   * Only the ACTUAL column is taken. A sheet prints the marker ratio, the expected figure
+   * and what came off side by side, and the short row is the entire point of the document —
+   * a size that came out under plan is what the report exists to record, so nothing here
+   * quietly rounds it up to the expectation the screen has already prefilled.
+   *
+   * The lay is NOT switched from the reading. This screen is already open on one lay; a
+   * photograph naming a different one is somebody about to file the wrong table's numbers,
+   * and the honest answer is to say so rather than to follow the paper.
+   */
+  function fillFromSheet(read: ReadFields) {
+    const str = (x: unknown) => (x === null || x === undefined ? '' : String(x))
+    const sheetLay = str(read.values.layNo).toLowerCase().replace(/[^a-z0-9]/g, '')
+    const thisLay = lay.layNo.toLowerCase().replace(/[^a-z0-9]/g, '')
+
+    if (sheetLay && sheetLay !== thisLay) {
+      setReadNote(
+        `That sheet is for ${str(read.values.layNo)} and this is ${lay.layNo}. Open the right lay before filing it.`,
+      )
+      return
+    }
+
+    const cells = Array.isArray(read.values.cells)
+      ? (read.values.cells as Record<string, unknown>[])
+      : []
+    const bySize = new Map(cells.map((cell) => [str(cell.size).toUpperCase(), str(cell.cut)]))
+
+    const missed: string[] = []
+    setActual((prev) => {
+      const next = { ...prev }
+      for (const cell of lay.cells) {
+        const found = bySize.get(cell.size.toUpperCase())
+        if (found !== undefined && found !== '') next[cell.size] = found
+        else missed.push(cell.size)
+      }
+      return next
+    })
+
+    setReadNote(
+      missed.length > 0
+        ? `The sheet has nothing for ${missed.join(', ')} — those are still the expected figures, not counted ones.`
+        : null,
+    )
+  }
 
   const tolerance = Number(tolerancePct)
 
@@ -83,6 +132,9 @@ export function ReportClient({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       <SyncPill online={online} queued={queued} syncing={syncing} onSync={() => void sync()} />
+
+      <ReadIntoForm kindId="cut_sheet" prompt="the cutting sheet" onFilled={fillFromSheet} />
+      {readNote ? <InlineAlert tone="warning">{readNote}</InlineAlert> : null}
 
       {refused.length > 0 ? (
         <InlineAlert tone="danger">

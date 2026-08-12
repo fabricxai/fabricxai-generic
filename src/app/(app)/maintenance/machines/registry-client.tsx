@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 
 import { InlineAlert } from '@/components/fx/feedback'
+import { ReadIntoForm, type ReadFields } from '@/components/shell/read-into-form'
 import { actionErrorMessage } from '@/lib/action-error'
 import { Ident } from '@/components/fx/format'
 import { Badge, Button } from '@/components/fx/primitives'
@@ -113,6 +114,25 @@ export function MachineRegistry({
       {/* ── Add ──────────────────────────────────────────────────────────── */}
       {adding ? (
         <div style={{ ...surface, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {/* Four hundred machines is four hundred of these typed off oily metal, and the
+              serial — the field a spare part is ordered against — is the one that must be
+              exact. The line stays a picker: where a machine stands is where somebody put
+              it, not something stamped on the plate. */}
+          <ReadIntoForm
+            kindId="machine_nameplate"
+            prompt="a photo of the nameplate"
+            onFilled={(read: ReadFields) => {
+              const str = (x: unknown) => (x === null || x === undefined ? '' : String(x))
+              setForm((prev) => ({
+                ...prev,
+                machineType: str(read.values.machineType) || prev.machineType,
+                brand: str(read.values.brand) || prev.brand,
+                model: str(read.values.model) || prev.model,
+                serial: str(read.values.serial) || prev.serial,
+              }))
+            }}
+          />
+
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             <Field label="Type" required>
               <input

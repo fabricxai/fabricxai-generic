@@ -19,6 +19,28 @@ export const machineInput = z.object({
   assignedFrom: isoDate.optional(),
 })
 
+/**
+ * A machine's nameplate, photographed on the floor.
+ *
+ * The rivet-on plate every industrial machine carries: maker, model, serial, sometimes the
+ * type and the year. Registering a floor of four hundred machines means typing four hundred
+ * of these, and the serial — the one field that has to be exact, because it is what a spare
+ * part and a service call are ordered against — is a fifteen-character string of letters and
+ * digits read off oily metal.
+ *
+ * The line is not read. Which line a machine stands on is where somebody put it, not
+ * something stamped on it.
+ */
+export const machineNameplateDraft = z.object({
+  /** "single needle lockstitch", "overlock 5-thread", "flatlock" — what it does. */
+  machineType: z.string().min(1),
+  brand: z.string().max(80).optional().catch(undefined),
+  model: z.string().max(80).optional().catch(undefined),
+  /** Exactly as stamped, including letters, dashes and leading zeros. */
+  serial: z.string().max(80).optional().catch(undefined),
+  purchasedAt: isoDate.optional().catch(undefined),
+})
+
 /** What 6.1's machine-downtime event carries. */
 export const autoTicketInput = z.object({
   downtimeId: z.uuid(),
@@ -79,6 +101,17 @@ export const monthlyCostInput = z.object({
   /** First day of the month. */
   forMonth: isoDate,
 })
+
+/**
+ * Maintenance proposes nothing and still needs a schema.
+ *
+ * Registering a machine is not a claim to be reviewed the next morning — the machine is on
+ * the floor or it is not. `machine_nameplate_v1` exists so a reading has a shape to be parsed
+ * into, which `resolveReadSchema` asks the module to name.
+ */
+export const MAINTENANCE_ZOD_MAP = {
+  machine_nameplate_v1: machineNameplateDraft,
+} as const
 
 export type MachineInput = z.infer<typeof machineInput>
 export type ManualTicketInput = z.infer<typeof manualTicketInput>

@@ -75,7 +75,42 @@ export const toleranceOverridePayload = z.object({
   reason: z.string().min(1).max(500),
 })
 
+/**
+ * A packing list, as the packing floor or a forwarder writes it.
+ *
+ * `cartonPayload` names the order by uuid and keys contents by "colour|size"; a packing list
+ * prints a carton number, what is in it, and its weights. This reads that and the screen
+ * attaches it to the order it is already open on.
+ *
+ * Weights are read because they are what a forwarder charges on and what the B/L must agree
+ * with — a packing list whose gross weight disagrees with the bill of lading is a discrepancy
+ * at the bank, and it is caught by somebody comparing two pieces of paper.
+ */
+export const packingListDraft = z.object({
+  reference: z.string().max(80).optional().catch(undefined),
+  cartons: z
+    .array(
+      z.object({
+        cartonNo: z.string().min(1).max(60),
+        contents: z
+          .array(
+            z.object({
+              color: z.string().min(1).max(60),
+              size: z.string().min(1).max(20),
+              qty: z.number().int().min(0),
+            }),
+          )
+          .min(1),
+        grossKg: z.string().regex(/^\d{1,8}(\.\d{1,3})?$/).optional().catch(undefined),
+        netKg: z.string().regex(/^\d{1,8}(\.\d{1,3})?$/).optional().catch(undefined),
+      }),
+    )
+    .min(1)
+    .max(500),
+})
+
 export const SHIPMENT_ZOD_MAP = {
+  packing_list_v1: packingListDraft,
   tolerance_override: toleranceOverridePayload,
   carton: cartonPayload,
 } as const

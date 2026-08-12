@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
 import { InlineAlert } from '@/components/fx/feedback'
+import { ReadIntoForm, type ReadFields } from '@/components/shell/read-into-form'
 import { SyncPill } from '@/components/fx/floor'
 import { Badge, Button } from '@/components/fx/primitives'
 import { SectionHeading } from '@/components/fx/signature'
@@ -70,6 +71,65 @@ export function PackingClient({
 
   const [selected, setSelected] = useState<string | null>(cells[0] ?? null)
   const [noted, setNoted] = useState<string | null>(null)
+  const [importing, setImporting] = useState(false)
+
+  /**
+   * A packing list somebody else already wrote.
+   *
+   * The tap-to-pack flow above is for a floor packing cartons as they go, and it is the
+   * better way. This is the other case, which is just as common: the cartons are packed, a
+   * forwarder or the packing floor has produced a list, and somebody is now retyping thirty
+   * carton numbers into a screen that already knows what should be in them.
+   *
+   * Every carton goes through the same `pack_carton` write as a tap — same offline queue,
+   * same idempotency, same over-pack gate. A list that would pack more than has been finished
+   * is refused exactly as a thirty-first tap would be, which is the point: reading a document
+   * must not be a way around a gate.
+   */
+  async function packFromList(read: ReadFields) {
+    const str = (x: unknown) => (x === null || x === undefined ? '' : String(x))
+    const cartons = Array.isArray(read.values.cartons)
+      ? (read.values.cartons as Record<string, unknown>[])
+      : []
+    if (cartons.length === 0) return
+
+    setImporting(true)
+    let packedCount = 0
+    try {
+      for (const carton of cartons) {
+        const contents = Array.isArray(carton.contents)
+          ? (carton.contents as Record<string, unknown>[])
+          : []
+        const cellMap: Record<string, number> = {}
+        for (const row of contents) {
+          const qty = Number(str(row.qty))
+          if (!Number.isFinite(qty) || qty <= 0) continue
+          cellMap[`${str(row.color)}|${str(row.size)}`] = Math.trunc(qty)
+        }
+        if (Object.keys(cellMap).length === 0) continue
+
+        await capture({
+          moduleId: 'shipment',
+          operation: 'pack_carton',
+          payload: {
+            orderId,
+            // The list's own carton number, not a generated one — it is printed on the box,
+            // it is on the bill of lading, and it is what a shortage is traced by.
+            cartonNo: str(carton.cartonNo),
+            contents: cellMap,
+            ...(carton.grossKg ? { grossKg: str(carton.grossKg) } : {}),
+            ...(carton.netKg ? { netKg: str(carton.netKg) } : {}),
+          },
+        })
+        packedCount += 1
+      }
+      setNoted(`${packedCount} carton${packedCount === 1 ? '' : 's'} taken off the packing list.`)
+      if (online) await sync()
+      router.refresh()
+    } finally {
+      setImporting(false)
+    }
+  }
 
   const overPacked = cells.filter((c) => (packed[c] ?? 0) > (finished[c] ?? 0))
 
@@ -114,6 +174,13 @@ export function PackingClient({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
       <SyncPill online={online} queued={queued} syncing={syncing} onSync={() => void sync()} />
+
+      <ReadIntoForm
+        kindId="packing_list"
+        prompt="the packing list"
+        onFilled={(read) => void packFromList(read)}
+      />
+      {importing ? <InlineAlert tone="info">Packing the cartons…</InlineAlert> : null}
 
       {refused.length > 0 ? (
         <InlineAlert tone="danger">

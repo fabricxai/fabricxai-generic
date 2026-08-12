@@ -73,7 +73,36 @@ export const bundleScanPayload = z.object({
   status: z.enum(['in_sewing', 'done']),
 })
 
+/**
+ * A cutting sheet, photographed at the table.
+ *
+ * The cut report screen already knows the lay and what the marker expected; what it asks for
+ * is what actually came off, size by size, and that is written on a clipboard next to the
+ * spreader. `cutReportPayload` names the lay by uuid, which no sheet carries — this reads the
+ * lay number as printed and the screen matches it against the lays it is already showing.
+ *
+ * The cut quantity is the one that matters and the one people get wrong: the sheet prints
+ * plies, expected and actual side by side, and the actual is the only one this is asking for.
+ */
+export const cutSheetDraft = z.object({
+  /** "LAY-32", "L-32", "Lay No 32" — matched against the lays on the screen. */
+  layNo: z.string().min(1),
+  /** The colour being spread. One lay is one colour.  */
+  color: z.string().max(60).optional().catch(undefined),
+  plies: z.number().int().min(0).optional().catch(undefined),
+  cells: z
+    .array(
+      z.object({
+        size: z.string().min(1).max(20),
+        /** What actually came off the table for this size. Never the marker's ratio. */
+        cut: z.number().int().min(0),
+      }),
+    )
+    .min(1),
+})
+
 export const CUTTING_ZOD_MAP = {
+  cut_sheet_v1: cutSheetDraft,
   marker: markerPayload,
   cut_report_correction: cutReportCorrectionPayload,
 } as const
