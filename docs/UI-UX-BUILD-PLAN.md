@@ -174,7 +174,7 @@ stands: **one codebase, role skins** — start as an installable PWA over the ex
 screens (proven: zero horizontal scroll), graduate to React Native only if push/camera limits
 demand it. **Push is the long pole** — nothing in 4.2+ lands without 4.1.
 
-- [ ] **4.0 🅗 The mobile contract, written before build.** One document (`docs/05-owner-app/` is
+- [x] **4.0 🅗 The mobile contract, written. ✅** — docs/05-owner-app/MOBILE-CONTRACT.md; awaiting the sign-off tick inside it before 4.1 code. One document (`docs/05-owner-app/` is
   the precedent folder): per-skin screen list from audit §3, the offline write set (exactly the
   existing `offline_key` operations, no new ones), push event list per role, and what is
   DELIBERATELY absent (settings, role grants, policy edits, document assembly). This is the
