@@ -24,7 +24,7 @@ import { createRequisition, upsertItem, upsertLocation } from './service'
 export async function saveItem(input: {
   code: string
   name: string
-  kind: 'fabric' | 'trim' | 'accessory'
+  kind: 'fabric' | 'trim' | 'accessory' | 'yarn' | 'greige'
   uom: string
   spec?: Record<string, unknown>
   isActive?: boolean

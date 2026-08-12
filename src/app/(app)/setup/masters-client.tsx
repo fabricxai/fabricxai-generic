@@ -173,7 +173,7 @@ function ItemPanel({ rows }: { rows: Row[] }) {
     saveItem({
       code: form.code.trim(),
       name: form.name.trim(),
-      kind: form.kind as 'fabric' | 'trim' | 'accessory',
+      kind: form.kind as 'fabric' | 'trim' | 'accessory' | 'yarn' | 'greige',
       uom: form.uom.trim(),
     }),
   )
@@ -181,7 +181,7 @@ function ItemPanel({ rows }: { rows: Row[] }) {
   return (
     <Panel
       title="Items"
-      blurb="Fabric, trims and accessories. The store cannot receive anything until at least one exists — a GRN line names an item."
+      blurb="Yarn, greige, dyed fabric, trims and accessories. The store cannot receive anything until at least one exists — a GRN line names an item."
       count={rows.length}
       rows={rows}
       empty="Nothing on the master list yet. Add the first fabric and the receive form will accept a delivery."
@@ -223,7 +223,9 @@ function ItemPanel({ rows }: { rows: Row[] }) {
             value={form.kind}
             onChange={(e) => setForm({ ...form, kind: e.target.value })}
           >
-            <option value="fabric">Fabric</option>
+            <option value="yarn">Yarn</option>
+            <option value="greige">Greige (knitted, undyed)</option>
+            <option value="fabric">Fabric (dyed, ready to cut)</option>
             <option value="trim">Trim</option>
             <option value="accessory">Accessory</option>
           </Select>

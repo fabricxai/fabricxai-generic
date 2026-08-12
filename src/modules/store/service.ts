@@ -14,7 +14,7 @@
  * Blocking would get people working around the system by not recording the shade, which
  * is strictly worse than a warning nobody reads.
  */
-import { and, eq, inArray, sql } from 'drizzle-orm'
+import { and, count, eq, inArray, sql } from 'drizzle-orm'
 
 import { fromMinor, toMinor } from '@/lib/quantity'
 
@@ -167,10 +167,11 @@ function remaining(required: string, issued: string): string {
  * trying to receive a delivery as a new customer would; a code read had not.
  *
  * Upsert on `code`, because the code is what a storekeeper types off a challan and typing
- * it twice should correct the row rather than collide on an index they cannot see. What it
- * will NOT do is change `uom`: quantities already recorded against this item are in the
- * old unit, and silently reinterpreting 400 as metres when it was yards is a stock figure
- * that is wrong in a way nobody can see.
+ * it twice should correct the row rather than collide on an index they cannot see. `uom`
+ * is correctable while the item has never been transacted and refused afterwards — the
+ * reason for the lock is that quantities already recorded are in the old unit, and
+ * reinterpreting 400 as metres when it was yards is a stock figure wrong in a way nobody
+ * can see. Until there is a first quantity, there is nothing to reinterpret.
  */
 export async function upsertItem(
   ctx: RequestCtx,
@@ -184,12 +185,41 @@ export async function upsertItem(
       .from(items)
       .where(scoped(items, ctx, eq(items.code, payload.code)))
 
+    /*
+     * The unit is locked because quantities already recorded are IN it, and reinterpreting
+     * them silently is a stock figure nobody can see is wrong. That reasoning is exact, and
+     * it says nothing whatever about an item nothing has ever been recorded against.
+     *
+     * Which is where it bit: on day one a storekeeper adds "sewing thread" and picks pcs
+     * instead of cone, notices within the minute, and the product's answer is that the
+     * mistake is permanent — the only way out is a second item under a mangled code, which
+     * is then the code that gets typed off half the challans forever.
+     *
+     * So the lock now asks whether there is anything to protect. A roll, a GRN line or an
+     * issue line means real quantities exist and the refusal stands. None of the three means
+     * the unit is still just a decision somebody made, and decisions are correctable.
+     */
     if (existing && existing.uom !== payload.uom) {
-      throw conflict('store.errors.item_uom_locked', {
-        code: payload.code,
-        currentUom: existing.uom,
-        requestedUom: payload.uom,
-      })
+      const movedIn = async (table: typeof rolls | typeof grnLines | typeof issueLines) => {
+        const [row] = await tx
+          .select({ n: count() })
+          .from(table)
+          .where(scoped(table, ctx, eq(table.itemId, existing.id)))
+        return row?.n ?? 0
+      }
+      const movements =
+        (await movedIn(rolls)) + (await movedIn(grnLines)) + (await movedIn(issueLines))
+
+      if (movements > 0) {
+        throw conflict('store.errors.item_uom_locked', {
+          code: payload.code,
+          currentUom: existing.uom,
+          requestedUom: payload.uom,
+          // The number is the whole explanation: "42 movements already recorded in m" is
+          // a reason, "locked" is a wall.
+          movements,
+        })
+      }
     }
 
     const [row] = await tx
@@ -208,6 +238,9 @@ export async function upsertItem(
         set: {
           name: payload.name,
           kind: payload.kind,
+          // Reached only when the check above found nothing recorded against the item —
+          // otherwise it has already thrown.
+          uom: payload.uom,
           spec: payload.spec,
           isActive: payload.isActive,
           updatedAt: new Date(),

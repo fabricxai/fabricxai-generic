@@ -554,3 +554,67 @@ describe('stock adjustment · approving one changes the count', () => {
     ).rejects.toBeInstanceOf(AppError)
   })
 })
+
+/**
+ * The unit of measure is locked to protect quantities, so it cannot be locked before any
+ * exist.
+ *
+ * A storekeeper adding an item on day one picks the wrong unit — pcs for thread that comes
+ * on cones — and notices immediately. The product's answer used to be that the mistake was
+ * permanent: the only way out was a second item under a mangled code, which is then the
+ * code that gets typed off half the challans forever.
+ *
+ * The refusal itself is right and stays. What changed is when it starts applying.
+ */
+describe('3.1 · the unit of measure', () => {
+  const CODE = `TRM-THR-${randomUUID().slice(0, 6)}`
+
+  it('is correctable while nothing has been recorded against the item', async () => {
+    const { upsertItem } = await import('@/modules/store/service')
+
+    const first = await upsertItem(ctx, { code: CODE, name: 'sewing thread 40/2', kind: 'trim', uom: 'pcs' })
+    expect(first.created).toBe(true)
+
+    const corrected = await upsertItem(ctx, { code: CODE, name: 'sewing thread 40/2', kind: 'trim', uom: 'cone' })
+    expect(corrected.created).toBe(false)
+    expect(corrected.itemId).toBe(first.itemId)
+
+    const [row] = await withTenantRead(ctx, (tx) =>
+      tx.select({ uom: items.uom }).from(items).where(eq(items.id, first.itemId)),
+    )
+    expect(row!.uom).toBe('cone')
+  })
+
+  it('is refused once a quantity exists in it, and says how many', async () => {
+    const { upsertItem } = await import('@/modules/store/service')
+
+    // `fabricId` already carries rolls and GRN lines from the receipts above — real
+    // quantities, in metres, that a silent reinterpretation would falsify.
+    const [fabric] = await withTenantRead(ctx, (tx) =>
+      tx.select({ code: items.code, uom: items.uom, name: items.name, kind: items.kind }).from(items).where(eq(items.id, fabricId)),
+    )
+
+    await expect(
+      upsertItem(ctx, {
+        code: fabric!.code,
+        name: fabric!.name,
+        kind: fabric!.kind,
+        uom: fabric!.uom === 'yds' ? 'm' : 'yds',
+      }),
+    ).rejects.toMatchObject({
+      code: 'conflict',
+      messageKey: 'store.errors.item_uom_locked',
+    })
+
+    // The count is the whole explanation. "42 movements already recorded in m" is a reason
+    // a storekeeper can act on; "locked" is a wall.
+    await upsertItem(ctx, {
+      code: fabric!.code,
+      name: fabric!.name,
+      kind: fabric!.kind,
+      uom: fabric!.uom === 'yds' ? 'm' : 'yds',
+    }).catch((e: AppError) => {
+      expect(Number((e.details as { movements: number }).movements)).toBeGreaterThan(0)
+    })
+  })
+})

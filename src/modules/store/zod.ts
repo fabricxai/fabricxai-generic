@@ -43,8 +43,11 @@ export const calendarDate = z
 export const itemPayload = z.object({
   code: z.string().min(1).max(60),
   name: z.string().min(1).max(200),
-  kind: z.enum(['fabric', 'trim', 'accessory']),
-  /** Never converted implicitly anywhere in this module — so it is chosen once, here. */
+  kind: z.enum(['fabric', 'trim', 'accessory', 'yarn', 'greige']),
+  /**
+   * Fixed once the item has been transacted, and free until then — see `upsertItem`. It is
+   * never converted implicitly anywhere in this module, so it is chosen once, here.
+   */
   uom: z.string().min(1).max(20),
   spec: z.record(z.string(), z.unknown()).default({}),
   isActive: z.boolean().default(true),

@@ -36,7 +36,27 @@ import { orders } from '@/modules/orders/schema'
 // Enums
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const itemKindEnum = pgEnum('item_kind', ['fabric', 'trim', 'accessory'])
+/**
+ * `yarn` and `greige` are here because this is Bangladesh.
+ *
+ * A knit composite factory's single largest purchase is yarn — 30/1 combed cotton by the
+ * tonne — which it knits into greige and then dyes into the cloth it cuts. Three materials,
+ * three prices, three suppliers, three UD lines at customs. The original three kinds forced
+ * a storekeeper receiving ten tonnes of yarn to file it as "fabric", which made every stock
+ * report and every consumption figure for actual cloth wrong by the weight of the yarn
+ * behind it.
+ *
+ * The 4-point gate still reads `fabric` alone and that stays correct: the system grades
+ * cloth by faults per hundred square yards and has nothing to say about a cone of yarn.
+ * Greige is graded on the knitting machine, not on an inspection table.
+ */
+export const itemKindEnum = pgEnum('item_kind', [
+  'fabric',
+  'trim',
+  'accessory',
+  'yarn',
+  'greige',
+])
 export const locationKindEnum = pgEnum('location_kind', ['bonded', 'general', 'floor'])
 export const rollStatusEnum = pgEnum('roll_status', [
   'in_stock',
