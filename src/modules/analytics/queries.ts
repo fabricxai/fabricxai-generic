@@ -23,7 +23,7 @@ import { money, type Money } from '@/lib/money'
 
 import type { AnyCtx } from '../core/ctx'
 import { readJsonbObject } from '../core/jsonb'
-import { withTenantRead } from '../core/tenancy'
+import { type TenantDb, withTenantRead } from '../core/tenancy'
 
 import {
   AnalyticsError,
@@ -115,6 +115,17 @@ export interface ExceptionRow {
   ref: string
   /** Null when the stored detail would not parse — the row still shows, unexplained. */
   detail: Record<string, string | number | boolean | null> | null
+  /**
+   * What this exception is ABOUT, in the words the factory uses for it — "PO-BF-2044",
+   * "LC-4471". Resolved here because the feed stores ids and only ids: a `tna_risk` row
+   * carries the milestone's uuid as `ref` and the order's uuid in its detail, and neither is
+   * something a person can act on. The owner's screen showed nine late milestones without
+   * naming one order between them.
+   *
+   * Null when the subject cannot be resolved — a row whose order has since been deleted is
+   * still a real exception, and dropping it would hide the problem to tidy the screen.
+   */
+  subject: string | null
   since: Date
   severity: 'low' | 'medium' | 'high'
   ageDays: number
@@ -140,7 +151,7 @@ export async function exceptions(
       .where(isNull(exceptionsFeed.resolvedAt))
       .orderBy(sql`${exceptionsFeed.severity} desc`, exceptionsFeed.since)
 
-    const mapped = rows.map((row) => ({
+    const parsed = rows.map((row) => ({
       id: row.id,
       kind: row.kind as ExceptionKind,
       ref: row.ref,
@@ -151,6 +162,9 @@ export async function exceptions(
       severity: row.severity as 'low' | 'medium' | 'high',
       ageDays: Math.floor((now.getTime() - row.since.getTime()) / 86_400_000),
     }))
+
+    const subjects = await resolveSubjects(tx, parsed)
+    const mapped = parsed.map((row) => ({ ...row, subject: subjects.get(row.id) ?? null }))
 
     // The newest `last_seen_at` is when the feed was last refreshed. With no rows at all
     // there is nothing to date it from, which is itself worth saying.
@@ -169,6 +183,58 @@ export async function exceptions(
         : { unavailable: 'the feed has never been refreshed' },
     }
   })
+}
+
+/**
+ * Turn the ids the feed stores into the names the factory uses.
+ *
+ * One batched read per kind rather than one per row: the feed is capped at what fits a
+ * screen, but it is read on every dashboard load by every owner, and a query per exception
+ * is the shape that looks fine with nine rows and falls over at ninety.
+ *
+ * Reads only — `modules/analytics` is read-only by rule 9, and this stays a lookup.
+ */
+async function resolveSubjects(
+  tx: TenantDb,
+  rows: readonly { id: string; kind: ExceptionKind; ref: string; detail: Record<string, unknown> | null }[],
+): Promise<Map<string, string>> {
+  const out = new Map<string, string>()
+
+  const orderIds = new Set<string>()
+  for (const row of rows) {
+    const id = row.detail?.orderId
+    if (typeof id === 'string' && id) orderIds.add(id)
+  }
+
+  if (orderIds.size > 0) {
+    const { orders } = await import('@/modules/orders/schema')
+    const found = await tx
+      .select({ id: orders.id, poNumbers: orders.poNumbers })
+      .from(orders)
+      .where(inArray(orders.id, [...orderIds]))
+
+    // The FIRST po number, not all of them. An order carrying both the buyer's number and a
+    // supplier reference would otherwise print two, and the first is the one the desk says
+    // out loud.
+    const byId = new Map(found.map((o) => [o.id, (o.poNumbers as string[])[0] ?? null]))
+    for (const row of rows) {
+      const id = row.detail?.orderId
+      if (typeof id === 'string') {
+        const po = byId.get(id)
+        if (po) out.set(row.id, po)
+      }
+    }
+  }
+
+  // The rest name themselves in their own detail — a credit carries its number, and there is
+  // nothing to look up.
+  for (const row of rows) {
+    if (out.has(row.id)) continue
+    const named = row.detail?.lcNumber ?? row.detail?.number ?? row.detail?.moduleId
+    if (typeof named === 'string' && named) out.set(row.id, named)
+  }
+
+  return out
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

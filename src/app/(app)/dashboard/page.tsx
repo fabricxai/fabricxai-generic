@@ -1,6 +1,7 @@
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 
+import { describeException, exceptionKindLabel } from '@/components/fx/exception-copy'
 import { LockedState } from '@/components/fx/feedback'
 import { CoverageNote, ExceptionRow, FigureTile } from '@/components/fx/figures'
 import { SectionHeading } from '@/components/fx/signature'
@@ -20,6 +21,7 @@ import {
   otd,
   type AnalyticsPolicy,
 } from '@/modules/analytics/queries'
+import { requestLocale } from '@/lib/ui-locale'
 import { companyProfile, getPolicy } from '@/modules/settings/service'
 
 /**
@@ -44,6 +46,7 @@ export default async function DashboardPage() {
   if (!ctx) redirect('/login')
 
   const profile = await companyProfile(ctx)
+  const locale = await requestLocale(profile?.locale)
   const item = NAV.find((n) => n.id === 'dashboard')!
 
   // Deliberately narrow — this is the whole-factory view.
@@ -121,9 +124,11 @@ export default async function DashboardPage() {
               feed.exceptions.map((e) => (
                 <ExceptionRow
                   key={e.id}
-                  kind={e.kind.replace(/_/g, ' ')}
-                  reference={e.ref}
-                  truth={describe(e.kind, e.detail)}
+                  kind={exceptionKindLabel(e.kind, locale)}
+                  /* The PO number, not the milestone's primary key. `e.ref` is a uuid, and a
+                     uuid tells the owner nothing about which order is in trouble. */
+                  reference={e.subject ?? '—'}
+                  truth={describeException({ kind: e.kind, subject: e.subject, detail: e.detail }, locale)}
                   /* `since` is preserved by the worker, so the age keeps
                      counting from when it first became true. */
                   age={e.ageDays === 0 ? 'today' : `${e.ageDays} days`}
@@ -329,17 +334,3 @@ function toneFor(direction: string): 'neutral' | 'good' | 'warning' {
  * The feed stores structured detail rather than a sentence, so the wording lives
  * here where it can change without a migration.
  */
-function describe(
-  kind: string,
-  detail: Record<string, string | number | boolean | null> | null,
-): string {
-  // Null means the stored detail would not parse. The exception is still real,
-  // so it keeps its row and says what kind of thing it is.
-  if (!detail) return kind.replace(/_/g, ' ')
-
-  const parts = Object.entries(detail)
-    .filter(([, v]) => v !== null && v !== '')
-    .map(([k, v]) => `${k.replace(/_/g, ' ')} ${String(v)}`)
-
-  return parts.length > 0 ? parts.join(' · ') : kind.replace(/_/g, ' ')
-}

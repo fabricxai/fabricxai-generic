@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 
 import { t } from '@/lib/i18n'
 import { tui } from '@/lib/i18n-ui'
+import { describeException, exceptionKindLabel } from '@/components/fx/exception-copy'
 import { requestLocale } from '@/lib/ui-locale'
 import { exceptions, type AnalyticsPolicy } from '@/modules/analytics/queries'
 import { inboxRows } from '@/modules/approvals/queries'
@@ -22,7 +23,6 @@ import {
   capRows,
   draftWhy,
   exceptionHref,
-  exceptionKindLabel,
   HOME_COPY,
   type WorkRow,
 } from './home-copy'
@@ -128,8 +128,12 @@ export default async function HomePage() {
       empty: HOME_COPY.wrongEmpty,
       rows: feedCap.rows.map((e) => ({
         id: e.id,
-        title: `${exceptionKindLabel(e.kind)} · ${e.ref}`,
-        why: describeDetail(e.kind, e.detail),
+        // The subject, not the uuid. `e.ref` is the milestone's primary key — true, unique,
+        // and not something anybody in the building can act on.
+        title: e.subject
+          ? `${e.subject} · ${exceptionKindLabel(e.kind, locale)}`
+          : exceptionKindLabel(e.kind, locale),
+        why: describeException({ kind: e.kind, subject: e.subject, detail: e.detail }, locale),
         href: exceptionHref(e.kind),
         age: ageDaysLabel(e.ageDays),
         severity: e.severity,
@@ -302,17 +306,6 @@ export default async function HomePage() {
         ]
 
   return <HomeView sections={sections} calm={calm} dayOne={dayOne} calmLinks={calmLinks} />
-}
-
-function describeDetail(
-  kind: string,
-  detail: Record<string, string | number | boolean | null> | null,
-): string {
-  if (!detail) return exceptionKindLabel(kind)
-  const parts = Object.entries(detail)
-    .filter(([, v]) => v !== null && v !== '')
-    .map(([k, v]) => `${k.replace(/_/g, ' ')} ${String(v)}`)
-  return parts.length > 0 ? parts.join(' · ') : exceptionKindLabel(kind)
 }
 
 function quoteNeedCount(quotes: Awaited<ReturnType<typeof rfqBoard>>): number {
