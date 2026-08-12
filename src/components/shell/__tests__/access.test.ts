@@ -342,3 +342,41 @@ describe('the read-only banner distinguishes "you may not" from "nobody does"', 
     expect(hidden.readOnly).toBe(false)
   })
 })
+
+describe('rail trimming never touches access (plan 2.5)', () => {
+  const trimmed = NAV.filter((item) => item.railHiddenFor?.length)
+
+  it('exists for the production rail', () => {
+    // Six doors off the daily scan. The list shrinking to zero would mean the mechanism
+    // lost its only user and should go; growing is fine.
+    expect(trimmed.map((item) => item.id).sort()).toEqual([
+      'orders', 'planning', 'quality', 'sampling', 'setup', 'store',
+    ])
+  })
+
+  it('hides the entry from the rail and nothing else', () => {
+    for (const item of trimmed) {
+      for (const role of item.railHiddenFor!) {
+        // The trim is presentation: the same role that cannot SEE the entry can still
+        // OPEN the route, or the trim would be an access change wearing a layout hat.
+        expect(canSee(item, [role], 'knit-composite'), `${item.id} access for ${role}`).toBe(true)
+        const rail = visibleNav([role], 'knit-composite')
+        expect(rail.some((entry) => entry.id === item.id), `${item.id} on ${role}'s rail`).toBe(false)
+      }
+    }
+  })
+
+  it('an owner covering the desk still sees everything', () => {
+    const rail = visibleNav(['owner'], 'knit-composite')
+    for (const item of trimmed) {
+      expect(rail.some((entry) => entry.id === item.id), `${item.id} on the owner's rail`).toBe(true)
+    }
+  })
+
+  it('a person holding a second role keeps the union of their rails', () => {
+    // Hidden only when EVERY role agrees: a production supervisor who is also the planner
+    // must not lose the planning board to the trim.
+    const rail = visibleNav(['production', 'planner'], 'knit-composite')
+    expect(rail.some((entry) => entry.id === 'planning')).toBe(true)
+  })
+})

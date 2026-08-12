@@ -133,7 +133,13 @@ export function PolicySection({
           if (items.length === 0) return null
 
           return (
-            <div key={concern.id} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div
+              key={concern.id}
+              id={`rules-${concern.id}`}
+              /* Anchor target for the jump strip (plan 2.4) — 58 inputs stay on one page,
+                 findable. scrollMargin clears the sticky top bar. */
+              style={{ display: 'flex', flexDirection: 'column', gap: 12, scrollMarginTop: 76 }}
+            >
               <div>
                 <div
                   style={{

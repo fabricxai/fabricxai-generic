@@ -49,6 +49,16 @@ export function RollsClient({
   const router = useRouter()
   const [adjusting, setAdjusting] = useState<RollRow | null>(null)
   const [drafted, setDrafted] = useState<string | null>(null)
+  /*
+   * Shade filter (role audit 2.7c). The shade-mix warning names GROUPS — "this order
+   * already drew shade A" — and this list then made the storekeeper hunt for them row by
+   * row. Client state, not a URL param: the item picker reloads the page and a filter is
+   * a glance, not a place.
+   */
+  const [shade, setShade] = useState<string | null>(null)
+
+  const shadeGroups = [...new Set(rolls.map((roll) => roll.shadeGroup).filter(Boolean))] as string[]
+  const shown = shade ? rolls.filter((roll) => roll.shadeGroup === shade) : rolls
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
@@ -91,8 +101,37 @@ export function RollsClient({
       <SectionHeading eyebrow={t('ui.store.roll_lot_eyebrow')}>
         {t('ui.store.rolls_all_heading')}
       </SectionHeading>
+
+      {shadeGroups.length > 1 ? (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: -14 }}>
+          {[null, ...shadeGroups].map((group) => {
+            const on = shade === group
+            return (
+              <button
+                key={group ?? 'all'}
+                onClick={() => setShade(group)}
+                style={{
+                  minHeight: 'var(--fx-tap-min)',
+                  padding: '8px 14px',
+                  borderRadius: 'var(--fx-radius-sm)',
+                  border: `1px solid ${on ? 'var(--fx-accent)' : 'var(--fx-border-default)'}`,
+                  background: on ? 'var(--fx-accent-subtle)' : 'transparent',
+                  color: 'var(--fx-text-primary)',
+                  cursor: 'pointer',
+                  font: "500 12.5px/1 var(--fx-font-sans)",
+                }}
+              >
+                {group === null
+                  ? t('ui.store.shade_all')
+                  : t('ui.store.shade_label', { group })}
+              </button>
+            )
+          })}
+        </div>
+      ) : null}
+
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        {rolls.map((roll) => (
+        {shown.map((roll) => (
           <div
             key={roll.id}
             style={{

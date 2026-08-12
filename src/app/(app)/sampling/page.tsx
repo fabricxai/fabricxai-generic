@@ -78,7 +78,7 @@ export default async function SamplingPage() {
               .filter((row) => !['shipped_full', 'closed', 'cancelled'].includes(row.status))
               .map((row) => ({
                 id: row.id,
-                label: `${row.poNumbers[0] ?? row.id.slice(0, 8)} · ${row.styleCode ?? ''}`,
+                label: `${row.poNumbers[0] ?? row.styleCode ?? 'unnumbered order'} · ${row.styleCode ?? ''}`,
                 styleCode: row.styleCode,
               }))}
           />
@@ -229,6 +229,17 @@ function SampleCard({ sample, highlight }: { sample: SampleRow; highlight?: bool
             <span style={{ font: "400 13px/1.3 var(--fx-font-mono)", color: 'var(--fx-text-tertiary)' }}>
               {sample.poNumber}
             </span>
+          ) : null}
+          {/* The consequence, on the card (role audit 2.7g): a PP verdict is the gate the
+              cutting floor waits behind, and the person chasing the buyer should see what
+              their chasing unblocks. */}
+          {sample.type === 'pp' && sample.status !== 'approved' && sample.poNumber ? (
+            <Link
+              href="/cutting"
+              style={{ font: "400 12.5px/1.3 var(--fx-font-sans)", color: 'var(--fx-warning)' }}
+            >
+              gates cutting on {sample.poNumber} →
+            </Link>
           ) : null}
           <Badge
             tone={

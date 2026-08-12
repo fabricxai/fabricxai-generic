@@ -91,43 +91,43 @@ phase is replication with each desk's own signals, not invention.
   changes — this is layout over the existing actions.
   *Verify:* every operation still reachable (browser test enumerates the ten action names);
   a shipment mid-pack shows pack expanded and bank greyed with the reason.
-- [ ] **2.3 🅜 Costing lands on the sheet list (S4a).** `/costing` shows existing sheets +
+- [x] **2.3 🅜 Costing lands on the sheet list (S4a).** ✅ — the studio sits behind a "Cost a style" door; an RFQ seed still opens it expanded, because a deep link into a door in front of a door helps nobody. `/costing` shows existing sheets +
   "Cost a style" as an action; the 31-input form moves behind it (same component, new route or
   dialog state). Deep links that land in the form today keep working.
   *Verify:* landing shows the list; the merchandiser's two paths (new sheet, open existing) are
   each one click.
-- [ ] **2.4 🅜 Settings gets per-module jump nav (S4b).** Left-rail anchor list (module names)
+- [x] **2.4 🅜 Settings gets per-module jump nav (S4b).** ✅ — eleven anchors: the six top sections plus the five policy concerns. Left-rail anchor list (module names)
   over the existing single page — no data changes, no per-module routes yet. 58 inputs stay,
   findable.
   *Verify:* clicking a module name scrolls/focuses its section; keyboard reachable.
-- [ ] **2.5 🅜 Trim production's rail (S5).** Keep: this hour, endline, plan day, line tracking,
+- [x] **2.5 🅜 Trim production's rail (S5).** ✅ — new `railHiddenFor` on NavItem, presentation-only; four unit cases pin that access is untouched, an owner still sees everything, and a production+planner keeps the union. Keep: this hour, endline, plan day, line tracking,
   maintenance (they raise tickets), MARBIM, settings. Move orders/sampling/planning/store/quality/
   setup out of the rail for this role — they keep ACCESS (routes stay open; `canSee` unchanged)
   but the rail shows a "More…" group or drops them. **Not an access change** — nav presentation
   only, so no role-gate tests move.
   *Verify:* production's rail ≤8 entries; every removed route still opens by URL for the role
   (access sweep unchanged); nav-copy ratchet clean.
-- [ ] **2.6 🅜 The approve inbox teaches (S8).** Empty state lists the 2–3 draft kinds that
+- [x] **2.6 🅜 The approve inbox teaches (S8).** ✅ — derived from the tenant's own active rules + the intake registry; supervisors are told about the fallback; no rules at all is said plainly with the settings link. Empty state lists the 2–3 draft kinds that
   route to THIS role's queue (derived from `approval_rules` + intake kinds), each with the door
   that raises one. No rules configured → says that, with the settings link for owner/admin.
   *Verify:* per-role browser test: commercial's empty inbox names UD overrides and LC drafts;
   a viewer's names nothing and says why.
 - [ ] **2.7 🅜 Per-role friction sweep (the audit's small ones, one commit each or batched):**
-  - **2.7a** BTB headroom on the LC register rows (free amount + % as a chip; red under
+  - ~~2.7a~~ already satisfied — the register rows carry the used % with over-limit colouring (the audit sweep itself recorded "39.8%"). BTB headroom on the LC register rows (free amount + % as a chip; red under
     threshold). *Verify:* row shows the same number the credit detail computes.
-  - **2.7b** HR gets the worker door on `/workforce` (reuse setup's worker panel; grant stays
+  - [x] **2.7b** ✅ signposted — the roster heading links to setup's worker door; a second copy of the form would drift from the first. HR gets the worker door on `/workforce` (reuse setup's worker panel; grant stays
     as-is — HR already holds it via setup).
-  - **2.7c** Rolls list filters by shade group; the shade-mix warning's group names become
+  - [x] **2.7c** ✅ — chips appear only when more than one group exists. Rolls list filters by shade group; the shade-mix warning's group names become
     filter links.
-  - **2.7d** Admin's `/workforce` states why payroll doors are absent ("Payroll needs the hr
+  - ~~2.7d~~ already satisfied — the LockedState has said "Payroll is HR and the owner only" since day-one finding D2. Admin's `/workforce` states why payroll doors are absent ("Payroll needs the hr
     role — supervision doesn't cover pay", en+bn).
-  - **2.7e** CAP list filter: needs-evidence / waiting-closure / overdue.
-  - **2.7f** Planner's read-only `/planning` render for production role gets a "view only"
+  - [x] **2.7e** ✅ — URL-param chips (sendable to the CAP's owner), shown only past two rows. CAP list filter: needs-evidence / waiting-closure / overdue.
+  - ~~2.7f~~ void — 2.5 dropped planning from production's rail. Planner's read-only `/planning` render for production role gets a "view only"
     eyebrow instead of looking broken; or drop it from production's rail in 2.5 (decide there —
     if 2.5 drops it, 2.7f is void).
-  - **2.7g** Sampling → the order's TNA milestone: a "gates cutting on <order>" link on the
+  - [x] **2.7g** ✅ — "gates cutting on <PO> →" on every pending PP card. Also fixed in passing: the sample order picker printed `row.id.slice(0,8)`. Sampling → the order's TNA milestone: a "gates cutting on <order>" link on the
     sample card.
-  - **2.7h** Store receive's two <38px links (remove/replace on the attached photo) — covered
+  - [x] **2.7h** ✅ via 1.8 (re-measured 0). Store receive's two <38px links (remove/replace on the attached photo) — covered
     by 1.8's component fix; verify here specifically.
 
 ---

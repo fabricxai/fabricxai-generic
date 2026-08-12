@@ -72,6 +72,16 @@ export interface NavItem {
    * findable (search reads `NAV` directly) and stays refusable; it just isn't in the list.
    */
   hiddenFromSidebar?: boolean
+  /**
+   * Roles whose SIDEBAR omits this entry while their access is untouched (plan 2.5).
+   *
+   * The audit found production's rail carrying thirteen doors for a job with four — a line
+   * supervisor's world is this hour, endline, downtime and yesterday, and everything else
+   * is a read they make twice a month. Removing the role from `roles` would lock the route;
+   * this trims the list they scan every day without changing what a URL will open.
+   * `canSee` never reads it, and the access sweep proves that stays true.
+   */
+  railHiddenFor?: readonly Role[]
   section: NavSection
 }
 
@@ -231,6 +241,7 @@ export const NAV: readonly NavItem[] = [
   },
   {
     id: 'orders',
+    railHiddenFor: ['production'],
     label: 'Order desk & TNA',
     href: '/orders',
     section: 'work',
@@ -255,6 +266,7 @@ export const NAV: readonly NavItem[] = [
   },
   {
     id: 'sampling',
+    railHiddenFor: ['production'],
     label: 'Sampling room',
     href: '/sampling',
     section: 'work',
@@ -319,6 +331,7 @@ export const NAV: readonly NavItem[] = [
   // ── Floor ───────────────────────────────────────────────
   {
     id: 'planning',
+    railHiddenFor: ['production'],
     label: 'Planning board',
     href: '/planning',
     section: 'floor',
@@ -328,6 +341,7 @@ export const NAV: readonly NavItem[] = [
   },
   {
     id: 'store',
+    railHiddenFor: ['production'],
     label: 'Store',
     href: '/store',
     section: 'floor',
@@ -374,6 +388,7 @@ export const NAV: readonly NavItem[] = [
   },
   {
     id: 'quality',
+    railHiddenFor: ['production'],
     label: 'Quality',
     href: '/quality',
     section: 'floor',
@@ -484,6 +499,7 @@ export const NAV: readonly NavItem[] = [
      * the services: store+procurement for items, hr for the roster, planner for lines.
      */
     id: 'setup',
+    railHiddenFor: ['production'],
     label: 'Factory setup',
     href: '/setup',
     section: 'system',
@@ -561,6 +577,9 @@ export function visibleNav(
   return NAV.filter(
     (item) =>
       !item.hiddenFromSidebar &&
+      // Rail-only, role-only: an ALL_ACCESS supervisor still sees everything, because the
+      // trim is about a supervisor's daily scan, not about an owner covering a desk.
+      !(item.railHiddenFor && roles.every((r) => item.railHiddenFor!.includes(r))) &&
       canSee(item, roles, factoryType) &&
       (marbimEnabled || !item.requiresMarbim),
   )

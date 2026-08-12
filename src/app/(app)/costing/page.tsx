@@ -14,7 +14,7 @@ import { costSheets } from '@/modules/costing/schema'
 import { getPolicy } from '@/modules/settings/service'
 import { buildFromBom, type CostingPolicy } from '@/modules/costing/service'
 
-import { CostingStudio, type StudioSeed } from './studio-client'
+import { CostingStudioDoor, type StudioSeed } from './studio-client'
 
 /**
  * 1.5 Costing Studio.
@@ -93,14 +93,17 @@ export default async function CostingPage({
     <>
       <PageHeader
         eyebrow="Costing studio"
-        title="Cost a style"
+        /* The list is the landing (plan 2.3): the visit a merchandiser makes most is
+           checking a sheet that exists, and the 31-input form is one task's destination,
+           not a lobby. */
+        title={`${sheets.length} cost sheet${sheets.length === 1 ? '' : 's'}`}
         meta={policy.marginFloorPct ? `floor ${policy.marginFloorPct}%` : undefined}
         // The studio's own primary action owns the amber.
         ownsAmber={false}
       />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 36 }}>
-        <CostingStudio marginFloorPct={policy.marginFloorPct ?? null} seed={seed} />
+        <CostingStudioDoor marginFloorPct={policy.marginFloorPct ?? null} seed={seed} />
 
         {/* The bill of materials is where consumption comes from; the studio prices it.
             Keeping them on separate screens is what stops a rate being buried in a BOM. */}

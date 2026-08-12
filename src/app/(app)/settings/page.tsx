@@ -52,7 +52,51 @@ export default async function SettingsPage() {
       />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 36 }}>
-        <section>
+        {/*
+          The jump strip (plan 2.4, audit S4b). Fifty-eight inputs on one page is fine for
+          the once-a-quarter visit ONLY if "cut tolerance" is reachable without scrolling
+          past payroll — anchors, not per-module routes, because splitting the page would
+          break the one thing it does well: everything the factory is configured by,
+          reviewable in one scroll.
+        */}
+        <nav
+          aria-label="Settings sections"
+          style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: -8 }}
+        >
+          {[
+            ['#identity', 'Identity'],
+            ['#factory-type', 'What it makes'],
+            ['#rules-commercial', 'Money & documents'],
+            ['#rules-floor', 'Floor & planning'],
+            ['#rules-quality', 'Quality'],
+            ['#rules-desk', 'Desks'],
+            ['#rules-oversight', 'Oversight'],
+            ['#rules-platform', 'Platform'],
+            ['#people', 'People'],
+            ['#routing', 'Approval routing'],
+            ['#audit', 'Audit trail'],
+          ].map(([href, label]) => (
+            <a
+              key={href}
+              href={href}
+              style={{
+                font: '500 12.5px/1 var(--fx-font-sans)',
+                color: 'var(--fx-text-secondary)',
+                textDecoration: 'none',
+                border: '1px solid var(--fx-border-default)',
+                borderRadius: 'var(--fx-radius-sm)',
+                padding: '8px 12px',
+                minHeight: 'var(--fx-tap-min)',
+                display: 'inline-flex',
+                alignItems: 'center',
+              }}
+            >
+              {label}
+            </a>
+          ))}
+        </nav>
+
+        <section id="identity" style={{ scrollMarginTop: 76 }}>
           <SectionHeading>Identity</SectionHeading>
           <ProfileForm
             canEdit={canEdit}
@@ -76,7 +120,7 @@ export default async function SettingsPage() {
           />
         </section>
 
-        <section>
+        <section id="factory-type" style={{ scrollMarginTop: 76 }}>
           <SectionHeading eyebrow="changes which modules exist">What this unit makes</SectionHeading>
           <FactoryTypePanel current={profile?.factoryType ?? 'woven'} />
         </section>
@@ -92,7 +136,7 @@ export default async function SettingsPage() {
           }))}
         />
 
-        <section>
+        <section id="people" style={{ scrollMarginTop: 76 }}>
           <SectionHeading eyebrow={`${matrix.length} people`}>Who can do what</SectionHeading>
           <div
             style={{
@@ -177,13 +221,13 @@ export default async function SettingsPage() {
           </div>
         </section>
 
-        <section>
+        <section id="routing" style={{ scrollMarginTop: 76 }}>
           <SectionHeading eyebrow="who signs which drafts">Approval routing</SectionHeading>
           <ApprovalRules rules={approvalRuleRows} canEdit={ctx.roles.includes('owner')} />
         </section>
 
         {canEdit ? (
-          <section>
+          <section id="audit" style={{ scrollMarginTop: 76 }}>
             <SectionHeading eyebrow="who changed what, and when">The audit trail</SectionHeading>
             <AuditViewer
               initial={trail.map((row) => ({

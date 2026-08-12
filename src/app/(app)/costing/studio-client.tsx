@@ -537,3 +537,37 @@ function Cell({
     />
   )
 }
+
+/**
+ * The studio behind a door (plan 2.3, audit S4a).
+ *
+ * `/costing` LANDED inside the 31-input form, which is the destination for one task —
+ * costing a new style — and the wrong place for the visit a merchandiser makes most,
+ * which is checking a sheet that already exists. The sheet list leads now and the form
+ * opens on demand.
+ *
+ * A seed still opens it immediately: a deep link from the RFQ desk arrives with a style
+ * already chosen, and making that person click "Cost a style" to see the form they were
+ * sent to would be a door in front of a door.
+ */
+export function CostingStudioDoor({
+  marginFloorPct,
+  seed = null,
+}: {
+  marginFloorPct: string | null
+  seed?: StudioSeed | null
+}) {
+  const [open, setOpen] = useState(Boolean(seed))
+
+  if (!open) {
+    return (
+      <div>
+        <Button variant="primary" onClick={() => setOpen(true)}>
+          Cost a style
+        </Button>
+      </div>
+    )
+  }
+
+  return <CostingStudio marginFloorPct={marginFloorPct} seed={seed} />
+}

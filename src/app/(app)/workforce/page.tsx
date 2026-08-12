@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { factoryMonth, formatFactoryDate} from '@/lib/dates'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
@@ -339,7 +340,21 @@ export default async function WorkforcePage() {
         )}
 
         <section>
-          <SectionHeading eyebrow={`${people.length} shown`}>Roster</SectionHeading>
+          {/* The worker door lives on the setup screen; HR holds setup access but looks
+              HERE first (role audit 2.7b) — the signpost is the fix, not a second form. */}
+          <SectionHeading
+            eyebrow={`${people.length} shown`}
+            action={
+              <Link
+                href="/setup"
+                style={{ font: '500 13px/1 var(--fx-font-sans)', color: 'var(--fx-text-secondary)' }}
+              >
+                Add a worker → factory setup
+              </Link>
+            }
+          >
+            Roster
+          </SectionHeading>
           {people.length === 0 ? (
             <Card>
               <span style={{ font: "400 15px/1.55 var(--fx-font-sans)", color: 'var(--fx-text-secondary)' }}>

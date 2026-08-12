@@ -94,6 +94,7 @@ export const UI_MESSAGES: Catalogue = {
     'ui.desk.calm_inline': 'Inline QC',
     'ui.desk.calm_shipment': 'Shipment board',
     'ui.desk.calm_lcs': 'LC register',
+    'ui.store.shade_all': 'All shades',
     'ui.marbim.awaiting_desk':
       'You don’t have a desk yet — ask your admin to assign one under Settings → People. Until then you can ask questions, but there is nothing here to act on.',
     'ui.desk.calm_procurement': 'Procurement board',
@@ -1395,6 +1396,7 @@ export const UI_MESSAGES: Catalogue = {
     'ui.common.read_only': 'শুধু পড়া',
     'ui.common.read_only_body':
       'আপনার রোল {what} পড়তে পারে, বদলাতে পারে না। দরকার হলে ওনার বা অ্যাডমিনকে বলুন।',
+'ui.store.shade_all': 'সব শেড',
 'ui.marbim.awaiting_desk':
   'আপনার এখনও কোনো ডেস্ক নেই — Settings → People-এ গিয়ে অ্যাডমিনকে একটি ডেস্ক দিতে বলুন। ততক্ষণ প্রশ্ন করতে পারবেন, কিন্তু এখানে করার মতো কিছু নেই।',
 'ui.desk.calm_procurement': 'প্রকিউরমেন্ট বোর্ড',

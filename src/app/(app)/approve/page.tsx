@@ -6,9 +6,11 @@ import { PageHeader } from '@/components/shell/page-shell'
 import { WorkCue } from '@/components/shell/work-cue'
 import { canSee, NAV } from '@/components/shell/nav'
 import { getCtx } from '@/modules/core/session'
-import { inboxRows } from '@/modules/approvals/queries'
+import { inboxRows, listApprovalRules } from '@/modules/approvals/queries'
 import type { ApprovalsPolicy } from '@/modules/approvals/service'
 import { companyProfile, getPolicy } from '@/modules/settings/service'
+
+import { WhatArrivesHere } from './what-arrives'
 
 import { ApproveInbox } from './inbox-client'
 
@@ -38,7 +40,10 @@ export default async function ApprovePage() {
   }
 
   const policy = await getPolicy<ApprovalsPolicy>(ctx, 'approvals')
-  const rows = await inboxRows(ctx, { now: new Date() }, policy)
+  const [rows, rules] = await Promise.all([
+    inboxRows(ctx, { now: new Date() }, policy),
+    listApprovalRules(ctx),
+  ])
 
   const aging = rows.filter((r) => r.aging).length
 
@@ -72,6 +77,7 @@ export default async function ApprovePage() {
               : []
         }
       />
+      {rows.length === 0 ? <WhatArrivesHere roles={ctx.roles} rules={rules} /> : null}
       <ApproveInbox
         rows={rows.map((r) => ({
           ...r,

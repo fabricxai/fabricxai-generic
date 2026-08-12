@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 
@@ -31,7 +32,12 @@ import { factoryToday } from '@/lib/dates'
  */
 export const dynamic = 'force-dynamic'
 
-export default async function CompliancePage() {
+export default async function CompliancePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ cap?: string }>
+}) {
+  const { cap: capFilter } = await searchParams
   const ctx = await getCtx(await headers())
   if (!ctx) redirect('/login')
 
@@ -44,11 +50,30 @@ export default async function CompliancePage() {
   const today = factoryToday()
   const policy = await getPolicy<CompliancePolicy>(ctx, 'compliance')
 
-  const [ladder, exceptions, findings] = await Promise.all([
+  const [ladder, allExceptions, findings] = await Promise.all([
     certificateLadder(ctx, today, policy),
     capExceptions(ctx, today),
     openFindings(ctx),
   ])
+
+  /*
+   * The CAP filter (role audit 2.7e). Three questions a compliance officer actually asks of
+   * this list — what needs evidence, what is waiting on closure, what is already overdue —
+   * as URL params rather than client state, so a filtered view can be sent to the person
+   * who owns the CAP. At two rows the chips are furniture; at thirty they are the screen.
+   */
+  const exceptions = allExceptions.filter((e) => {
+    switch (capFilter) {
+      case 'evidence':
+        return e.status === 'open' || e.status === 'in_progress'
+      case 'closing':
+        return e.status === 'evidence_submitted'
+      case 'overdue':
+        return e.deadline < today
+      default:
+        return true
+    }
+  })
 
   const expired = ladder.filter((c) => c.state === 'expired')
   const expiring = ladder.filter((c) => c.state !== 'expired' && c.rung !== null)
@@ -206,7 +231,44 @@ export default async function CompliancePage() {
         </section>
 
         <section>
-          <SectionHeading eyebrow={`${exceptions.length} open`}>Corrective actions</SectionHeading>
+          <SectionHeading eyebrow={`${exceptions.length} of ${allExceptions.length} shown`}>
+            Corrective actions
+          </SectionHeading>
+
+          {allExceptions.length > 2 ? (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, margin: '0 0 14px' }}>
+              {(
+                [
+                  [undefined, 'All'],
+                  ['evidence', 'Needs evidence'],
+                  ['closing', 'Waiting on closure'],
+                  ['overdue', 'Overdue'],
+                ] as const
+              ).map(([param, label]) => {
+                const on = capFilter === param || (!capFilter && !param)
+                return (
+                  <Link
+                    key={label}
+                    href={param ? `/compliance?cap=${param}` : '/compliance'}
+                    style={{
+                      minHeight: 'var(--fx-tap-min)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      padding: '8px 14px',
+                      borderRadius: 'var(--fx-radius-sm)',
+                      border: `1px solid ${on ? 'var(--fx-accent)' : 'var(--fx-border-default)'}`,
+                      background: on ? 'var(--fx-accent-subtle)' : 'transparent',
+                      color: 'var(--fx-text-primary)',
+                      font: "500 12.5px/1 var(--fx-font-sans)",
+                      textDecoration: 'none',
+                    }}
+                  >
+                    {label}
+                  </Link>
+                )
+              })}
+            </div>
+          ) : null}
 
           {exceptions.length === 0 ? (
             <div
