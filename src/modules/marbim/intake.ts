@@ -155,6 +155,21 @@ export const INTAKE_KINDS: readonly IntakeKind[] = [
     fillsFormOnly: true,
   },
   {
+    /*
+     * The clipboard every sewing line actually keeps. The tablet is meant to replace it and
+     * does not — the paper works when the network does not — so what happens instead is
+     * somebody typing eleven rows off the sheet at seven in the evening.
+     */
+    id: 'hourly_sheet',
+    label: 'An hourly production sheet',
+    hint: "A line's own hourly report for a day. Fills the whole day's hours in one go.",
+    moduleId: 'production',
+    targetTable: 'hourly_outputs',
+    zodSchemaKey: 'hourly_sheet_v1',
+    roles: ['production', 'planner'],
+    fillsFormOnly: true,
+  },
+  {
     id: 'ud_scan',
     label: 'A customs Utilization Declaration',
     hint: 'The UD paper for duty-free bonded material. Drafts the authorised items and quantities.',

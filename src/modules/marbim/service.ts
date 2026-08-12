@@ -124,6 +124,33 @@ const HISTORY_BUDGET_CHARS = 12_000
  * is the kind that has to be prevented at the instruction.
  */
 const TARGET_NOTES: Record<string, readonly string[]> = {
+  hourly_outputs: [
+    'This is a sewing line\'s HOURLY PRODUCTION REPORT — a clipboard sheet, handwritten,',
+    'photographed at the end of the day.',
+    '',
+    'HOURS are written as bands the way the floor says them: "8-9", "9-10", "12-1",',
+    '"2-3", "6-7". `hourSlot` is the 24-hour START of the band. A Bangladeshi shift runs',
+    'from 8am to about 7pm with a lunch break, and the afternoon is written in 12-hour',
+    'form with no am/pm because everyone on the floor knows which it is. So:',
+    '',
+    '  "8-9" is 8      "11-12" is 11    "12-1" is 12    "1-2" is 13',
+    '  "2-3" is 14     "3-4" is 15      "4-5" is 16     "6-7" is 18',
+    '',
+    'Nothing is sewn at two in the morning. A sheet that skips an hour is a lunch break,',
+    'not a missing row — leave it out rather than filling it with a zero.',
+    '',
+    'ACTUAL is what came off the line that hour. CUM. or CUMULATIVE is a running total the',
+    'supervisor keeps by hand: it is NOT an hour\'s output and must never be read as one.',
+    'The last cumulative figure equals the day total, which is a check on the hours you',
+    'read, not a row of its own.',
+    '',
+    'TARGET is usually stated once at the top ("Target/hr: 210") and repeated down the',
+    'column. Put it in `targetPerHour` and leave the per-row target out unless a row',
+    'genuinely differs.',
+    '',
+    'REMARKS are the reason an hour missed — "needle chg SN-1-021", "thread break",',
+    '"power". Transcribe them as written; they are what a supervisor is asked about.',
+  ],
   supplier_quotes: [
     'This is a PROFORMA INVOICE or quotation from a mill, trader or accessories supplier.',
     '',

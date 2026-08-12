@@ -5,6 +5,7 @@ import { and, eq, isNull } from 'drizzle-orm'
 import { EmptyState } from '@/components/fx/feedback'
 import { FloorScreen } from '@/components/fx/floor'
 import { PageHeader } from '@/components/shell/page-shell'
+import { DayCatchupButton } from './day-catchup'
 import { tui } from '@/lib/i18n-ui'
 import { requestLocale } from '@/lib/ui-locale'
 import { getCtx } from '@/modules/core/session'
@@ -146,6 +147,15 @@ export default async function HourlyPage() {
             : undefined
         }
         ownsAmber
+        actions={
+          <DayCatchupButton
+            lines={rows.map((row) => ({
+              lineId: row.lineId,
+              code: row.code,
+              orderId: planByLine.get(row.lineId)?.orderId ?? null,
+            }))}
+          />
+        }
       />
       <HourlyClient
         producedOn={today}
