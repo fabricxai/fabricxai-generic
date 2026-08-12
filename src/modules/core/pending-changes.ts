@@ -50,6 +50,23 @@ export interface ProposeInput {
   sourceDocumentId?: string
   extractorVersion?: string
   model?: string
+  /**
+   * Who this draft belongs to, when `ctx` is not them.
+   *
+   * An extraction runs on a system ctx — nobody is signed in when a queue worker calls
+   * `propose` — so `ctx.userId` was null and every AI draft landed with no raiser at all.
+   * The consequences were quiet and all bad: "My raised drafts" could not show a person the
+   * document they had just uploaded, the self-approval ban had no one to compare against,
+   * and the success notification pointed them at `/approve`, which is the reviewer's queue
+   * and empty for the person who raised it. A merchandiser therefore uploaded a purchase
+   * order, was told it had been read, and could find no trace of it anywhere.
+   *
+   * The extraction job records who queued it, and that is the person this belongs to. It
+   * changes nothing about who may APPROVE — that is still the rule's business — and it
+   * makes the self-approval ban do its job, since somebody who uploads a document is
+   * exactly the somebody who should not also sign for it.
+   */
+  onBehalfOf?: string
 }
 
 export interface ApproveInput {
@@ -198,7 +215,7 @@ async function resolveRule(
 export async function propose(
   ctx: AnyCtx,
   input: ProposeInput,
-): Promise<{ id: string; status: 'pending' | 'committed' }> {
+): Promise<{ id: string; status: 'drafted' | 'pending' | 'committed' }> {
   const schema = resolvePendingSchema(input.moduleId, input.targetTable, input.zodSchemaKey)
   const fieldConfidence = input.fieldConfidence ?? {}
 
@@ -212,6 +229,16 @@ export async function propose(
   }
 
   const confidenceMin = lowestConfidence(fieldConfidence)
+
+  /*
+   * A machine read a document for somebody. That somebody checks it first.
+   *
+   * Only when BOTH are true: the draft came from an extraction (a chat-composed draft is
+   * already the product of a conversation the person was in), and there is a named raiser
+   * to hand it to. A draft with no raiser has nobody to check it, and holding it in
+   * `drafted` forever would be worse than routing it — so it goes to the inbox as before.
+   */
+  const needsRaiserCheck = input.source === 'ai_extraction' && Boolean(input.onBehalfOf)
 
   const { id, rule } = await withTenantTx(ctx, async (tx) => {
     const [row] = await tx
@@ -230,7 +257,9 @@ export async function propose(
         sourceDocumentId: input.sourceDocumentId ?? null,
         extractorVersion: input.extractorVersion ?? null,
         model: input.model ?? null,
-        createdBy: ctx.userId,
+        createdBy: input.onBehalfOf ?? ctx.userId,
+        status: needsRaiserCheck ? 'drafted' : 'pending',
+        submittedAt: needsRaiserCheck ? null : new Date(),
       })
       .returning({ id: pendingChanges.id })
 
@@ -246,7 +275,16 @@ export async function propose(
     }
   })
 
+  /*
+   * A `drafted` row never auto-approves, whatever its confidence.
+   *
+   * The floor exists to spare a REVIEWER work the numbers say is unnecessary. It was never
+   * an argument for skipping the person who has the document — and a 0.99 draft that
+   * silently committed before they looked would be the one failure mode this whole step is
+   * for. The floor still applies at confirm, where the raiser has said the reading is right.
+   */
   const clearsFloor =
+    !needsRaiserCheck &&
     rule.autoApprove &&
     rule.minConfidence !== null &&
     confidenceMin !== null &&
@@ -259,7 +297,7 @@ export async function propose(
     return { id, status: result.status === 'committed' ? 'committed' : 'pending' }
   }
 
-  return { id, status: 'pending' }
+  return { id, status: needsRaiserCheck ? 'drafted' : 'pending' }
 }
 
 /**
@@ -283,6 +321,165 @@ export interface ApproveResult {
 // AnyCtx, not RequestCtx: the auto-approve floor runs under SystemCtx (extraction jobs
 // have no user). A system approval records no row in the approvals ledger — there is no
 // approver — and can never stand in for a rule that demands more than one human.
+// ─────────────────────────────────────────────────────────────────────────────
+// The raiser's own check — `drafted` → `pending`
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface ConfirmDraftInput {
+  pendingChangeId: string
+  /**
+   * What the raiser changed, field → new value. Merged into the payload and re-validated,
+   * exactly as a reviewer's corrections are at approve.
+   */
+  corrections?: Record<string, unknown>
+}
+
+/**
+ * The person who asked for a document to be read says the reading is right.
+ *
+ * This is the step that was missing, and its absence put the wrong person in front of the
+ * question. A merchandiser dropped a purchase order; the model's output went straight to an
+ * approver's inbox; and the approver — who does not have the paper — was asked to verify
+ * quantities against a document sitting on somebody else's desk. The raiser, the one person
+ * who could compare the two, never saw it at all.
+ *
+ * Only the raiser may confirm. Not an owner, not an admin: the point is not authority, it is
+ * that this person has the source. An approver who wants to change something has their own
+ * corrections at approve; that is a different check and it stays where it is.
+ *
+ * A corrected field's confidence becomes 1. It is no longer the extractor's number — a human
+ * with the document typed it — and leaving 0.62 on a value somebody hand-fixed would make
+ * the approver's weakest-confidence signal point at the one field that is now certain.
+ */
+export async function confirmDraft(
+  ctx: RequestCtx,
+  input: ConfirmDraftInput,
+): Promise<{ id: string; status: 'pending' | 'committed' }> {
+  const id = await withTenantTx(ctx, async (tx) => {
+    const [draft] = await tx
+      .select()
+      .from(pendingChanges)
+      .where(scoped(pendingChanges, ctx, eq(pendingChanges.id, input.pendingChangeId)))
+      .for('update')
+
+    if (!draft) throw notFound('errors.pending_change_not_found', { id: input.pendingChangeId })
+
+    if (draft.status !== 'drafted') {
+      throw conflict('errors.pending_change_not_drafted', { id: draft.id, status: draft.status })
+    }
+    if (draft.createdBy !== ctx.userId) {
+      // Somebody else's unsubmitted reading. Not theirs to send on.
+      throw new AppError('forbidden', 'errors.not_the_raiser', { id: draft.id })
+    }
+
+    const corrections = input.corrections ?? {}
+    const merged = { ...(draft.payload as Record<string, unknown>), ...corrections }
+
+    // Re-validated against the module's CURRENT schema, the same as approve does — a draft
+    // that sat while the schema tightened must not slip through on the older one.
+    const schema = resolvePendingSchema(draft.moduleId, draft.targetTable, draft.zodSchemaKey)
+    const payload = parseOrThrow(schema, merged)
+
+    const fieldConfidence = { ...((draft.fieldConfidence ?? {}) as Record<string, number>) }
+    const changed: Record<string, unknown> = {}
+    for (const [field, to] of Object.entries(corrections)) {
+      changed[field] = { from: (draft.payload as Record<string, unknown>)[field] ?? null, to }
+      fieldConfidence[field] = 1
+    }
+
+    await tx
+      .update(pendingChanges)
+      .set({
+        payload,
+        fieldConfidence,
+        confidenceMin: lowestConfidence(fieldConfidence),
+        draftCorrections: changed,
+        status: 'pending',
+        submittedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(scoped(pendingChanges, ctx, eq(pendingChanges.id, draft.id)))
+
+    return draft.id
+  })
+
+  /*
+   * The auto-approve floor applies HERE rather than at propose.
+   *
+   * Deferring it is the whole point: a high-confidence reading still had to be seen by the
+   * person holding the document, and once they have said it is right, a rule that trusts
+   * that confidence has its condition met in a way it did not before.
+   */
+  const rule = await withTenantRead(ctx, async (tx) => {
+    const [draft] = await tx
+      .select()
+      .from(pendingChanges)
+      .where(scoped(pendingChanges, ctx, eq(pendingChanges.id, id)))
+    return draft
+      ? {
+          resolved: await resolveRule(tx, ctx, {
+            moduleId: draft.moduleId,
+            targetTable: draft.targetTable,
+            operation: draft.operation,
+          }),
+          confidenceMin: draft.confidenceMin,
+        }
+      : null
+  })
+
+  if (
+    rule?.resolved.autoApprove &&
+    rule.resolved.minConfidence !== null &&
+    rule.confidenceMin !== null &&
+    Number(rule.confidenceMin) >= Number(rule.resolved.minConfidence)
+  ) {
+    const result = await approve(ctx, { pendingChangeId: id, autoApproved: true })
+    return { id, status: result.status === 'committed' ? 'committed' : 'pending' }
+  }
+
+  return { id, status: 'pending' }
+}
+
+/**
+ * The raiser throws their own reading away.
+ *
+ * A separate door from `reject` because nothing was ever asked of anybody: no approver saw
+ * it, no queue held it. Recorded rather than deleted so the extractor's failures stay
+ * countable — a reading discarded before submission is the strongest possible signal that
+ * it was wrong, and deleting the row would throw that away too.
+ */
+export async function discardDraft(
+  ctx: RequestCtx,
+  input: { pendingChangeId: string; reason?: string },
+): Promise<void> {
+  await withTenantTx(ctx, async (tx) => {
+    const [draft] = await tx
+      .select()
+      .from(pendingChanges)
+      .where(scoped(pendingChanges, ctx, eq(pendingChanges.id, input.pendingChangeId)))
+      .for('update')
+
+    if (!draft) throw notFound('errors.pending_change_not_found', { id: input.pendingChangeId })
+    if (draft.status !== 'drafted') {
+      throw conflict('errors.pending_change_not_drafted', { id: draft.id, status: draft.status })
+    }
+    if (draft.createdBy !== ctx.userId) {
+      throw new AppError('forbidden', 'errors.not_the_raiser', { id: draft.id })
+    }
+
+    await tx
+      .update(pendingChanges)
+      .set({
+        status: 'rejected',
+        reviewedBy: ctx.userId,
+        reviewedAt: new Date(),
+        reviewNote: input.reason ?? 'discarded by the person who uploaded it',
+        updatedAt: new Date(),
+      })
+      .where(scoped(pendingChanges, ctx, eq(pendingChanges.id, draft.id)))
+  })
+}
+
 export async function approve(ctx: AnyCtx, input: ApproveInput): Promise<ApproveResult> {
   type Failure = { schemaError: AppError }
   type Awaiting = { awaiting: { approvals: number; required: number } }

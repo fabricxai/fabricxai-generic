@@ -29,18 +29,41 @@ interface ContextField {
 type Attachment =
   | { state: 'none' }
   | { state: 'uploading'; filename: string }
-  | { state: 'attached'; documentId: string; filename: string; modelReadable: boolean }
+  | {
+      state: 'attached'
+      documentId: string
+      filename: string
+      /** The model opens it directly. */
+      modelReadable: boolean
+      /** The server converts it to text first. Either one can carry the submission. */
+      serverReadable: boolean
+    }
   | { state: 'failed'; message: string }
 
 /** Text-bearing types the browser can read without anything parsing them. */
 const READABLE = /\.(txt|csv|md|eml|json)$/i
 
 /**
- * Types the extract model reads natively — the server's MODEL_READABLE_MIME, mirrored here
+ * Types the extract model reads natively — the server's `MODEL_READABLE_MIME`, mirrored here
  * so the button can enable before a round-trip. The server re-checks against the stored
  * mime, so a spoofed type gets refused at the door, not queued.
  */
 const MODEL_READABLE = /^(application\/pdf|image\/(jpeg|png|webp))$/
+
+/**
+ * Types the SERVER turns into text before the model sees them.
+ *
+ * The two sets are separate because they read differently and the screen says so, but they
+ * are equally submittable — which the send gate did not know. `fileCarries` tested only
+ * `MODEL_READABLE`, so attaching a buyer's PO as the .docx it actually arrives as left the
+ * button disabled, with no explanation, on the one screen built to read it. The server had
+ * accepted that exact file since the converter was written.
+ *
+ * Mirrors `TEXT_EXTRACTABLE_MIME` in `lib/document-text.ts`. `.csv` is in both places on
+ * purpose: it fills the paste box client-side as well, and either route works.
+ */
+const SERVER_READABLE =
+  /^(text\/csv|application\/vnd\.openxmlformats-officedocument\.(wordprocessingml\.document|spreadsheetml\.sheet))$/
 
 /**
  * Say what it is, give MARBIM the text, optionally attach the original.
@@ -53,9 +76,10 @@ const MODEL_READABLE = /^(application\/pdf|image\/(jpeg|png|webp))$/
  * **Text or a readable file — either is enough.** Pasted text is read when it exists.
  * Without it, a PDF or photo (JPEG/PNG/WebP) is handed to the extract model directly — the
  * vendor's own reader sees the pages, and per-field confidence measures the whole journey
- * from pixels to value. Types the model cannot read (spreadsheets, Word, HEIC) still need
- * their text pasted, and the copy under the box says which is which so nobody drops a scan
- * and waits for a draft that cannot come.
+ * from pixels to value. A Word file or spreadsheet is converted to text on the server and
+ * read the same way. Only what neither can open (a legacy .doc, a HEIC photo) still needs
+ * its text pasted, and the copy under the box says which is which so nobody drops a scan and
+ * waits for a draft that cannot come.
  *
  * **Queued, not done.** The queue is now immediate rather than a five-minute tick (plan 6.6:
  * `marbim.extraction.queued` routes to the derive queue), but the confirmation still says
@@ -112,6 +136,7 @@ export function IntakeClient({ kinds }: { kinds: readonly Kind[] }) {
         documentId: uploaded.documentId,
         filename: file.name,
         modelReadable: MODEL_READABLE.test(file.type),
+        serverReadable: SERVER_READABLE.test(file.type),
       })
 
       // A text file can fill the box itself. A PDF cannot, and pretending otherwise by
@@ -127,8 +152,11 @@ export function IntakeClient({ kinds }: { kinds: readonly Kind[] }) {
     }
   }
 
-  // The file can carry the submission by itself only when the model can read it.
-  const fileCarries = attachment.state === 'attached' && attachment.modelReadable
+  // The file carries the submission by itself when ANYTHING can read it — the model
+  // directly, or the server's converter first. Both end up as source text for the same
+  // extractor, the same measured confidence and the same approve inbox.
+  const fileCarries =
+    attachment.state === 'attached' && (attachment.modelReadable || attachment.serverReadable)
   const readable = text.trim() !== '' || fileCarries
 
   function send() {
@@ -312,12 +340,13 @@ export function IntakeClient({ kinds }: { kinds: readonly Kind[] }) {
               color: 'var(--fx-text-tertiary)',
             }}
           >
-            {/* Said plainly rather than discovered — which types the model reads by itself,
-                and which still need a person's paste. */}
-            Paste the text, or skip it: a PDF or photo (JPEG, PNG, WebP) attached below is
-            read by the model directly, pages and all. Spreadsheets, Word files and HEIC
-            still need their text pasted here. When you paste AND attach, the paste is what
-            gets read. A .txt or .csv attachment fills this box on its own.
+            {/* Said plainly rather than discovered — which types are read how. */}
+            Paste the text, or skip it: attach the file below instead. A PDF or photo (JPEG,
+            PNG, WebP) is read by the model directly, pages and all. A Word document or
+            spreadsheet is converted to text on the server first — tables included — and read
+            the same way. Only a legacy .doc or a HEIC photo still needs its text pasted here.
+            When you paste AND attach, the paste is what gets read. A .txt or .csv attachment
+            fills this box on its own.
           </p>
         </section>
       ) : null}
@@ -332,7 +361,18 @@ export function IntakeClient({ kinds }: { kinds: readonly Kind[] }) {
           <input
             ref={fileRef}
             type="file"
-            accept="application/pdf,image/*,.txt,.csv,.md,.eml"
+            /*
+             * Word and Excel belong here, and were missing.
+             *
+             * The server has read them since the day the extractor was written:
+             * `readDocument` accepts anything in `TEXT_EXTRACTABLE_MIME`, and
+             * `marbim/service.ts` converts the bytes before the model ever sees them. Only
+             * this attribute — and the sentence below it, which told people to paste
+             * instead — kept the door shut. A buyer's PO arrives as a .docx more often than
+             * as anything else, so the one document this screen exists for was the one it
+             * would not take.
+             */
+            accept="application/pdf,image/*,.txt,.csv,.md,.eml,.docx,.xlsx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             style={{ display: 'none' }}
             onChange={(e) => {
               const file = e.target.files?.[0]
@@ -358,9 +398,13 @@ export function IntakeClient({ kinds }: { kinds: readonly Kind[] }) {
                 }}
               >
                 {attachment.filename} attached
-                {attachment.modelReadable && text.trim() === ''
-                  ? ' — the model will read it directly'
-                  : ''}
+                {text.trim() !== ''
+                  ? ''
+                  : attachment.modelReadable
+                    ? ' — the model will read it directly'
+                    : attachment.serverReadable
+                      ? ' — its text will be read'
+                      : ''}
               </span>
             ) : null}
           </div>

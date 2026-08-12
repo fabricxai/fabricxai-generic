@@ -870,10 +870,42 @@ export async function applyOrderFromPo(
 
   const result = await createOrderIn(ctx, tx, { order, styles })
 
+  /*
+   * The grid the PO carried, saved with the order rather than left for somebody to re-type.
+   *
+   * `createOrderIn` returns the style ids in the order it was given the styles, which is
+   * what makes this mapping safe — and the reason it is asserted here rather than assumed
+   * is that a silent misalignment would attach one style's sizes to another's.
+   *
+   * A breakdown that does not add up to the contracted quantity is NOT corrected here.
+   * `saveBreakdownIn` has the gate for that and it belongs there; the point of committing
+   * the grid at all is that the approver saw both numbers before signing.
+   */
+  const breakdowns: number[] = []
+  for (const [i, style] of styles.entries()) {
+    const cells = (style as { breakdown?: { color: string; size: string; qty: number }[] }).breakdown
+    if (!cells?.length) continue
+
+    const orderStyleId = result.orderStyleIds[i]
+    if (!orderStyleId) throw new Error('createOrderIn returned fewer style ids than styles')
+
+    const saved = await saveBreakdownIn(ctx, tx, {
+      orderStyleId,
+      cells,
+      buyerRevision: false,
+      reason: 'read from the buyer’s purchase order',
+    })
+    breakdowns.push(saved.totalQty)
+  }
+
   return {
     rowId: result.orderId,
     before: null,
-    after: { orderId: result.orderId, orderStyleIds: result.orderStyleIds },
+    after: {
+      orderId: result.orderId,
+      orderStyleIds: result.orderStyleIds,
+      ...(breakdowns.length > 0 ? { breakdownTotals: breakdowns } : {}),
+    },
   }
 }
 

@@ -43,6 +43,7 @@ import {
 } from './loop'
 import {
   getProvider,
+  modelForRole,
   MODEL_READABLE_MIME,
   ProviderError,
   type ExtractFile,
@@ -108,7 +109,33 @@ const HISTORY_BUDGET_CHARS = 12_000
  * An ambiguous numeric date with nothing around it to settle it is left EMPTY. A missing
  * ex-factory date is visible to whoever approves the draft; a plausible wrong one is not,
  * and a date that is wrong by six months is the class of error that reaches a bank.
+ *
+ * ## What a target needs said about it that its schema cannot say.
+ *
+ * Field names and types are already in the schema; this is for the cases where a document's
+ * shape and the schema's shape disagree, and the model has to be told which is which.
+ *
+ * The buyer-PO note exists because of a real, silent failure. A PO's quantity table has one
+ * row per colour and size — ten rows for one garment — and `styles[]` was the only repeating
+ * structure the schema offered. The extractor did the reasonable thing with what it had and
+ * returned ten styles, all with the same style code, one size's quantity each. Nothing
+ * refused it: the payload was valid, the confidence was high, and approving it would have
+ * created an order with ten duplicate styles and no grid. A wrong answer no gate can catch
+ * is the kind that has to be prevented at the instruction.
  */
+const TARGET_NOTES: Record<string, readonly string[]> = {
+  orders: [
+    'A STYLE is one garment the buyer is buying — one style code, one description, one',
+    'unit price. A purchase order usually has exactly one, occasionally two or three.',
+    'The table of quantities per colour and size is NOT a list of styles: it is that one',
+    'style\'s BREAKDOWN, and it goes in that style\'s `breakdown` array, one entry per cell.',
+    '`contractedQty` is the TOTAL across the whole grid — the figure the PO calls the order',
+    'quantity — not one row of it. If the document prints a total, use it; a grid that does',
+    'not add up to the printed total is a real discrepancy and the approver needs to see',
+    'both numbers, so do not silently correct either one.',
+  ],
+}
+
 export function extractionInstruction(moduleId: string, targetTable: string): string {
   return [
     `Extract a ${targetTable} record for the ${moduleId} module.`,
@@ -119,6 +146,7 @@ export function extractionInstruction(moduleId: string, targetTable: string): st
     'If a purely numeric date is ambiguous (05/12/2026 could be 5 December or 12 May) and',
     'nothing else on the page settles which, leave that field empty rather than choosing:',
     'a missing date is visible to the person approving this, and a wrong one is not.',
+    ...(TARGET_NOTES[targetTable] ? ['', ...TARGET_NOTES[targetTable]] : []),
   ].join('\n')
 }
 
@@ -508,12 +536,52 @@ export async function runExtraction(
       }
     }
 
-    const result = await getProvider().extract({
+    /*
+     * The extraction call, and the ledger entry it had never written.
+     *
+     * `marbim_call_log`'s own header says extraction lands here — "a factory that uploads
+     * two hundred POs in an afternoon has spent real money, and the daily ceiling has to
+     * see it, otherwise the budget only governs the cheapest of the three roles" — and
+     * nothing wrote the row. Only the chat loop did. So the ceiling counted conversations
+     * and ignored document reading entirely: the table held zero `extract` rows across
+     * every tenant, while extractions ran and were billed.
+     *
+     * Logged either way. A call that failed after the vendor accepted it was still paid
+     * for, and a ledger that only records successes drifts upward exactly as reliability
+     * gets worse.
+     */
+    const extractStartedAt = Date.now()
+    let result
+    try {
+      result = await getProvider().extract({
+        role: 'extract',
+        schema,
+        input: source,
+        instruction: extractionInstruction(job.moduleId, job.targetTable),
+        ...(file ? { file } : {}),
+      })
+    } catch (error) {
+      await logCall(ctx, {
+        role: 'extract',
+        // The call died before it could say which model answered. The configured one is
+        // the honest guess, and 'unknown' is what the chat path records in the same spot.
+        model: modelForRole('extract') ?? 'unknown',
+        iteration: 0,
+        durationMs: Date.now() - extractStartedAt,
+        outcome: error instanceof Error ? error.message : String(error),
+        createdBy: job.createdBy,
+      })
+      throw error
+    }
+
+    await logCall(ctx, {
       role: 'extract',
-      schema,
-      input: source,
-      instruction: extractionInstruction(job.moduleId, job.targetTable),
-      ...(file ? { file } : {}),
+      model: result.model,
+      iteration: 0,
+      ...(result.usage ? { usage: result.usage } : {}),
+      durationMs: Date.now() - extractStartedAt,
+      outcome: 'ok',
+      createdBy: job.createdBy,
     })
 
     /**
@@ -566,6 +634,9 @@ export async function runExtraction(
       sourceDocumentId: job.sourceDocumentId ?? undefined,
       extractorVersion: job.extractorVersion,
       model: result.model,
+      // The draft belongs to whoever queued the reading, not to the worker that ran it.
+      // Without this every AI draft was raised by nobody — see `onBehalfOf`.
+      ...(job.createdBy ? { onBehalfOf: job.createdBy } : {}),
     })
 
     return await withTenantTx(ctx, async (tx) => {
@@ -814,7 +885,10 @@ export async function tokensSpentToday(ctx: AnyCtx, now = new Date()): Promise<n
  * same argument is written out at length in `core/job-runs.ts`.
  */
 async function logCall(
-  ctx: RequestCtx,
+  // AnyCtx: an extraction runs on the queue's system ctx, and its spend is the spend that
+  // was invisible. A ledger that only accepts a signed-in caller cannot record the calls
+  // made on a person's behalf, which is most of them.
+  ctx: AnyCtx,
   entry: {
     role: 'extract' | 'reason' | 'embed'
     model: string
@@ -823,6 +897,8 @@ async function logCall(
     usage?: { inputTokens: number; outputTokens: number }
     durationMs: number
     outcome: string
+    /** Who the call was made for, when `ctx` is the queue rather than a person. */
+    createdBy?: string | null
   },
 ): Promise<void> {
   try {
@@ -837,7 +913,7 @@ async function logCall(
         outputTokens: entry.usage?.outputTokens ?? null,
         durationMs: entry.durationMs,
         outcome: entry.outcome.slice(0, 500),
-        createdBy: ctx.userId,
+        createdBy: entry.createdBy ?? ctx.userId,
       })
     })
   } catch (error) {

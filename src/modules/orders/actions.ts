@@ -201,7 +201,10 @@ export async function proposeOrderRevision(input: {
   cells: { color: string; size: string; qty: number }[]
   reason: string
   documentId?: string
-}): Promise<{ pendingChangeId: string; status: 'pending' | 'committed' }> {
+  // `drafted` is unreachable from here — that state is only for an extraction handed back
+  // to the person who asked for it, and this is somebody typing a revision themselves. The
+  // union follows `propose` rather than restating a narrower promise that would go stale.
+}): Promise<{ pendingChangeId: string; status: 'drafted' | 'pending' | 'committed' }> {
   const ctx = await requireRole(await headers(), ...WRITERS)
 
   const result = await propose(ctx, {

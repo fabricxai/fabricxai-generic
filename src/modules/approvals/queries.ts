@@ -13,6 +13,7 @@ import { z } from 'zod'
 
 import { approvalRules, pendingChangeApprovals, pendingChanges, users } from '@/db/schema/core'
 import type { AnyCtx, RequestCtx } from '@/modules/core/ctx'
+import { buyerAccounts } from '@/modules/buyers/queries'
 import { readJsonbObject } from '@/modules/core/jsonb'
 import { scoped } from '@/modules/core/scoped'
 import { withTenantRead } from '@/modules/core/tenancy'
@@ -27,6 +28,9 @@ import { withTenantRead } from '@/modules/core/tenancy'
 const fieldConfidenceSchema = z.record(z.string().min(1), z.number().min(0).max(1))
 
 import { inbox, type ApprovalsPolicy, type InboxItem } from './service'
+
+/** A uuid-shaped value is an id this system assigned, never something a document carried. */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 /** A draft as the inbox list renders it. */
 export interface InboxRow extends InboxItem {
@@ -532,4 +536,126 @@ export async function listApprovalRules(ctx: RequestCtx): Promise<ApprovalRuleRo
       .where(scoped(approvalRules, ctx, eq(approvalRules.isActive, true)))
       .orderBy(approvalRules.moduleId, approvalRules.targetTable, approvalRules.operation),
   )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// What MARBIM read, waiting on the person who asked for it
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface UnconfirmedDraft {
+  id: string
+  moduleId: string
+  targetTable: string
+  createdAt: Date
+  /** Every field the extractor produced, with what it read and how sure it was. */
+  fields: {
+    name: string
+    value: unknown
+    /** Null for a field the extractor did not score — a person supplied it. */
+    confidence: number | null
+    /**
+     * A value this person chose from a picker, not one the document carried. Shown as the
+     * name they picked and NOT editable: it arrived as an id, and a person cannot usefully
+     * check or retype a uuid — but they can be shown that the reading is filed against
+     * "Bestseller A/S", which is the thing they would actually notice was wrong.
+     */
+    supplied?: { label: string }
+  }[]
+  /** The document it was read from, when one was attached. */
+  sourceDocumentId: string | null
+  model: string | null
+}
+
+/**
+ * Readings this person asked for that they have not yet checked.
+ *
+ * The queue between "MARBIM read your document" and "an approver is looking at it", which
+ * did not exist: an extraction went straight into somebody else's inbox, so the approver
+ * was asked to verify quantities against a purchase order sitting on another desk, and the
+ * one person who could actually compare the two never saw the draft at all.
+ *
+ * Scoped to `created_by` AND to `drafted`, so it is exactly the raiser's own unsent work.
+ * Nobody else can see a `drafted` row — not because it is secret, but because there is
+ * nothing anyone else can do with it yet.
+ *
+ * Fields come back flat and in a stable order rather than as the raw payload: the dialog
+ * shows a value beside its confidence, and a nested object has no single number to show.
+ * A nested value is rendered as JSON and edited as a whole — honest about the fact that
+ * `styles[]` is not a text box.
+ */
+export async function myUnconfirmedDrafts(
+  ctx: RequestCtx,
+  limit = 5,
+): Promise<UnconfirmedDraft[]> {
+  const rows = await withTenantRead(ctx, (tx) =>
+    tx
+      .select({
+        id: pendingChanges.id,
+        moduleId: pendingChanges.moduleId,
+        targetTable: pendingChanges.targetTable,
+        payload: pendingChanges.payload,
+        fieldConfidence: pendingChanges.fieldConfidence,
+        sourceDocumentId: pendingChanges.sourceDocumentId,
+        model: pendingChanges.model,
+        createdAt: pendingChanges.createdAt,
+      })
+      .from(pendingChanges)
+      .where(
+        scoped(
+          pendingChanges,
+          ctx,
+          and(eq(pendingChanges.status, 'drafted'), eq(pendingChanges.createdBy, ctx.userId)),
+        ),
+      )
+      .orderBy(desc(pendingChanges.createdAt))
+      .limit(limit),
+  )
+
+  /*
+   * The names behind the ids, for the fields a person picked rather than the document
+   * carried.
+   *
+   * Without this the dialog showed a merchandiser `7a42b4ed-bf78-4a06-970f-5d8351c796b9`
+   * beside "100%" — a number they cannot check, wearing a confidence that is not the
+   * extractor's, on a field they themselves chose from a dropdown. Resolving it costs one
+   * query and turns a meaningless row into the one line most worth glancing at: the buyer
+   * this whole order is about.
+   */
+  const uuidFields = new Set(
+    rows.flatMap((row) =>
+      Object.entries((row.payload ?? {}) as Record<string, unknown>)
+        .filter(([, v]) => typeof v === 'string' && UUID_RE.test(v))
+        .map(([k]) => k),
+    ),
+  )
+  const names = uuidFields.has('buyerId')
+    ? new Map((await buyerAccounts(ctx)).map((b) => [b.id, b.name]))
+    : new Map<string, string>()
+
+  return rows.map((row) => {
+    const payload = (row.payload ?? {}) as Record<string, unknown>
+    const confidence = (row.fieldConfidence ?? {}) as Record<string, number>
+    return {
+      id: row.id,
+      moduleId: row.moduleId,
+      targetTable: row.targetTable,
+      createdAt: row.createdAt,
+      sourceDocumentId: row.sourceDocumentId,
+      model: row.model,
+      fields: Object.keys(payload)
+        .sort()
+        .map((name) => {
+          const value = payload[name]
+          const isId = typeof value === 'string' && UUID_RE.test(value)
+          return {
+            name,
+            value,
+            confidence: typeof confidence[name] === 'number' ? confidence[name] : null,
+            ...(isId
+              ? { supplied: { label: names.get(value) ?? 'chosen when you sent it' } }
+              : {}),
+          }
+        }),
+    }
+  })
 }

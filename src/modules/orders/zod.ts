@@ -197,6 +197,20 @@ const orderStyleDraft = z.object({
   contractedQty: transcribedCount.optional(),
   unitPrice: transcribedMoney.optional(),
   currency: currencyCode.default('USD'),
+  /**
+   * The colour × size grid, when the PO carries one — and it nearly always does.
+   *
+   * This had nowhere to go, and the consequence was not that the grid was dropped: it was
+   * that the extractor put it somewhere wrong. Given a PO with ten quantity rows and a
+   * `styles[]` array as the only repeating structure in the schema, the model produced TEN
+   * styles — same style code ten times, one size's quantity each — and approving that would
+   * have created an order with ten duplicate styles and no breakdown at all.
+   *
+   * A schema with no home for the most repetitive thing on the page does not omit it; it
+   * invites the model to improvise. So the grid gets a home, and the extraction instruction
+   * for this target now says which is which.
+   */
+  breakdown: z.array(breakdownCell).optional(),
 })
 
 /** What MARBIM extracts from a buyer PO scan. Every field is uncertain, hence optional. */

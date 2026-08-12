@@ -120,6 +120,10 @@ describe('provenance carries names, never values', () => {
       reviewedAt: new Date('2026-08-01T06:00:00Z'),
       reviewNote: null,
       corrections: { basic_wage: '9700.00' },
+      // The raiser confirmed this reading unchanged and submitted it — no edits of their
+      // own, which is a different fact from the reviewer's correction below it.
+      draftCorrections: {},
+      submittedAt: new Date('2026-08-01T05:00:00Z'),
       committedAt: new Date('2026-08-01T06:00:00Z'),
       committedRowId: '33333333-3333-4333-8333-333333333333',
       error: null,

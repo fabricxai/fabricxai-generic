@@ -6,7 +6,9 @@ import { z } from 'zod'
 
 import {
   approve,
+  confirmDraft,
   currentRow,
+  discardDraft,
   reject,
   type ApproveResult,
 } from '@/modules/core/pending-changes'
@@ -196,5 +198,79 @@ export async function removeApprovalRule(
     const result = await deactivateApprovalRule(ctx, parsed)
     revalidatePath('/settings')
     return result
+  })
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The raiser's own check, before anybody else is asked
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Roles that may confirm their own reading.
+ *
+ * Wider than `INBOX_ROLES` on purpose, and it is not a weakening: `confirmDraft` refuses
+ * anybody who is not the row's own `created_by`, so this list only has to admit the roles
+ * that can queue a document at all. A storekeeper who photographs a UD is entitled to check
+ * what was read off it — and is still not entitled to approve it.
+ */
+const RAISER_ROLES: readonly Role[] = [
+  'owner',
+  'admin',
+  'merchandiser',
+  'commercial',
+  'store',
+  'procurement',
+  'planner',
+  'quality',
+  'hr',
+  'compliance',
+  'production',
+  'cutting',
+  'shipment',
+  'maintenance',
+  'finance',
+]
+
+const confirmInput = z.object({
+  pendingChangeId: z.uuid(),
+  /** Field → the value the raiser corrected it to. Absent means "as read". */
+  corrections: z.record(z.string(), z.unknown()).optional(),
+})
+
+/**
+ * "Yes, that is what the paper says" — and only then does an approver see it.
+ *
+ * The corrections here are the most reliable signal this product collects about its own
+ * extractor: made by the one person holding the document, before anyone else's opinion is
+ * in the room. They are stored apart from the reviewer's for that reason.
+ */
+export async function confirmMyDraft(
+  input: unknown,
+): Promise<{ id: string; status: 'pending' | 'committed' } | ActionFailure> {
+  const ctx = await requireRole(await headers(), ...RAISER_ROLES)
+  return surfaced(async () => {
+    const parsed = confirmInput.parse(input)
+    const result = await confirmDraft(ctx, {
+      pendingChangeId: parsed.pendingChangeId,
+      ...(parsed.corrections ? { corrections: parsed.corrections } : {}),
+    })
+    revalidatePath('/home')
+    revalidatePath('/approve')
+    return result
+  })
+}
+
+/** "No, that is not what it says" — thrown away by its own author, and counted. */
+export async function discardMyDraft(input: unknown): Promise<void | ActionFailure> {
+  const ctx = await requireRole(await headers(), ...RAISER_ROLES)
+  return surfaced(async () => {
+    const parsed = z
+      .object({ pendingChangeId: z.uuid(), reason: z.string().max(500).optional() })
+      .parse(input)
+    await discardDraft(ctx, {
+      pendingChangeId: parsed.pendingChangeId,
+      ...(parsed.reason ? { reason: parsed.reason } : {}),
+    })
+    revalidatePath('/home')
   })
 }

@@ -212,6 +212,22 @@ export function geminiExtractor({ apiKey, model }: GeminiOptions) {
         // the vendor: two extractors both "gemini" that scored differently would pool.
         method: `gemini/token-logprobs@${EXTRACTOR_PROMPT_VERSION}`,
         model,
+        /*
+         * The vendor's own count. Third of three providers to have reported it and dropped
+         * it — only Anthropic ever filled this in, so the daily token ceiling has been
+         * counting chat and nothing else since the ceiling was written.
+         *
+         * Omitted rather than zeroed when absent: null reads as "not reported", zero reads
+         * as "free", and only one of those is true.
+         */
+        ...(response.usageMetadata
+          ? {
+              usage: {
+                inputTokens: response.usageMetadata.promptTokenCount ?? 0,
+                outputTokens: response.usageMetadata.candidatesTokenCount ?? 0,
+              },
+            }
+          : {}),
       }
     },
   }

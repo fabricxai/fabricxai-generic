@@ -9,6 +9,7 @@ import { actionErrorMessage } from '@/lib/action-error'
 import { unwrap } from '@/lib/action-failure'
 import { Eyebrow } from '@/components/fx/signature'
 import { Ident } from '@/components/fx/format'
+import { GridSummary, humanise, looksLikeGrid } from '@/components/shell/reading-fields'
 import { MarbimMark, type MarkState } from '@/components/fx/mark'
 import { approveDraft, draftFields, rejectDraft } from '@/modules/approvals/actions'
 import type { DraftDetail } from '@/modules/approvals/queries'
@@ -1157,7 +1158,16 @@ function EditableRows({
  */
 function FieldValue({ value }: { value: unknown }) {
   const scalar = (v: unknown): string =>
-    v === null || v === undefined ? '—' : typeof v === 'object' ? JSON.stringify(v) : String(v)
+    v === null || v === undefined ? '—' : String(v)
+
+  /*
+   * The colour × size grid, as a grid.
+   *
+   * Rendered identically to what the raiser confirmed, deliberately: an approver looking at
+   * a different picture from the person who checked it against the paper makes "I checked
+   * it" and "I approved it" two claims about two different things.
+   */
+  if (looksLikeGrid(value)) return <GridSummary cells={value} />
 
   if (Array.isArray(value) && value.some((v) => v !== null && typeof v === 'object')) {
     return (
@@ -1176,8 +1186,15 @@ function FieldValue({ value }: { value: unknown }) {
             {entry !== null && typeof entry === 'object' ? (
               Object.entries(entry as Record<string, unknown>).map(([k, v]) => (
                 <span key={k} style={{ font: "400 12.5px/1.5 var(--fx-font-sans)" }}>
-                  <span style={{ color: 'var(--fx-text-tertiary)' }}>{k}: </span>
-                  <span style={{ color: 'var(--fx-text-primary)' }}>{scalar(v)}</span>
+                  <span style={{ color: 'var(--fx-text-tertiary)' }}>{humanise(k)}: </span>
+                  {/* Recurse rather than stringify: a style's breakdown is a nested array,
+                      and `JSON.stringify` on it put a wall of braces in front of the one
+                      person whose job is to check the quantities. */}
+                  {v !== null && typeof v === 'object' ? (
+                    <FieldValue value={v} />
+                  ) : (
+                    <span style={{ color: 'var(--fx-text-primary)' }}>{scalar(v)}</span>
+                  )}
                 </span>
               ))
             ) : (

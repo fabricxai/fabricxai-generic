@@ -107,7 +107,15 @@ export function openAiEmbedder({ apiKey, model }: OpenAiOptions) {
         )
       }
 
-      return { vectors, model: response.model }
+      return {
+        vectors,
+        model: response.model,
+        // Same omission as extract had: embedding a factory's whole order history is a real
+        // bill, and the ceiling counted none of it.
+        ...(response.usage
+          ? { usage: { inputTokens: response.usage.prompt_tokens, outputTokens: 0 } }
+          : {}),
+      }
     },
   }
 }
@@ -381,6 +389,26 @@ export function openAiExtractor({ apiKey, model }: OpenAiOptions) {
             }
           : {}),
         model,
+        /*
+         * What the vendor says it cost.
+         *
+         * Reported and then thrown away for as long as this provider has existed: only the
+         * Anthropic one filled this in, so the daily token ceiling — which counts from
+         * `marbim_call_log` — saw conversations and nothing else. Extraction is the role a
+         * factory uses in bulk (two hundred POs in an afternoon is a normal week), and it
+         * was the role the budget could not see.
+         *
+         * Omitted rather than zeroed when the response carries no usage block: a null in
+         * the ledger reads as "not reported", and a zero reads as "free".
+         */
+        ...(response.usage
+          ? {
+              usage: {
+                inputTokens: response.usage.prompt_tokens,
+                outputTokens: response.usage.completion_tokens,
+              },
+            }
+          : {}),
       }
     },
   }

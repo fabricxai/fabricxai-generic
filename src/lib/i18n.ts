@@ -340,6 +340,10 @@ export const MESSAGES: Catalogue = {
     'errors.payload_invalid':
       'Some of what was entered does not fit what this record accepts. Nothing was saved.',
     'errors.pending_change_not_found': 'That draft no longer exists.',
+    'errors.not_the_raiser':
+      'That reading belongs to whoever uploaded the document. Only they can check it against the paper and send it on.',
+    'errors.pending_change_not_drafted':
+      'That reading has already been sent for approval, or thrown away.',
     'errors.pending_change_not_pending': 'That draft has already been decided.',
     'errors.rate_limited':
       'Too many attempts in a short time. Wait a moment and try again — nothing was saved.',
@@ -444,9 +448,9 @@ export const MESSAGES: Catalogue = {
     'marbim.errors.token_ceiling':
       'This factory has used up its model budget for the day. MARBIM will answer again once the last 24 hours clear, or an owner can raise the daily limit in Settings.',
     'marbim.notifications.extraction_succeeded.title':
-      'The document you sent to MARBIM has been read — the draft is waiting for you to approve it.',
+      'The document you sent to MARBIM has been read — check it against the paper before it goes for approval.',
     'marbim.notifications.extraction_succeeded.body':
-      'Check every field before you approve. The weakest one is the one to read twice.',
+      'Nobody else can see it yet. You have the document; the approver does not. The weakest field is the one to read twice.',
     'marbim.notifications.extraction_rejected.title':
       'MARBIM could not read the document you sent, and will not try again.',
     'marbim.notifications.extraction_rejected.body':
@@ -900,6 +904,10 @@ export const MESSAGES: Catalogue = {
     'errors.payload_invalid':
       'যা লেখা হয়েছে তার কিছু অংশ এই রেকর্ডে চলে না। কিছুই সংরক্ষণ হয়নি।',
     'errors.pending_change_not_found': 'এই ড্রাফটটি আর নেই।',
+    'errors.not_the_raiser':
+      'এই রিডিংটি যিনি ডকুমেন্ট আপলোড করেছেন তাঁর। কাগজের সাথে মিলিয়ে দেখে পাঠানোর কাজটি কেবল তিনিই করতে পারেন।',
+    'errors.pending_change_not_drafted':
+      'এই রিডিংটি ইতিমধ্যে অনুমোদনে পাঠানো হয়েছে, নয়তো বাতিল করা হয়েছে।',
     'errors.pending_change_not_pending': 'এই ড্রাফটের সিদ্ধান্ত আগেই হয়ে গেছে।',
     'errors.rate_limited':
       'অল্প সময়ে অনেকবার চেষ্টা হয়েছে। একটু পরে আবার করুন — কিছু সংরক্ষণ হয়নি।',
@@ -964,9 +972,9 @@ export const MESSAGES: Catalogue = {
     'marbim.errors.token_ceiling':
       'এই ফ্যাক্টরির আজকের model বাজেট শেষ হয়ে গেছে। গত ২৪ ঘণ্টার হিসাব শেষ হলে MARBIM আবার উত্তর দেবে, অথবা owner চাইলে Settings-এ দৈনিক সীমা বাড়াতে পারেন।',
     'marbim.notifications.extraction_succeeded.title':
-      'আপনি MARBIM-কে যে ডকুমেন্ট পাঠিয়েছিলেন তা পড়া হয়েছে — draft আপনার approve-এর অপেক্ষায়।',
+      'আপনি MARBIM-কে যে ডকুমেন্ট পাঠিয়েছিলেন তা পড়া হয়েছে — অনুমোদনে পাঠানোর আগে কাগজের সাথে মিলিয়ে দেখুন।',
     'marbim.notifications.extraction_succeeded.body':
-      'approve করার আগে প্রতিটি ঘর দেখে নিন। যেটির confidence সবচেয়ে কম, সেটি দুইবার পড়ুন।',
+      'এখনো অন্য কেউ এটি দেখতে পাচ্ছে না। ডকুমেন্টটি আপনার হাতে আছে, অনুমোদনকারীর হাতে নেই। যেটির confidence সবচেয়ে কম, সেটি দুইবার পড়ুন।',
     'marbim.notifications.extraction_rejected.title':
       'আপনি যে ডকুমেন্ট পাঠিয়েছিলেন MARBIM সেটি পড়তে পারেনি, এবং আর চেষ্টা করবে না।',
     'marbim.notifications.extraction_rejected.body':

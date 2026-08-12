@@ -89,6 +89,20 @@ export const auditActionEnum = pgEnum('audit_action', [
 export const pendingOperationEnum = pgEnum('pending_operation', ['insert', 'update', 'delete'])
 
 export const pendingStatusEnum = pgEnum('pending_status', [
+  /**
+   * Read from a document, and not yet submitted by the person who asked for the reading.
+   *
+   * The step this adds is the raiser's own check. Before it, a merchandiser dropped a PO
+   * and the model's output went straight into somebody else's approve inbox — so the
+   * person holding the actual paper, the only one who could say "no, that says 12,000 not
+   * 1,200", never saw it, and the approver was asked to verify a document they did not
+   * have. Confidence numbers do not fix that; they tell you where to look, not what the
+   * page said.
+   *
+   * A `drafted` row is invisible to the approval inbox (which filters on `pending`), never
+   * auto-approves, and belongs to exactly one person: `created_by`.
+   */
+  'drafted',
   'pending',
   'approved', // approved, commit in flight
   'committed', // target row written, audit trail closed
@@ -364,6 +378,22 @@ export const pendingChanges = pgTable(
      * confidence number to a user at all.
      */
     corrections: jsonb('corrections').$type<Record<string, unknown>>().notNull().default({}),
+
+    /**
+     * Field-level edits the RAISER made before submitting, same shape as `corrections`.
+     *
+     * Kept apart from the reviewer's because they are different measurements of different
+     * things. The reviewer is checking a colleague's judgement; the raiser is checking a
+     * machine's reading against the paper in their hand — which makes this the better
+     * signal about the extractor, and conflating the two would blur both.
+     */
+    draftCorrections: jsonb('draft_corrections')
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
+
+    /** When the raiser submitted it for approval — `drafted` → `pending`. */
+    submittedAt: timestamp('submitted_at', { withTimezone: true }),
 
     committedAt: timestamp('committed_at', { withTimezone: true }),
     /** Primary key of the row actually written — closes the draft→reviewer→row chain. */

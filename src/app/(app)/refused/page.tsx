@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { Card } from '@/components/fx/data'
 import { EmptyState, InlineAlert, LockedState } from '@/components/fx/feedback'
 import { Ident } from '@/components/fx/format'
+import { PayloadSummary } from '@/components/shell/reading-fields'
 import { Badge } from '@/components/fx/primitives'
 import { Eyebrow, SectionHeading } from '@/components/fx/signature'
 import { PageHeader } from '@/components/shell/page-shell'
@@ -202,24 +203,24 @@ export default async function RefusedPage() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                       <Eyebrow>{tui(locale, 'ui.refused.payload_heading')}</Eyebrow>
                       {row.payload ? (
-                        <pre
+                        <span
                           className="fx-scroll-x"
-                          // Focusable, or a keyboard cannot scroll it (WCAG 2.1.1). Found by 7.2's
-                          // axe sweep at the tablet viewport — the check 4.4 could not make when it
-                          // added this wrapper, because there was no browser to make it in.
+                          // Focusable, or a keyboard cannot scroll it (WCAG 2.1.1).
                           tabIndex={0}
                           style={{
-                            margin: 0,
+                            display: 'block',
                             padding: '10px 12px',
                             background: 'var(--fx-bg-sunken)',
                             border: '1px solid var(--fx-border-subtle)',
                             borderRadius: 'var(--fx-radius-sm)',
-                            font: "400 12px/1.55 var(--fx-font-mono)",
-                            color: 'var(--fx-text-secondary)',
                           }}
                         >
-                          {JSON.stringify(row.payload, null, 2)}
-                        </pre>
+                          {/* Was `JSON.stringify(payload, null, 2)` in a <pre>. This page
+                              exists so somebody can see WHY their write was refused, and a
+                              raw object is that reason written in a language they do not
+                              read. */}
+                          <PayloadSummary payload={row.payload as Record<string, unknown>} />
+                        </span>
                       ) : (
                         <span
                           style={{

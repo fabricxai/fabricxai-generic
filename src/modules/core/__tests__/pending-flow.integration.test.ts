@@ -28,7 +28,13 @@ import {
 } from '@/db/schema/core'
 import type { RequestCtx } from '@/modules/core/ctx'
 import { AppError } from '@/modules/core/errors'
-import { approve, propose, reject } from '@/modules/core/pending-changes'
+import {
+  approve,
+  confirmDraft,
+  discardDraft,
+  propose,
+  reject,
+} from '@/modules/core/pending-changes'
 import { __resetRegistry, registerModule } from '@/modules/core/registry'
 
 const client = createDirectClient()
@@ -41,6 +47,14 @@ const USER_B = `gate-b-other-${randomUUID().slice(0, 8)}`
 
 const ctxA: RequestCtx = { companyId: COMPANY_A, userId: USER_A, roles: ['owner'] }
 const ctxB: RequestCtx = { companyId: COMPANY_B, userId: USER_B, roles: ['owner'] }
+/**
+ * A second person inside company A.
+ *
+ * `ctxB` is a different COMPANY, so it would be refused by RLS as not-found and prove
+ * nothing about who may confirm a reading. The raiser check is about identity within one
+ * tenant, and it needs a colleague to be tested against.
+ */
+const ctxB2: RequestCtx = { companyId: COMPANY_A, userId: USER_B, roles: ['owner'] }
 
 /** The module's payload schema. Case 6 re-registers a tightened version of it. */
 const widgetLoose = z.object({
@@ -509,5 +523,113 @@ describe('gate B · propose → approve → commit → audit', () => {
     const error = await approve(viewer, { pendingChangeId: id }).catch((e: unknown) => e)
     expect(error).toBeInstanceOf(AppError)
     expect((error as AppError).status).toBe(403)
+  })
+})
+
+/**
+ * The raiser's own check — `drafted` → `pending`.
+ *
+ * The step between "a machine read your document" and "an approver is looking at it". Its
+ * absence put the wrong person in front of the question: the approver, who does not have
+ * the paper, was asked to verify quantities against it, while the person holding it never
+ * saw the reading at all.
+ */
+describe('gate B2 · a reading waits on the person who asked for it', () => {
+  const readingFor = (userId: string) => ({ ...draft(), onBehalfOf: userId })
+
+  it('lands an extraction with a named raiser in `drafted`, not `pending`', async () => {
+    const { id, status } = await propose(ctxA, readingFor(USER_A))
+    expect(status).toBe('drafted')
+
+    const [row] = await db.select().from(pendingChanges).where(eq(pendingChanges.id, id))
+    expect(row?.status).toBe('drafted')
+    // The whole point of `onBehalfOf`: the draft belongs to somebody.
+    expect(row?.createdBy).toBe(USER_A)
+    expect(row?.submittedAt).toBeNull()
+  })
+
+  it('leaves an extraction with NO raiser routing straight to the inbox', async () => {
+    // Nobody to hand it to. Holding it in `drafted` forever would be worse than routing it.
+    const { status } = await propose(ctxA, draft())
+    expect(status).toBe('pending')
+  })
+
+  it('hides a `drafted` row from the approval inbox', async () => {
+    const { id } = await propose(ctxA, readingFor(USER_A))
+    // The inbox filters on `pending`, which is what makes this true — asserted rather than
+    // assumed, because that filter is one edit away from including a state it should not.
+    await expect(approve(ctxA, { pendingChangeId: id })).rejects.toMatchObject({
+      code: 'conflict',
+      messageKey: 'errors.pending_change_not_pending',
+    })
+  })
+
+  it('refuses anybody but the raiser', async () => {
+    const { id } = await propose(ctxA, readingFor(USER_A))
+    await expect(confirmDraft(ctxB2, { pendingChangeId: id })).rejects.toMatchObject({
+      code: 'forbidden',
+      messageKey: 'errors.not_the_raiser',
+    })
+  })
+
+  it('submits it on confirm, and only then can an approver act', async () => {
+    const { id } = await propose(ctxA, readingFor(USER_A))
+    const result = await confirmDraft(ctxA, { pendingChangeId: id })
+    expect(result.status).toBe('pending')
+
+    const [row] = await db.select().from(pendingChanges).where(eq(pendingChanges.id, id))
+    expect(row?.status).toBe('pending')
+    expect(row?.submittedAt).not.toBeNull()
+
+    await expect(approve(ctxA, { pendingChangeId: id })).resolves.toMatchObject({
+      status: 'committed',
+    })
+  })
+
+  it('records the raiser’s edits apart from the reviewer’s, and scores them certain', async () => {
+    const { id } = await propose(ctxA, readingFor(USER_A))
+    await confirmDraft(ctxA, { pendingChangeId: id, corrections: { quantity: 1250 } })
+
+    const [row] = await db.select().from(pendingChanges).where(eq(pendingChanges.id, id))
+    expect(row?.payload).toMatchObject({ quantity: 1250 })
+    // From → to, so the extractor's mistake stays countable after the payload is fixed.
+    expect(row?.draftCorrections).toEqual({ quantity: { from: 1200, to: 1250 } })
+    // The reviewer has not looked yet; their column must still be untouched.
+    expect(row?.corrections).toEqual({})
+    // A human with the document typed this. It is no longer the extractor's 0.71, and
+    // leaving it there would point the approver's weakest-field signal at the one field
+    // that is now certain.
+    expect((row?.fieldConfidence as Record<string, number>).quantity).toBe(1)
+    expect(Number(row?.confidenceMin)).toBeCloseTo(0.98, 3)
+  })
+
+  it('re-validates on confirm, so a correction cannot smuggle in an invalid payload', async () => {
+    const { id } = await propose(ctxA, readingFor(USER_A))
+    await expect(
+      confirmDraft(ctxA, { pendingChangeId: id, corrections: { quantity: -5 } }),
+    ).rejects.toMatchObject({ code: 'validation_failed' })
+
+    const [row] = await db.select().from(pendingChanges).where(eq(pendingChanges.id, id))
+    expect(row?.status).toBe('drafted')
+  })
+
+  it('discards a reading its own author rejects, and keeps the row', async () => {
+    const { id } = await propose(ctxA, readingFor(USER_A))
+    await discardDraft(ctxA, { pendingChangeId: id, reason: 'it read the wrong column' })
+
+    const [row] = await db.select().from(pendingChanges).where(eq(pendingChanges.id, id))
+    // Recorded, not deleted: a reading thrown away before submission is the strongest
+    // signal the extractor got it wrong, and deleting it would throw that away too.
+    expect(row?.status).toBe('rejected')
+    expect(row?.reviewNote).toBe('it read the wrong column')
+  })
+
+  it('refuses a second confirm', async () => {
+    const { id } = await propose(ctxA, readingFor(USER_A))
+    await confirmDraft(ctxA, { pendingChangeId: id })
+    await expect(confirmDraft(ctxA, { pendingChangeId: id })).rejects.toMatchObject({
+      code: 'conflict',
+      messageKey: 'errors.pending_change_not_drafted',
+    })
   })
 })

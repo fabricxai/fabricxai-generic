@@ -242,7 +242,15 @@ export const NOTIFY_RULES: Readonly<Record<string, NotifyRule>> = {
       moduleId: 'marbim',
       entityTable: 'pending_changes',
       entityId: str(p.pendingChangeId),
-      href: '/approve',
+      /*
+       * Home, not `/approve`.
+       *
+       * The reading now waits on THIS person to check it against the paper, and `/approve`
+       * is the reviewer's queue — which filters on `pending` and is therefore empty for
+       * them. The notification used to say "your document was read" and send them to a
+       * screen showing nothing at all.
+       */
+      href: '/home',
       dedupeKey: `marbim.extraction_succeeded:${str(p.jobId) || id}`,
     }
   },
