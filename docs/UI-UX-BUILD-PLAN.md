@@ -85,7 +85,7 @@ phase is replication with each desk's own signals, not invention.
   *Verify:* owner nav has one morning entry; `/dashboard` 307s to `/home`; the figures strip
   renders the same numbers the dashboard did (snapshot the four values in a browser test);
   exceptions still read as sentences.
-- [ ] **2.2 🅗 Shipment board → pipeline (S6-adjacent, the audit's shipment finding).** Render
+- [x] **2.2 🅗 Shipment board → pipeline. ✅** — as a named stage rail on each card (PACK → EX-FACTORY → EXP → DOCUMENTS → BANK, done ticked, current highlighted) rather than a column relayout: the operations already appear and disappear by the shipment's own state, and the sequence being VISIBLE is what makes that legible. Render
   each shipment as a row moving left-to-right through pack → ex-factory → EXP → docs → bank;
   the ten operations become stage-local actions on the row instead of a wall of doors. No service
   changes — this is layout over the existing actions.

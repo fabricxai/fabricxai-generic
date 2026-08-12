@@ -95,6 +95,56 @@ export function ShipmentActions({ state }: { state: ShipmentActionState }) {
         </span>
       ) : null}
 
+      {/*
+        The pipeline, named (plan 2.2, the audit's shipment finding). The ten operations
+        used to render as one flat wall of doors with no sequence, and the sequence is the
+        whole shape of the job: pack, leave, EXP, documents, bank. The rail says where this
+        shipment stands and the buttons below remain exactly the operations they were —
+        each already appears and disappears by the shipment's own state, which is what
+        makes the wall readable once the order is visible.
+      */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+        {(
+          [
+            ['Pack', state.unloadedCartons === 0 && Boolean(state.packingList)],
+            ['Ex-factory', Boolean(state.actualExFactory)],
+            ['EXP', Boolean(state.expNumber)],
+            ['Documents', state.docs.length > 0 && state.docs.every((d) => d.status !== 'missing')],
+            ['Bank', state.blockers.length === 0 && Boolean(state.expNumber)],
+          ] as const
+        ).map(([label, done], i, stages) => {
+          const firstOpen = stages.findIndex(([, d]) => !d)
+          const current = i === (firstOpen === -1 ? stages.length - 1 : firstOpen)
+          return (
+            <span key={label} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              {i > 0 ? (
+                <span style={{ color: 'var(--fx-border-strong)', font: '400 11px/1 var(--fx-font-mono)' }}>
+                  →
+                </span>
+              ) : null}
+              <span
+                style={{
+                  font: `${current ? 600 : 400} 11.5px/1 var(--fx-font-mono)`,
+                  letterSpacing: '.05em',
+                  textTransform: 'uppercase',
+                  padding: '5px 8px',
+                  borderRadius: 'var(--fx-radius-sm)',
+                  color: done
+                    ? 'var(--fx-success)'
+                    : current
+                      ? 'var(--fx-text-primary)'
+                      : 'var(--fx-text-tertiary)',
+                  background: current ? 'var(--fx-accent-subtle)' : 'transparent',
+                }}
+              >
+                {done ? '✓ ' : ''}
+                {label}
+              </span>
+            </span>
+          )
+        })}
+      </div>
+
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
         {/* ── Loading ──────────────────────────────────────────────────── */}
         {state.unloadedCartons > 0 ? (
