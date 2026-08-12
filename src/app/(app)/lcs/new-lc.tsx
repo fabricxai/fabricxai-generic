@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 
 import { InlineAlert, Modal } from '@/components/fx/feedback'
+import { ReadIntoForm, ReadMark, type ReadFields } from '@/components/shell/read-into-form'
 import { DateInput, TextInput } from '@/components/fx/forms'
 import { useLocale, useT } from '@/components/fx/locale'
 import { Button } from '@/components/fx/primitives'
@@ -64,6 +65,31 @@ export function NewLcButton({ buyers }: { buyers: readonly { id: string; name: s
   const [latestShipment, setLatestShipment] = useState('')
   const [expiry, setExpiry] = useState('')
   const [docs, setDocs] = useState<Record<string, boolean>>({})
+  /** How sure the reader was, per field. Empty until a document is read. */
+  const [readAs, setReadAs] = useState<Record<string, number | null>>({})
+
+  /**
+   * What the SWIFT advice said, into the boxes.
+   *
+   * The buyer is NOT taken from the reading. 59 and 50 name a company in prose; which record
+   * in this factory's book that is, is a judgement, and the picker above is where it is made.
+   * Everything else on an MT700 is on a numbered line and reads cleanly.
+   */
+  function fill(read: ReadFields) {
+    const v = read.values
+    const str = (x: unknown) => (x === null || x === undefined ? '' : String(x))
+    if (v.number !== undefined) setNumber(str(v.number))
+    if (v.value !== undefined) setValue(str(v.value))
+    if (v.currency !== undefined) setCurrency(str(v.currency))
+    if (v.tolerancePct !== undefined) setTolerancePct(str(v.tolerancePct))
+    if (v.issueDate !== undefined) setIssueDate(str(v.issueDate))
+    if (v.latestShipmentDate !== undefined) setLatestShipment(str(v.latestShipmentDate))
+    if (v.expiryDate !== undefined) setExpiry(str(v.expiryDate))
+    if (v.docsRequired && typeof v.docsRequired === 'object') {
+      setDocs((prev) => ({ ...prev, ...(v.docsRequired as Record<string, boolean>) }))
+    }
+    setReadAs(read.confidence)
+  }
 
   const ready = buyerId !== '' && number.trim() !== '' && value.trim() !== ''
 
@@ -103,6 +129,18 @@ export function NewLcButton({ buyers }: { buyers: readonly { id: string; name: s
 
       <Modal open={open} onClose={() => setOpen(false)} title={t('ui.lcs.new_lc')}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <ReadIntoForm
+            kindId="lc_swift"
+            prompt="the SWIFT advice"
+            contextValues={buyerId ? { buyerId } : {}}
+            contextMissing={
+              buyerId
+                ? null
+                : 'Choose the buyer first, then drop the SWIFT advice here and the rest fills in.'
+            }
+            onFilled={fill}
+          />
+
           <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <span style={{ font: "500 13px/1.3 var(--fx-font-sans)" }}>{t('ui.lcs.buyer')}</span>
             <select value={buyerId} onChange={(e) => setBuyerId(e.target.value)} style={fieldStyle}>
@@ -124,6 +162,7 @@ export function NewLcButton({ buyers }: { buyers: readonly { id: string; name: s
             required
             value={number}
             onChange={(e) => setNumber(e.target.value)}
+            hint={<ReadMark confidence={readAs.number} />}
           />
 
           <div className="fx-stack-tablet" style={{ display: 'grid', gridTemplateColumns: '1fr 110px 110px', gap: 12 }}>
@@ -133,6 +172,7 @@ export function NewLcButton({ buyers }: { buyers: readonly { id: string; name: s
               inputMode="decimal"
               value={value}
               onChange={(e) => setValue(e.target.value)}
+              hint={<ReadMark confidence={readAs.value} />}
             />
             <TextInput
               label={t('ui.lcs.currency')}
@@ -150,13 +190,24 @@ export function NewLcButton({ buyers }: { buyers: readonly { id: string; name: s
           </div>
 
           <div className="fx-stack-tablet" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
-            <DateField label={t('ui.lcs.issue_date')} value={issueDate} onChange={setIssueDate} />
+            <DateField
+              label={t('ui.lcs.issue_date')}
+              value={issueDate}
+              onChange={setIssueDate}
+              readAs={readAs.issueDate}
+            />
             <DateField
               label={t('ui.lcs.latest_shipment')}
               value={latestShipment}
               onChange={setLatestShipment}
+              readAs={readAs.latestShipmentDate}
             />
-            <DateField label={t('ui.lcs.expiry')} value={expiry} onChange={setExpiry} />
+            <DateField
+              label={t('ui.lcs.expiry')}
+              value={expiry}
+              onChange={setExpiry}
+              readAs={readAs.expiryDate}
+            />
           </div>
           <span style={{ font: "400 12.5px/1.45 var(--fx-font-sans)", color: 'var(--fx-text-tertiary)' }}>
             {t('ui.lcs.dates_hint')}
@@ -206,14 +257,20 @@ function DateField({
   label,
   value,
   onChange,
+  readAs,
 }: {
   label: string
   value: string
   onChange: (next: string) => void
+  /** How sure the reader was, when this came off a document. */
+  readAs?: number | null
 }) {
   return (
     <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <span style={{ font: "500 13px/1.3 var(--fx-font-sans)" }}>{label}</span>
+      <span style={{ font: "500 13px/1.3 var(--fx-font-sans)" }}>
+        {label}
+        <ReadMark confidence={readAs} />
+      </span>
       <DateInput
         value={value}
         onChange={onChange}

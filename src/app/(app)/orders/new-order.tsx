@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 
 import { InlineAlert, Modal } from '@/components/fx/feedback'
+import { ReadIntoForm, ReadMark, type ReadFields } from '@/components/shell/read-into-form'
 import { DateInput, TextInput } from '@/components/fx/forms'
 import { useLocale, useT } from '@/components/fx/locale'
 import { Button } from '@/components/fx/primitives'
@@ -50,6 +51,41 @@ export function NewOrderButton({
   const [styleCode, setStyleCode] = useState('')
   const [contractedQty, setContractedQty] = useState('')
   const [unitPrice, setUnitPrice] = useState('')
+  const [readAs, setReadAs] = useState<Record<string, number | null>>({})
+
+  /**
+   * What the purchase order said, into the boxes.
+   *
+   * A PO carries its styles as a list; this dialog opens ONE style, deliberately (see above).
+   * So the first style's fields are taken and the rest are left — a two-style PO is still
+   * better read here than typed, and the second style is added on the order itself where
+   * there is room for it.
+   */
+  function fill(read: ReadFields) {
+    const v = read.values
+    const str = (x: unknown) => (x === null || x === undefined ? '' : String(x))
+    /*
+     * ALL the references, not the first.
+     *
+     * A buyer's order routinely carries two — their own number, and a supplier reference they
+     * ask to be quoted on the invoice and the shipping documents. The bank matches the export
+     * documents against the second one, so dropping it is a discrepancy at the counter months
+     * later; the extraction instruction goes out of its way to capture both, and taking
+     * `[0]` here threw that away again one line from the form.
+     */
+    const pos = Array.isArray(v.poNumbers) ? (v.poNumbers as unknown[]) : []
+    if (pos.length > 0) setPoNumber(pos.map(str).filter(Boolean).join(', '))
+    if (v.plannedExFactoryDate !== undefined) setExFactory(str(v.plannedExFactoryDate))
+
+    const styles = Array.isArray(v.styles) ? (v.styles as Record<string, unknown>[]) : []
+    const first = styles[0]
+    if (first) {
+      if (first.styleCode !== undefined) setStyleCode(str(first.styleCode))
+      if (first.contractedQty !== undefined) setContractedQty(str(first.contractedQty))
+      if (first.unitPrice !== undefined) setUnitPrice(str(first.unitPrice))
+    }
+    setReadAs(read.confidence)
+  }
 
   // eslint-disable-next-line fabricxai/no-float-money -- pieces, not money; a blank or a typo falls to 0 and fails `required` below
   const qty = Number.parseInt(contractedQty, 10) || 0
@@ -64,7 +100,12 @@ export function NewOrderButton({
         const { orderId } = await createOrder({
           order: {
             buyerId,
-            poNumbers: [poNumber.trim()],
+            // Split, so a PO carrying two references keeps both. A single number is
+            // unaffected — one entry either way.
+            poNumbers: poNumber
+              .split(',')
+              .map((entry) => entry.trim())
+              .filter(Boolean),
             ...(exFactory ? { plannedExFactoryDate: exFactory } : {}),
           },
           styles: [
@@ -96,6 +137,18 @@ export function NewOrderButton({
 
       <Modal open={open} onClose={() => setOpen(false)} title={t('ui.orders.new_order')}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <ReadIntoForm
+            kindId="buyer_po"
+            prompt="the buyer's purchase order"
+            contextValues={buyerId ? { buyerId } : {}}
+            contextMissing={
+              buyerId
+                ? null
+                : "Choose the buyer first, then drop their purchase order here and the rest fills in."
+            }
+            onFilled={fill}
+          />
+
           <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <span style={{ font: "500 13px/1.3 var(--fx-font-sans)" }}>
               {t('ui.orders.buyer')}
@@ -136,6 +189,13 @@ export function NewOrderButton({
             required
             value={poNumber}
             onChange={(e) => setPoNumber(e.target.value)}
+            hint={
+              readAs.poNumbers !== undefined ? (
+                <ReadMark confidence={readAs.poNumbers} />
+              ) : (
+                'Two references separated by a comma, if the order carries two.'
+              )
+            }
           />
 
           <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -171,6 +231,7 @@ export function NewOrderButton({
               inputMode="numeric"
               value={contractedQty}
               onChange={(e) => setContractedQty(e.target.value)}
+              hint={<ReadMark confidence={readAs.styles} />}
             />
             <TextInput
               label={t('ui.orders.unit_price')}

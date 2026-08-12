@@ -5,6 +5,8 @@ import { headers } from 'next/headers'
 import { z } from 'zod'
 
 import { env } from '@/lib/env'
+import { consume } from '@/lib/rate-limit'
+import { surfaced, type ActionFailure } from '@/lib/action-failure'
 import { requireRole } from '@/modules/core/session'
 import { companyProfile, getPolicy } from '@/modules/settings/service'
 import { listModules } from '@/modules/core/registry'
@@ -26,6 +28,8 @@ import {
   extractionStatus,
   listConversations,
   queueExtraction,
+  readDocumentInto,
+  tokensSpentToday,
   type ChatResult,
   type ConversationSummary,
   type MarbimPolicy,
@@ -361,6 +365,140 @@ export async function readDocument(input: {
   revalidatePath('/approve')
 
   return { jobId, label: kind.label }
+}
+
+/**
+ * Read a document straight into the form the person already has open.
+ *
+ * The other path — `readDocument` above — queues a job, drafts a `pending_change`, and asks
+ * somebody to approve it. That is right when a document arrives and nobody is standing over
+ * it. It is the wrong shape entirely for the case this exists for: a commercial officer with
+ * the SWIFT advice in front of them, the "Record a credit" dialog already open, and eighteen
+ * fields to type off a page a model can read in two seconds. Sending them away to an intake
+ * screen, then to an inbox, then back, to enter data they are holding, is why nobody would
+ * ever use it.
+ *
+ * ## This does not write anything
+ *
+ * It fills a form. The person then checks it and presses the dialog's own save, which is the
+ * ordinary manual action with its own role wall and its own validation — so the WRITER is the
+ * human, exactly as they were before, and CLAUDE.md rule 3 is untouched: no AI write happens
+ * here, and none bypasses `pending_changes`. This is the workspace's stated agentic-input
+ * pattern — unstructured text → schema → pre-filled form → human review → save — and manual
+ * entry stays available because it is the same form.
+ *
+ * The reading is still measured, still logged against the daily ceiling, still refused if the
+ * extractor returns a uniform confidence. What changes is only who the answer goes to.
+ */
+export async function readIntoForm(input: {
+  kindId: string
+  documentId?: string
+  sourceText?: string
+  contextValues?: Record<string, string>
+}): Promise<
+  | {
+      fields: { name: string; value: unknown; confidence: number | null }[]
+      model: string
+      label: string
+    }
+  | ActionFailure
+> {
+  const ctx = await requireRole(await headers(), ...INTAKE_ROLES)
+
+  return surfaced(async () => {
+    if (!env.MARBIM_ENABLED || !hasProvider()) {
+      throw new AppError('validation_failed', 'marbim.errors.unavailable', {
+        enabled: env.MARBIM_ENABLED,
+        provider: hasProvider(),
+      })
+    }
+
+    const kind = intakeKind(input.kindId)
+    // The wall, not the filter — same as the queued path. A screen never decides this.
+    if (!mayFileKind(kind, ctx.roles)) {
+      throw new AppError('forbidden', 'marbim.errors.kind_not_your_desk', { kindId: kind.id })
+    }
+
+    const sourceText = input.sourceText?.trim() ? input.sourceText : undefined
+    if (!sourceText) {
+      if (!input.documentId) {
+        throw new AppError('validation_failed', 'marbim.errors.nothing_to_read', {})
+      }
+      const { documentMeta } = await import('@/modules/core/documents')
+      const meta = await documentMeta(ctx, input.documentId)
+      if (!MODEL_READABLE_MIME.has(meta.mimeType) && !TEXT_EXTRACTABLE_MIME.has(meta.mimeType)) {
+        throw new AppError('validation_failed', 'marbim.errors.file_unreadable', {
+          mimeType: meta.mimeType,
+        })
+      }
+    }
+
+    /*
+     * The same hourly limit the queued path consumes, and for the same reason: this makes
+     * real, billable model calls. An inline door that did not count would be the cheapest
+     * way to spend a factory's whole budget, and the ceiling would only ever see the path
+     * nobody uses.
+     */
+    const policy = await getPolicy<MarbimPolicy>(ctx, 'marbim')
+    const limit = await consume(`marbim:extract:${ctx.companyId}`, {
+      limit: policy.extractionsPerHour,
+      windowSeconds: 3_600,
+    })
+    if (!limit.ok) {
+      throw new AppError('rate_limited', 'marbim.errors.rate_limited', {
+        limit: policy.extractionsPerHour,
+        windowHours: 1,
+        retryAfterSeconds: limit.resetSeconds,
+      })
+    }
+
+    const spent = await tokensSpentToday(ctx)
+    if (spent >= policy.dailyTokenCeiling) {
+      throw new AppError('rate_limited', 'marbim.errors.token_ceiling', {
+        spent,
+        ceiling: policy.dailyTokenCeiling,
+      })
+    }
+
+    /* Context ids re-resolved against the caller's own options, never merely parsed —
+       they are merged in at confidence 1, so an unchecked one would be a way to put another
+       company's id into somebody's form wearing certainty. */
+    const contextValues: Record<string, string> = {}
+    for (const field of kind.context ?? []) {
+      const chosen = input.contextValues?.[field.field]
+      if (!chosen) continue
+      const options = await contextOptions(ctx, field.source)
+      if (!options.some((option) => option.id === chosen)) {
+        throw new AppError('validation_failed', 'marbim.errors.context_unknown', {
+          field: field.field,
+        })
+      }
+      contextValues[field.field] = chosen
+    }
+
+    const read = await readDocumentInto(ctx, {
+      moduleId: kind.moduleId,
+      targetTable: kind.targetTable,
+      zodSchemaKey: kind.zodSchemaKey,
+      ...(sourceText ? { sourceText } : {}),
+      ...(input.documentId ? { sourceDocumentId: input.documentId } : {}),
+      ...(Object.keys(contextValues).length > 0 ? { contextValues } : {}),
+      createdBy: ctx.userId,
+    })
+
+    return {
+      // Flattened for the dialog, which fills field by field and marks each with how sure
+      // the reading was. Null rather than 0 for a field with no score: "not read" and "read
+      // and unsure" are different things and the screen shows them differently.
+      fields: Object.entries(read.payload).map(([name, value]) => ({
+        name,
+        value,
+        confidence: read.fieldConfidence[name] ?? null,
+      })),
+      model: read.model,
+      label: kind.label,
+    }
+  })
 }
 
 /**

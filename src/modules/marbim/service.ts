@@ -124,6 +124,30 @@ const HISTORY_BUDGET_CHARS = 12_000
  * is the kind that has to be prevented at the instruction.
  */
 const TARGET_NOTES: Record<string, readonly string[]> = {
+  lcs: [
+    'DOCUMENTS REQUIRED (field 46A) is a numbered list written in bank prose, and',
+    '`docsRequired` is a fixed vocabulary of seven kinds. Map each line onto ONE of:',
+    '',
+    '  commercial_invoice      — "signed commercial invoice", "invoice in triplicate"',
+    '  packing_list            — "packing list", "weight list"',
+    '  bl                      — "bill of lading", "ocean B/L", "full set clean on board"',
+    '  certificate_of_origin   — "certificate of origin", "GSP Form A", "Form A"',
+    '  beneficiary_certificate — "beneficiary certificate", "beneficiary declaration"',
+    '  inspection_certificate  — "inspection certificate", named inspector (Intertek, SGS)',
+    '  exp_form                — "EXP form", "EXP form copy"',
+    '',
+    'Return the kind, not the sentence: {"commercial_invoice": true, "bl": true}. A line',
+    'that is none of the seven is left out entirely — do not invent a key for it. The',
+    'quantities ("in triplicate") and the conditions ("made out to order of X") are not',
+    'part of this field.',
+    '',
+    'The CREDIT NUMBER is field :20:, exactly as printed. It is often quoted again later',
+    'under 47A ("all documents must quote LC no ..."); the two agree, and :20: is the one.',
+    '',
+    'The two dates that matter are 44C (latest shipment — goods ON the vessel) and 31D',
+    '(expiry — documents AT the bank). They are different dates and both are needed.',
+    'Do not fill the buyer: no SWIFT message carries this system\'s id for one.',
+  ],
   orders: [
     'PO NUMBERS: capture EVERY reference the document gives, not just the one labelled',
     '"PO No". A buyer\'s order often carries two — the buyer\'s own number, and a supplier',
@@ -131,6 +155,12 @@ const TARGET_NOTES: Record<string, readonly string[]> = {
     'quote on docs", "please quote", "our ref"). Both go in `poNumbers`. The one the buyer',
     'asks to be quoted is what the bank matches the export documents against, so dropping',
     'it is how a set of documents gets refused at presentation for naming the wrong order.',
+    '',
+    'Every reference to THE ORDER, and nothing else. A style code, a tech-pack or BOM',
+    'reference, an article or EAN number, the buyer\'s department code — these identify a',
+    'GARMENT or a document, not the order, and they belong to their own fields or to no',
+    'field at all. "Capture every reference" read too widely puts the style code in',
+    '`poNumbers`, and the desk then shows an order that answers to a name nobody uses.',
     '',
     'A STYLE is one garment the buyer is buying — one style code, one description, one',
     'unit price. A purchase order usually has exactly one, occasionally two or three.',
@@ -449,6 +479,180 @@ export interface ExtractionOutcome {
   error?: string
 }
 
+export interface ReadDocumentInput {
+  moduleId: string
+  targetTable: string
+  /** Which of the module's draft schemas the reading is parsed against. Never optional —
+   *  `resolvePendingSchema` refuses without it, and a reading with no schema is a blob. */
+  zodSchemaKey: string
+  sourceText?: string | undefined
+  sourceDocumentId?: string | undefined
+  /** Ids the person chose. Merged over the model's reading and scored 1. */
+  contextValues?: Record<string, string> | undefined
+  /** Whose spend this is, when it is not the calling ctx's own. */
+  createdBy?: string | undefined
+}
+
+export interface ReadDocumentResult {
+  payload: Record<string, unknown>
+  fieldConfidence: Record<string, number>
+  model: string
+}
+
+/**
+ * A document, read into a checked payload — everything the extraction pipeline does except
+ * decide what to do with the answer.
+ *
+ * Factored out of `runExtraction` so a second caller could exist. The queued path takes this
+ * and proposes a pending change for somebody else to approve; the inline path (a person in a
+ * dialog, holding the paper, about to press save themselves) takes the same result and fills
+ * the form in front of them. One implementation, so the two cannot drift into reading the
+ * same purchase order differently — which is the failure that would be hardest to notice and
+ * worst to explain.
+ *
+ * Everything that makes a reading trustworthy stays here: the file conversion, the call
+ * ledger the daily ceiling is computed from, the person's context outranking the model, and
+ * `assertExtractionConfidence` refusing a uniform score.
+ */
+export async function readDocumentInto(
+  ctx: AnyCtx,
+  input: ReadDocumentInput,
+): Promise<ReadDocumentResult> {
+  const schema = resolvePendingSchema(input.moduleId, input.targetTable, input.zodSchemaKey)
+  let source = input.sourceText ?? ''
+
+  /*
+   * No text means the file IS the document (plan: file-native intake). The bytes are
+   * fetched tenant-scoped at run time rather than stored on the job — the job row stays
+   * small, and a document quarantined between queue and run is refused here exactly as
+   * it would be for a person. When text exists it is what gets read, file or no file:
+   * a human transcription was deliberate, and silently preferring the file would make
+   * the paste box a decoration.
+   */
+  let file: ExtractFile | undefined
+  if (!source.trim() && input.sourceDocumentId) {
+    const { readDocumentBytes } = await import('@/modules/core/documents')
+    const original = await readDocumentBytes(ctx, input.sourceDocumentId)
+
+    if (MODEL_READABLE_MIME.has(original.mimeType)) {
+      file = {
+        base64: Buffer.from(original.bytes).toString('base64'),
+        mimeType: original.mimeType,
+        filename: original.filename,
+      }
+    } else {
+      /*
+       * A Word document or a spreadsheet — which the model cannot read, and which this
+       * product accepted at upload and then did nothing with, in silence, until now.
+       *
+       * The text comes out here rather than at the door because the bytes are already
+       * being fetched tenant-scoped at this point, and because a conversion that failed
+       * during upload would have to be reported through a presign response that has no
+       * room to say anything useful. Extracted text is ordinary source text from here on:
+       * same extractor, same measured per-field confidence, same approve inbox.
+       */
+      const extracted = extractDocumentText(original.bytes, original.mimeType)
+      if (extracted === null) {
+        // `.doc` from 1997, a HEIC photo, a corrupt archive. Refused by name, so the
+        // person is told to paste the text rather than left waiting for a draft.
+        throw new AppError('validation_failed', 'marbim.errors.file_unreadable', {
+          mimeType: original.mimeType,
+          filename: original.filename,
+        })
+      }
+      source = extracted
+    }
+  }
+
+  /*
+   * The extraction call, and the ledger entry it had never written.
+   *
+   * `marbim_call_log`'s own header says extraction lands here — "a factory that uploads
+   * two hundred POs in an afternoon has spent real money, and the daily ceiling has to
+   * see it, otherwise the budget only governs the cheapest of the three roles" — and
+   * nothing wrote the row. Only the chat loop did. So the ceiling counted conversations
+   * and ignored document reading entirely: the table held zero `extract` rows across
+   * every tenant, while extractions ran and were billed.
+   *
+   * Logged either way. A call that failed after the vendor accepted it was still paid
+   * for, and a ledger that only records successes drifts upward exactly as reliability
+   * gets worse.
+   */
+  const extractStartedAt = Date.now()
+  let result
+  try {
+    result = await getProvider().extract({
+      role: 'extract',
+      schema,
+      input: source,
+      instruction: extractionInstruction(input.moduleId, input.targetTable),
+      ...(file ? { file } : {}),
+    })
+  } catch (error) {
+    await logCall(ctx, {
+      role: 'extract',
+      // The call died before it could say which model answered. The configured one is
+      // the honest guess, and 'unknown' is what the chat path records in the same spot.
+      model: modelForRole('extract') ?? 'unknown',
+      iteration: 0,
+      durationMs: Date.now() - extractStartedAt,
+      outcome: error instanceof Error ? error.message : String(error),
+      createdBy: input.createdBy,
+    })
+    throw error
+  }
+
+  await logCall(ctx, {
+    role: 'extract',
+    model: result.model,
+    iteration: 0,
+    ...(result.usage ? { usage: result.usage } : {}),
+    durationMs: Date.now() - extractStartedAt,
+    outcome: 'ok',
+    createdBy: input.createdBy,
+  })
+
+  /**
+   * The person's fields, folded in over the extractor's.
+   *
+   * Context wins on a collision, and deliberately: if somebody picked the buyer from a
+   * list of their own buyers and the model also read a name off the page, the person is
+   * the one who knows which record it maps to.
+   *
+   * Scored 1.0 — not as flattery of the extraction, but because a chosen value carries no
+   * reading risk. A reviewer looking at the draft sees the buyer at 1.0 and the quantity
+   * at 0.62 and knows exactly where to look, which is the entire point of per-field
+   * confidence. `assertExtractionConfidence` still refuses a payload that is uniform, so
+   * a context-only draft cannot slip through wearing certainty it did not earn.
+   */
+  const context = input.contextValues ?? {}
+  const payload = {
+    ...(result.value as Record<string, unknown>),
+    ...context,
+    // The pipeline's own knowledge outranks the model's reading, same as the person's
+    // context does. The model, offered a uuid field, fills it with whatever id-shaped
+    // string the page has — the job KNOWS which document it is reading. Schemas without
+    // the field are unaffected: propose stores the parsed payload, and parsing strips
+    // keys a schema does not name.
+    ...(input.sourceDocumentId ? { sourceDocumentId: input.sourceDocumentId } : {}),
+  }
+  const fieldConfidence = { ...result.fieldConfidence }
+  for (const field of Object.keys(context)) fieldConfidence[field] = 1
+  if (input.sourceDocumentId) fieldConfidence.sourceDocumentId = 1
+
+  // The check the whole module exists for. A constant is refused before it becomes a
+  // draft that looks reviewed.
+  wrapMarbimError(() =>
+    assertExtractionConfidence({
+      payload,
+      fieldConfidence,
+      method: result.method,
+      uniformConfidenceJustification: result.uniformConfidenceJustification,
+    }),
+  )
+  return { payload, fieldConfidence, model: result.model }
+}
+
 /**
  * Run a queued extraction. Called by the worker, never in a request.
  *
@@ -497,138 +701,15 @@ export async function runExtraction(
   })
 
   try {
-    const schema = resolvePendingSchema(job.moduleId, job.targetTable, job.zodSchemaKey)
-    let source = job.sourceText ?? ''
-
-    /*
-     * No text means the file IS the document (plan: file-native intake). The bytes are
-     * fetched tenant-scoped at run time rather than stored on the job — the job row stays
-     * small, and a document quarantined between queue and run is refused here exactly as
-     * it would be for a person. When text exists it is what gets read, file or no file:
-     * a human transcription was deliberate, and silently preferring the file would make
-     * the paste box a decoration.
-     */
-    let file: ExtractFile | undefined
-    if (!source.trim() && job.sourceDocumentId) {
-      const { readDocumentBytes } = await import('@/modules/core/documents')
-      const original = await readDocumentBytes(ctx, job.sourceDocumentId)
-
-      if (MODEL_READABLE_MIME.has(original.mimeType)) {
-        file = {
-          base64: Buffer.from(original.bytes).toString('base64'),
-          mimeType: original.mimeType,
-          filename: original.filename,
-        }
-      } else {
-        /*
-         * A Word document or a spreadsheet — which the model cannot read, and which this
-         * product accepted at upload and then did nothing with, in silence, until now.
-         *
-         * The text comes out here rather than at the door because the bytes are already
-         * being fetched tenant-scoped at this point, and because a conversion that failed
-         * during upload would have to be reported through a presign response that has no
-         * room to say anything useful. Extracted text is ordinary source text from here on:
-         * same extractor, same measured per-field confidence, same approve inbox.
-         */
-        const extracted = extractDocumentText(original.bytes, original.mimeType)
-        if (extracted === null) {
-          // `.doc` from 1997, a HEIC photo, a corrupt archive. Refused by name, so the
-          // person is told to paste the text rather than left waiting for a draft.
-          throw new AppError('validation_failed', 'marbim.errors.file_unreadable', {
-            mimeType: original.mimeType,
-            filename: original.filename,
-          })
-        }
-        source = extracted
-      }
-    }
-
-    /*
-     * The extraction call, and the ledger entry it had never written.
-     *
-     * `marbim_call_log`'s own header says extraction lands here — "a factory that uploads
-     * two hundred POs in an afternoon has spent real money, and the daily ceiling has to
-     * see it, otherwise the budget only governs the cheapest of the three roles" — and
-     * nothing wrote the row. Only the chat loop did. So the ceiling counted conversations
-     * and ignored document reading entirely: the table held zero `extract` rows across
-     * every tenant, while extractions ran and were billed.
-     *
-     * Logged either way. A call that failed after the vendor accepted it was still paid
-     * for, and a ledger that only records successes drifts upward exactly as reliability
-     * gets worse.
-     */
-    const extractStartedAt = Date.now()
-    let result
-    try {
-      result = await getProvider().extract({
-        role: 'extract',
-        schema,
-        input: source,
-        instruction: extractionInstruction(job.moduleId, job.targetTable),
-        ...(file ? { file } : {}),
-      })
-    } catch (error) {
-      await logCall(ctx, {
-        role: 'extract',
-        // The call died before it could say which model answered. The configured one is
-        // the honest guess, and 'unknown' is what the chat path records in the same spot.
-        model: modelForRole('extract') ?? 'unknown',
-        iteration: 0,
-        durationMs: Date.now() - extractStartedAt,
-        outcome: error instanceof Error ? error.message : String(error),
-        createdBy: job.createdBy,
-      })
-      throw error
-    }
-
-    await logCall(ctx, {
-      role: 'extract',
-      model: result.model,
-      iteration: 0,
-      ...(result.usage ? { usage: result.usage } : {}),
-      durationMs: Date.now() - extractStartedAt,
-      outcome: 'ok',
-      createdBy: job.createdBy,
-    })
-
-    /**
-     * The person's fields, folded in over the extractor's.
-     *
-     * Context wins on a collision, and deliberately: if somebody picked the buyer from a
-     * list of their own buyers and the model also read a name off the page, the person is
-     * the one who knows which record it maps to.
-     *
-     * Scored 1.0 — not as flattery of the extraction, but because a chosen value carries no
-     * reading risk. A reviewer looking at the draft sees the buyer at 1.0 and the quantity
-     * at 0.62 and knows exactly where to look, which is the entire point of per-field
-     * confidence. `assertExtractionConfidence` still refuses a payload that is uniform, so
-     * a context-only draft cannot slip through wearing certainty it did not earn.
-     */
-    const context = job.contextValues ?? {}
-    const payload = {
-      ...(result.value as Record<string, unknown>),
-      ...context,
-      // The pipeline's own knowledge outranks the model's reading, same as the person's
-      // context does. The model, offered a uuid field, fills it with whatever id-shaped
-      // string the page has — the job KNOWS which document it is reading. Schemas without
-      // the field are unaffected: propose stores the parsed payload, and parsing strips
-      // keys a schema does not name.
+    const { payload, fieldConfidence, model } = await readDocumentInto(ctx, {
+      moduleId: job.moduleId,
+      targetTable: job.targetTable,
+      zodSchemaKey: job.zodSchemaKey,
+      ...(job.sourceText ? { sourceText: job.sourceText } : {}),
       ...(job.sourceDocumentId ? { sourceDocumentId: job.sourceDocumentId } : {}),
-    }
-    const fieldConfidence = { ...result.fieldConfidence }
-    for (const field of Object.keys(context)) fieldConfidence[field] = 1
-    if (job.sourceDocumentId) fieldConfidence.sourceDocumentId = 1
-
-    // The check the whole module exists for. A constant is refused before it becomes a
-    // draft that looks reviewed.
-    wrapMarbimError(() =>
-      assertExtractionConfidence({
-        payload,
-        fieldConfidence,
-        method: result.method,
-        uniformConfidenceJustification: result.uniformConfidenceJustification,
-      }),
-    )
+      ...(job.contextValues ? { contextValues: job.contextValues } : {}),
+      ...(job.createdBy ? { createdBy: job.createdBy } : {}),
+    })
 
     const proposed = await propose(ctx, {
       moduleId: job.moduleId,
@@ -640,7 +721,7 @@ export async function runExtraction(
       source: 'ai_extraction',
       sourceDocumentId: job.sourceDocumentId ?? undefined,
       extractorVersion: job.extractorVersion,
-      model: result.model,
+      model,
       // The draft belongs to whoever queued the reading, not to the worker that ran it.
       // Without this every AI draft was raised by nobody — see `onBehalfOf`.
       ...(job.createdBy ? { onBehalfOf: job.createdBy } : {}),
@@ -652,7 +733,7 @@ export async function runExtraction(
         .set({
           status: 'succeeded',
           pendingChangeId: proposed.id,
-          model: result.model,
+          model,
           finishedAt: new Date(),
           updatedAt: new Date(),
         })

@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 
 import { InlineAlert, Modal } from '@/components/fx/feedback'
+import { ReadIntoForm, ReadMark, type ReadFields } from '@/components/shell/read-into-form'
 import { DateInput, TextInput } from '@/components/fx/forms'
 import { useLocale, useT } from '@/components/fx/locale'
 import { Button } from '@/components/fx/primitives'
@@ -51,6 +52,38 @@ export function NewUdButton() {
   const [issueDate, setIssueDate] = useState('')
   const [validUntil, setValidUntil] = useState('')
   const [items, setItems] = useState<Item[]>([{ itemRef: '', qty: '', unit: '' }])
+  const [readAs, setReadAs] = useState<Record<string, number | null>>({})
+
+  /**
+   * What the customs declaration said, into the boxes.
+   *
+   * The authorised items come back as a list and replace the blank row rather than appending
+   * to it — a UD naming three materials should produce three rows, not three plus an empty
+   * one somebody has to notice and delete.
+   *
+   * `itemRef` is left exactly as the paper words it. The gate matches a store issue against
+   * this text, and tidying "12oz stretch denim" into a house code here is how a reconciliation
+   * stops balancing.
+   */
+  function fill(read: ReadFields) {
+    const v = read.values
+    const str = (x: unknown) => (x === null || x === undefined ? '' : String(x))
+    if (v.number !== undefined) setNumber(str(v.number))
+    if (v.issueDate !== undefined) setIssueDate(str(v.issueDate))
+    if (v.validUntil !== undefined) setValidUntil(str(v.validUntil))
+
+    const read_items = Array.isArray(v.authorizedItems) ? (v.authorizedItems as Record<string, unknown>[]) : []
+    if (read_items.length > 0) {
+      setItems(
+        read_items.map((row) => ({
+          itemRef: str(row.itemRef),
+          qty: str(row.qty),
+          unit: str(row.unit),
+        })),
+      )
+    }
+    setReadAs(read.confidence)
+  }
 
   const filled = items.filter(
     (i) => i.itemRef.trim() !== '' && i.qty.trim() !== '' && i.unit.trim() !== '',
@@ -94,9 +127,15 @@ export function NewUdButton() {
 
       <Modal open={open} onClose={() => setOpen(false)} title={t('ui.ud.new_ud')}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <ReadIntoForm
+            kindId="ud_scan"
+            prompt="the customs declaration"
+            onFilled={fill}
+          />
+
           <TextInput
             label={t('ui.ud.number')}
-            hint={t('ui.ud.number_hint')}
+            hint={readAs.number !== undefined ? <ReadMark confidence={readAs.number} /> : t('ui.ud.number_hint')}
             mono
             required
             value={number}
