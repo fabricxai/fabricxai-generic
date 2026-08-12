@@ -11,6 +11,7 @@ import type { ApprovalsPolicy } from '@/modules/approvals/service'
 import { companyProfile, getPolicy } from '@/modules/settings/service'
 
 import { WhatArrivesHere } from './what-arrives'
+import { FloorTabs } from '@/components/shell/floor-tabs'
 
 import { ApproveInbox } from './inbox-client'
 
@@ -86,6 +87,15 @@ export default async function ApprovePage() {
         }))}
         escalateAfterHours={policy.agingEscalateAfterHours}
       />
+      {ctx.roles.some((r) => r === 'owner' || r === 'admin') ? (
+        <FloorTabs
+          tabs={[
+            { href: '/home', label: 'What needs you' },
+            { href: '/approve', label: 'Approve' },
+            { href: '/orders', label: 'Orders' },
+          ]}
+        />
+      ) : null}
     </>
   )
 }

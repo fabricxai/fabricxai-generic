@@ -23,6 +23,7 @@ import {
 import { recordChange, registerAuditedTables } from '../core/audit'
 import type { AnyCtx, RequestCtx, Role } from '../core/ctx'
 import { AppError, notFound } from '../core/errors'
+import { notify } from '../core/notifications'
 import { emit } from '../core/outbox'
 import { getModule } from '../core/registry'
 import { scoped } from '../core/scoped'
@@ -338,6 +339,28 @@ export async function emitAgingEscalations(
         payload: { ...draft, thresholdHours: policy.agingEscalateAfterHours },
         aggregateTable: 'pending_changes',
         aggregateId: draft.id,
+      })
+
+      /*
+       * The event goes to a queue with no worker — a fact in a ledger nobody is told
+       * (finance made the same observation about its shortfall). The notification is
+       * what a person actually receives: addressed to the role the rule routes the
+       * draft to, owner when no rule claims it (core's own fallback), pushed because a
+       * draft past its window is precisely the thing an approver away from the desk is
+       * away FROM. Once per draft — aging further is not news, sitting is.
+       */
+      await notify(ctx, {
+        role: draft.requiredRoles[0] ?? 'owner',
+        kind: 'approvals.draft.aging',
+        severity: 'warning',
+        titleKey: 'approvals.notifications.draft_aging.title',
+        params: { hours: policy.agingEscalateAfterHours },
+        moduleId: draft.moduleId,
+        entityTable: 'pending_changes',
+        entityId: draft.id,
+        href: '/approve',
+        dedupeKey: `draft-aging:${draft.id}`,
+        channels: ['in_app', 'push'],
       })
     }
     return { raised: aging.length }

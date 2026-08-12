@@ -4,6 +4,7 @@ import { desc, eq, inArray } from 'drizzle-orm'
 
 import { EmptyState } from '@/components/fx/feedback'
 import { FloorScreen } from '@/components/fx/floor'
+import { FloorTabs } from '@/components/shell/floor-tabs'
 import { PageHeader } from '@/components/shell/page-shell'
 import { getCtx } from '@/modules/core/session'
 import { withTenantRead } from '@/modules/core/tenancy'
@@ -56,7 +57,13 @@ export default async function PackingPage({
           title="No live orders"
           body="Cartons are packed against an order. An order that has shipped or closed is no longer packable."
         />
-      </FloorScreen>
+        <FloorTabs
+        tabs={[
+          { href: '/shipment', label: 'Pipeline' },
+          { href: '/shipment/packing', label: 'Packing' },
+        ]}
+      />
+    </FloorScreen>
     )
   }
 
@@ -121,6 +128,12 @@ export default async function PackingPage({
           contents: c.contents,
           at: c.createdAt.toISOString(),
         }))}
+      />
+      <FloorTabs
+        tabs={[
+          { href: '/shipment', label: 'Pipeline' },
+          { href: '/shipment/packing', label: 'Packing' },
+        ]}
       />
     </FloorScreen>
   )

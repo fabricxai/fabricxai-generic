@@ -204,6 +204,19 @@ async function recordFinishingOutputIn(
     dedupeKey: `lot-inspectable:${payload.orderId}`,
     channels: ['in_app', 'push'],
   })
+  // The Carton app's version of the same boundary: packing can start planning cartons.
+  await notify(ctx, {
+    role: 'shipment',
+    kind: 'shipment.packable',
+    titleKey: 'shipment.notifications.packable.title',
+    params: { poNumber: order?.poNumbers?.[0] ?? '', pieces: totalQty },
+    moduleId: 'shipment',
+    entityTable: 'finishing_outputs',
+    entityId: payload.orderId,
+    href: '/shipment/packing',
+    dedupeKey: `packable:${payload.orderId}`,
+    channels: ['in_app', 'push'],
+  })
 
   return { finishingOutputId: row.id, totalQty }
 }

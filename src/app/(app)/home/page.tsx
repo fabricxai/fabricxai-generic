@@ -30,6 +30,8 @@ import { capsAssignedSection, deskCalmLinks, deskRoleFor, deskSections } from '.
 import { HomeView, type HomeSection } from './home-view'
 import { OwnerFigures } from './owner-figures'
 
+import { FloorTabs } from '@/components/shell/floor-tabs'
+
 /**
  * Your work — composed from existing signals, no work_items table.
  *
@@ -308,16 +310,35 @@ export default async function HomePage() {
         ]
 
   return (
-    <HomeView
-      sections={sections}
-      calm={calm}
-      dayOne={dayOne}
-      calmLinks={calmLinks}
-      /* The owner's second morning, folded into the first (plan 2.1): queues above because
-         they are actionable, figures below because they are context. Never for the
-         merchandiser branch — their figures live on their own desks. */
-      after={isOwnerView ? <OwnerFigures ctx={ctx} /> : undefined}
-    />
+    <>
+      <HomeView
+        sections={sections}
+        calm={calm}
+        dayOne={dayOne}
+        calmLinks={calmLinks}
+        /* The owner's second morning, folded into the first (plan 2.1): queues above because
+           they are actionable, figures below because they are context. Never for the
+           merchandiser branch — their figures live on their own desks. */
+        after={isOwnerView ? <OwnerFigures ctx={ctx} /> : undefined}
+      />
+      {/* The Pulse and Desk skins' pocket bar (mobile contract §3) — role-keyed because
+          this one page is several roles' morning, and each role's three places differ. */}
+      <FloorTabs
+        tabs={
+          isOwnerView
+            ? [
+                { href: '/home', label: 'What needs you' },
+                { href: '/approve', label: 'Approve' },
+                { href: '/orders', label: 'Orders' },
+              ]
+            : [
+                { href: '/home', label: 'My work' },
+                { href: '/orders', label: 'Orders' },
+                { href: '/marbim/intake', label: 'Capture' },
+              ]
+        }
+      />
+    </>
   )
 }
 

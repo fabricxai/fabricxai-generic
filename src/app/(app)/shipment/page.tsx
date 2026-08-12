@@ -8,6 +8,7 @@ import { Eyebrow, SectionHeading } from '@/components/fx/signature'
 import { Ident } from '@/components/fx/format'
 import { ShipmentActions } from '@/components/fx/shipment-actions'
 import { SavableCard } from '@/components/fx/save-card'
+import { FloorTabs } from '@/components/shell/floor-tabs'
 import { PageHeader } from '@/components/shell/page-shell'
 import { eq } from 'drizzle-orm'
 
@@ -156,6 +157,12 @@ export default async function ShipmentPage() {
           not. A trail of somebody trying to present without one is worth having.
         </div>
       </div>
+      <FloorTabs
+        tabs={[
+          { href: '/shipment', label: 'Pipeline' },
+          { href: '/shipment/packing', label: 'Packing' },
+        ]}
+      />
     </>
   )
 }

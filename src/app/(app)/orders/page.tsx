@@ -11,6 +11,7 @@ import { AskAboutRow } from '@/components/shell/ask-about-row'
 import { PageHeader } from '@/components/shell/page-shell'
 import { WorkCue } from '@/components/shell/work-cue'
 import { canWrite, NAV } from '@/components/shell/nav'
+import { FloorTabs } from '@/components/shell/floor-tabs'
 import { getCtx } from '@/modules/core/session'
 import { buyerAccounts } from '@/modules/buyers/queries'
 import { companyProfile } from '@/modules/settings/service'
@@ -285,6 +286,17 @@ export default async function OrdersPage() {
           ))}
         </div>
       )}
+      {/* The Desk skin's pocket bar — never for the viewer, whose only capability is this
+          page and whose tabs would point at locked doors. */}
+      {ctx.roles.some((r) => ['merchandiser', 'commercial', 'owner', 'admin'].includes(r)) ? (
+        <FloorTabs
+          tabs={[
+            { href: '/home', label: 'My work' },
+            { href: '/orders', label: 'Orders' },
+            { href: '/marbim/intake', label: 'Capture' },
+          ]}
+        />
+      ) : null}
     </>
   )
 }

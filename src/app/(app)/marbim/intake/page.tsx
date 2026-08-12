@@ -8,6 +8,7 @@ import { SectionHeading } from '@/components/fx/signature'
 import { LockedState } from '@/components/fx/feedback'
 import { PageHeader } from '@/components/shell/page-shell'
 import { env } from '@/lib/env'
+import { FloorTabs } from '@/components/shell/floor-tabs'
 import { getCtx } from '@/modules/core/session'
 import { withTenantRead } from '@/modules/core/tenancy'
 import { INTAKE_KINDS } from '@/modules/marbim/intake'
@@ -171,6 +172,15 @@ export default async function IntakePage() {
           </section>
         ) : null}
       </div>
+      {ctx.roles.some((r) => r === 'merchandiser' || r === 'commercial') ? (
+        <FloorTabs
+          tabs={[
+            { href: '/home', label: 'My work' },
+            { href: '/orders', label: 'Orders' },
+            { href: '/marbim/intake', label: 'Capture' },
+          ]}
+        />
+      ) : null}
     </>
   )
 }

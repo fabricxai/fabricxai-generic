@@ -208,6 +208,10 @@ export async function runLcCountdown(
           entityId: lc.id,
           // Threshold in the key: crossing 14 → 7 is a new alert, not a duplicate.
           dedupeKey: `lc.countdown:${lc.id}:${label}:${threshold}`,
+          // The Pulse/Desk buzz (mobile contract §3): an LC date is the one deadline a
+          // commercial officer wants in their pocket, and the dedupe above already keeps
+          // it to one buzz per threshold.
+          channels: ['in_app', 'push'],
         })
       }
     }

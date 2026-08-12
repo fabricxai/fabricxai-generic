@@ -85,4 +85,4 @@ editing. Changing the rules of the factory is desk work.
 
 ## 5 · Sign-off
 
-- [ ] Contract reviewed — *(name, date)* — 4.x code may start.
+- [x] Contract reviewed — user ("Go, start 4.1"), 2026-08-12 — 4.x built same day: 4.1–4.5 complete, deviations recorded in the build plan.

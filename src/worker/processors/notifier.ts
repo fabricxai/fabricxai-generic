@@ -170,6 +170,10 @@ export const NOTIFY_RULES: Readonly<Record<string, NotifyRule>> = {
     entityTable: 'uds',
     entityId: str(p.udId),
     dedupeKey: `commercial.ud_overdrawn:${str(p.udId)}:${str(p.itemRef) || id}`,
+    // The Pulse app's loudest buzz (mobile contract §3): an approved customs overdraw is
+    // the single most audit-worthy event in this module, and the owner who signed it from
+    // a desk this morning should feel it land from the floor this afternoon.
+    channels: ['in_app', 'push'] as const,
   }),
 
   /**

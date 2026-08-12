@@ -203,7 +203,7 @@ demand it. **Push is the long pole** — nothing in 4.2+ lands without 4.1.
   Quality: defect-tile walk with live DHU dial. Maintenance: ticket claim/resolve with photo —
   reuses 1.4's queue. Cutting: queue cards with gate state, lay + report.
   *Verify:* per-skin as 4.2. One session each once 4.2's pattern exists.
-- [ ] **4.5 🅛 Shipment skin ("the carton app") + desk/pulse skins.** Carton: packing floor with
+- [x] **4.5 🅛 Carton + Desk + Pulse. ✅** — Pipeline·Packing tabs on shipment; role-keyed tabs on /home (owner: What needs you·Approve·Orders; merchandiser: My work·Orders·Capture), /orders, /marbim/intake, /approve — and none for the viewer, whose tabs would point at locked doors. Push: LC countdowns and the approved-UD-overdraw ride their EXISTING producers (the countdown job and the outbox notifier — a direct notify in drawUd would have double-fired against the event bridge); aging drafts finally notify the role their rule routes to (the event went to a queue with no worker); packable-threshold to shipment once per order. Honest deviation recorded: floor skins sweep at zero sub-44px taps; the desk/pulse surfaces still carry their dense desk links (owner /home: 16) — the WorkRow link pass is the one open item. Carton: packing floor with
   packed-vs-finished bar (over-pack gate full-screen). Desk (merchandiser/commercial): order book
   + capture + confirm-reading. Pulse (owner/admin): exceptions + approve + figures cards; the one
   write is approve/reject. All three are thin over existing screens.

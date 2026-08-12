@@ -247,6 +247,10 @@ export const MESSAGES: Catalogue = {
       'A mechanic has taken your ticket and is on the way.',
     'maintenance.notifications.ticket_resolved.title':
       'Your machine ticket is resolved — the line can run.',
+    'approvals.notifications.draft_aging.title':
+      'A draft has waited past {hours} hours in your approve queue.',
+    'shipment.notifications.packable.title':
+      '{poNumber} has {pieces} pieces off finishing — cartons can be planned.',
     'maintenance.notifications.ticket_opened.title':
       'A line is down — an unclaimed machine ticket is waiting.',
     'sampling.notifications.pp_approved.title':
@@ -757,6 +761,10 @@ export const MESSAGES: Catalogue = {
       'একজন মেকানিক আপনার টিকিট নিয়েছেন, আসছেন।',
     'maintenance.notifications.ticket_resolved.title':
       'আপনার মেশিনের টিকিট সমাধান হয়েছে — লাইন চালানো যাবে।',
+    'approvals.notifications.draft_aging.title':
+      'আপনার approve সারিতে একটি খসড়া {hours} ঘণ্টার বেশি অপেক্ষায়।',
+    'shipment.notifications.packable.title':
+      '{poNumber}-এর {pieces} পিস ফিনিশিং থেকে এসেছে — কার্টনের পরিকল্পনা করা যায়।',
     'maintenance.notifications.ticket_opened.title':
       'একটি লাইন বন্ধ — মেশিনের একটি টিকিট কেউ নেয়নি।',
     'sampling.notifications.pp_approved.title':
