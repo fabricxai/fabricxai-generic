@@ -205,6 +205,22 @@ export function fromDateInputText(text: string): string | null {
  * `05/` re-adds the slash the person just deleted and the field cannot be cleared.
  */
 export function maskDateInput(raw: string): string {
+  /*
+   * A pasted ISO date is accepted as itself.
+   *
+   * Everything in this product speaks `YYYY-MM-DD` — the API, the seeds, the buyer's own
+   * systems more often than not — so pasting one into a date field is the obvious thing to
+   * do and it produced `20/26/1220`: the digits of 2026-12-20, masked as if they had been
+   * typed day-first. Visibly wrong rather than silently wrong, but a person then has to
+   * work out that the field wanted the same date backwards.
+   *
+   * Matched on the SHAPE before the digits are stripped, so it cannot catch a half-typed
+   * date: only a complete `\\d{4}-\\d{2}-\\d{2}` reorders, and everything else masks as
+   * before.
+   */
+  const iso = raw.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`
+
   const digits = raw.replace(/\D/g, '').slice(0, 8)
   if (digits.length <= 2) return digits
   if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`

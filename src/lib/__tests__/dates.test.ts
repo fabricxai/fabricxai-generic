@@ -147,6 +147,13 @@ describe('typed dates — dd/mm/yyyy in, ISO out', () => {
     expect(maskDateInput('05')).toBe('05')
     expect(maskDateInput('051')).toBe('05/1')
     expect(maskDateInput('05122026')).toBe('05/12/2026')
+    // A pasted ISO date is the same date, not its digits read day-first. Everything in this
+    // product speaks YYYY-MM-DD, so pasting one into a date field is the obvious move — and
+    // it used to produce 20/26/1220.
+    expect(maskDateInput('2026-12-20')).toBe('20/12/2026')
+    expect(fromDateInputText(maskDateInput('2026-12-20'))).toBe('2026-12-20')
+    // Only a COMPLETE iso date reorders; a part-typed one still masks day-first.
+    expect(maskDateInput('2026-12')).toBe('20/26/12')
     // Backspacing over the separator must not immediately re-add it, or the field
     // cannot be cleared: '05/' minus its slash is '05', and stays '05'.
     expect(maskDateInput('05/')).toBe('05')
