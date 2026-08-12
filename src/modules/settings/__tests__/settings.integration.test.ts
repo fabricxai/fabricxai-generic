@@ -15,7 +15,7 @@
  */
 import { randomUUID } from 'node:crypto'
 
-import { eq, sql } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { createDirectClient, createDirectDb } from '@/db/direct'
@@ -110,7 +110,7 @@ describe('X.3 · policy storage', () => {
     const [row] = await db
       .select()
       .from(policySettings)
-      .where(eq(policySettings.moduleId, 'cutting'))
+      .where(and(eq(policySettings.companyId, COMPANY), eq(policySettings.moduleId, 'cutting')))
 
     // Only what somebody set. A full snapshot would freeze every default at whatever it was
     // the day they signed up, and improving a default would then never reach anybody.
@@ -168,10 +168,13 @@ describe('X.3 · policy storage', () => {
 
     await setPolicy(ownerCtx, { moduleId: 'quality', patch: { dhuAlertThreshold: '3' } })
 
+    // Scoped to THIS company. Unscoped, this read the first policy audit row in the whole
+    // table and passed only for as long as no other tenant in the development database had
+    // ever changed a policy — a green that depended on the neighbours being empty.
     const [entry] = await db
       .select()
       .from(auditLog)
-      .where(eq(auditLog.targetTable, 'policy_settings'))
+      .where(and(eq(auditLog.companyId, COMPANY), eq(auditLog.targetTable, 'policy_settings')))
 
     const after = entry!.after as { overrides: Record<string, unknown>; effective: Record<string, unknown> }
     expect(after.overrides).toEqual({ dhuAlertThreshold: '3' })

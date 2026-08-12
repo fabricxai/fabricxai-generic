@@ -23,6 +23,7 @@ import { recordChange, registerAuditedTables } from '../core/audit'
 import type { AnyCtx, RequestCtx, Role } from '../core/ctx'
 import { AppError, conflict, notFound } from '../core/errors'
 import { emit } from '../core/outbox'
+import { scoped } from '../core/scoped'
 import { withTenantRead, withTenantTx, type TenantDb } from '../core/tenancy'
 
 import { SETTINGS_EVENTS } from './events'
@@ -195,10 +196,14 @@ export async function setPolicy(
   assertPolicyAdmin(ctx)
 
   return withTenantTx(ctx, async (tx) => {
+    // Scoped, not just RLS-protected. CLAUDE.md rule 2: the session variable is the second
+    // wall and never the only one — and this is the row a factory's gate thresholds live in,
+    // selected `FOR UPDATE` and then written. An unscoped match here is the shape of bug
+    // that changes another tenant's margin floor.
     const [existing] = await tx
       .select()
       .from(policySettings)
-      .where(eq(policySettings.moduleId, input.moduleId))
+      .where(scoped(policySettings, ctx, eq(policySettings.moduleId, input.moduleId)))
       .for('update')
 
     const { next, resolved } = wrapSettingsError(() =>
@@ -213,7 +218,7 @@ export async function setPolicy(
       await tx
         .update(policySettings)
         .set({ overrides: next, updatedBy: ctx.userId, updatedAt: new Date() })
-        .where(eq(policySettings.id, existing.id))
+        .where(scoped(policySettings, ctx, eq(policySettings.id, existing.id)))
     } else {
       await tx.insert(policySettings).values({
         companyId: ctx.companyId,
