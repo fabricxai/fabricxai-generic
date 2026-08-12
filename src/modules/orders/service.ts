@@ -13,7 +13,7 @@ import { and, asc, eq, inArray, sql } from 'drizzle-orm'
 
 import { factoryToday } from '@/lib/dates'
 import { compositeKey } from '@/lib/keys'
-import { roundToScale, toMinor } from '@/lib/quantity'
+import { fromMinor, roundToScale, toMinor } from '@/lib/quantity'
 
 import {
   orderBreakdowns,
@@ -717,6 +717,34 @@ export interface CreateOrderResult {
 }
 
 /**
+ * Quantity times price, over every style that carries both.
+ *
+ * Whole cents throughout — `toMinor` refuses to drop a digit, and the multiplication happens
+ * in bigint so 18,000 × 7.25 is 130,500.00 and not 130,499.99999999999. Money never touches a
+ * float in this codebase and an order total is the last place to start.
+ *
+ * Returns null when nothing can be added up. A style priced but not sized, or sized but not
+ * priced, contributes nothing and does not make the total wrong by its absence — an order
+ * whose value genuinely is not known yet should say so rather than claim a partial sum is the
+ * whole.
+ */
+function sumStyleValues(
+  styles: readonly { contractedQty?: number | undefined; unitPrice?: string | undefined }[],
+): string | null {
+  let minor = 0n
+  let counted = 0
+
+  for (const style of styles) {
+    if (style.contractedQty === undefined || style.unitPrice === undefined) continue
+    minor += toMinor(style.unitPrice, 'unit price') * BigInt(style.contractedQty)
+    counted += 1
+  }
+
+  if (counted === 0 || counted < styles.length) return null
+  return fromMinor(minor)
+}
+
+/**
  * Create an order and its styles ⚖.
  *
  * The entry point 1.2 reaches through when an RFQ is won, and the reason it lives here
@@ -782,7 +810,21 @@ export async function createOrderIn(
         companyId: ctx.companyId,
         buyerId: orderInput.buyerId,
         poNumbers: orderInput.poNumbers,
-        totalValue: orderInput.totalValue ?? null,
+        /*
+         * Stated if the paper states it, otherwise added up from the styles.
+         *
+         * It used to be stored only when supplied, and the desk's own booking form does not
+         * ask for it — deliberately, because a total somebody types is a total that can
+         * disagree with the lines under it. So every order opened by hand had no value, and
+         * the order desk printed "—" directly beside the 18,000 pieces and the $7.25 that
+         * determine it (order-journey walk, stage 1). Meanwhile the seeds and the PO-extraction
+         * path both pass one, so the same screen showed values for some orders and not
+         * others, which is how a factory learns not to trust a column.
+         *
+         * A stated value still wins: a purchase order carrying a total that does not match
+         * its own lines is a discrepancy to raise with the buyer, not one to silently correct.
+         */
+        totalValue: orderInput.totalValue ?? sumStyleValues(styleInputs),
         currency: orderInput.currency,
         plannedExFactoryDate: orderInput.plannedExFactoryDate ?? null,
         ownerUserId: orderInput.ownerUserId ?? null,
