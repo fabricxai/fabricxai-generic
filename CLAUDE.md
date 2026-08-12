@@ -35,6 +35,13 @@ description, and the files say so at the top. The rule stands for what is built 
 - `pnpm test:e2e` — Playwright: one golden path + axe-core on the five floor screens.
   Needs `pnpm seed` and a production build; the suite starts one itself if none is running.
 - `pnpm seed` — factory-scale seed (also used by k6 and demos)
+- `pnpm seed:running --slug=<tenant>` — three orders caught mid-flight (sampling /
+  production / shipping), for adoption and UX walks
+- `pnpm seed:kit --slug=<tenant>` — the live-test kit's money rails and materials: two
+  master LCs, three BTBs, two UDs drawn to the kit's stated balances, suppliers, items,
+  receipts, rolls and the first issue. Stops one step short of each of the kit's five
+  refusals (BTB headroom, import PO with no BTB, UD overdraw, shade mix, failed 4-point)
+  so a person can meet them through the screen as the role that would.
 - `pnpm demo [orders|rfqs|leads]` — the screen-walkthrough scenario, through the
   real services; idempotent, so re-running it is safe. Set `DEMO_COMPANY_ID` when
   more than one company has an owner.
