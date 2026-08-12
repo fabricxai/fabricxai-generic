@@ -181,7 +181,6 @@ afterAll(async () => {
 describe('hidden modules refuse deep links, not just nav entries', () => {
   /** [path, locked-card subject, roles that may open it]. */
   const RESTRICTED: [string, string, Role[]][] = [
-    ['/dashboard', 'the owner dashboard', ['owner']],
     ['/workforce', 'workforce', ['owner', 'hr']],
     ['/compliance', 'compliance', ['owner', 'compliance']],
     ['/ud', 'the UD workbench', ['owner', 'store', 'commercial', 'compliance']],
@@ -231,6 +230,44 @@ describe('payroll leaks nothing to a role that cannot see it', () => {
   })
 })
 
+describe('the dashboard is one morning now (plan 2.1)', () => {
+  /*
+   * `/dashboard` folded into `/home`. The route survives as a redirect (bookmarks and
+   * muscle memory keep working) but the two halves of the old contract changed shape:
+   * an owner gets a 307 to home instead of a page, and everyone else still meets the
+   * layout's lock BEFORE the redirect can run, because access is decided by the shell,
+   * not by the page a path happens to render.
+   */
+  it('redirects an owner to /home', async () => {
+    const owner = actors.get('owner')
+    if (!owner) throw new Error('no owner actor')
+    const response = await fetch(`${BASE_URL}/dashboard`, {
+      headers: { cookie: owner.cookie },
+      redirect: 'manual',
+    })
+
+    if (response.status === 200) {
+      // The layout's auth work flushes headers before the page runs, so Next delivers the
+      // redirect inside the stream (a meta refresh) rather than as a 3xx. Same contract,
+      // different transport — assert the destination either way.
+      const body = await response.text()
+      expect(body).toContain('/home')
+      expect(body).toMatch(/http-equiv="refresh"|NEXT_REDIRECT/)
+    } else {
+      expect([302, 307]).toContain(response.status)
+      expect(response.headers.get('location')).toContain('/home')
+    }
+  })
+
+  it('still locks before it redirects, for a role without it', async () => {
+    const store = actors.get('store')
+    if (!store) throw new Error('no store actor')
+    const { status, body } = await visit(store, '/dashboard')
+    expect(status).toBe(200)
+    expect(body).toContain(lockedFor('the owner dashboard'))
+  })
+})
+
 describe('permitted screens still render for the roles that own them', () => {
   const ALLOWED: [string, Role][] = [
     ['/orders', 'merchandiser'],
@@ -238,7 +275,6 @@ describe('permitted screens still render for the roles that own them', () => {
     ['/store', 'store'],
     ['/quality', 'quality'],
     ['/workforce', 'hr'],
-    ['/dashboard', 'owner'],
     // Reached from the top-bar chip, so it carries `hiddenFromSidebar` and is absent from
     // the nav a storekeeper is sent. It is still registered, and must still open: the shell
     // now refuses any path the registry does not name, and the way to get that wrong is to

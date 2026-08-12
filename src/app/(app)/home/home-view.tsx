@@ -23,6 +23,7 @@ export function HomeView({
   calm,
   dayOne = false,
   calmLinks,
+  after,
 }: {
   sections: readonly HomeSection[]
   calm: boolean
@@ -33,6 +34,12 @@ export function HomeView({
   dayOne?: boolean
   /** Links shown when nothing is waiting — role-aware so we never point at a locked desk. */
   calmLinks: readonly { href: string; label: string }[]
+  /**
+   * Rendered below the queues, calm or not — the owner's figures live here (plan 2.1).
+   * BELOW deliberately: queues are actionable and figures are context, so an owner acts
+   * first and reads second. On a calm morning the figures are most of what remains.
+   */
+  after?: React.ReactNode
 }) {
   return (
     <>
@@ -71,6 +78,8 @@ export function HomeView({
           ))}
         </div>
       )}
+
+      {after}
     </>
   )
 }

@@ -406,6 +406,10 @@ export const NAV: readonly NavItem[] = [
     label: 'Owner dashboard',
     href: '/dashboard',
     section: 'oversight',
+    // A redirect to /home since plan 2.1 folded the two mornings into one. Hidden rather
+    // than deleted: the shell refuses any path without a NAV entry, and old bookmarks
+    // deserve to land somewhere.
+    hiddenFromSidebar: true,
     // Deliberately narrow. This is the whole-factory view.
     roles: [],
     // Read-only by rule 9 — importing a write op into `modules/analytics` is lint-banned.

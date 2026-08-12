@@ -77,7 +77,7 @@ phase is replication with each desk's own signals, not invention.
 
 ## Phase 2 — Structural UX (audit P2)
 
-- [ ] **2.1 🅗 ⏳ One owner morning (S2).** Merge `/dashboard` into `/home` for owner/admin:
+- [x] **2.1 🅗 ⏳ One owner morning (S2).** ✅ — plus one standing-rule violation fixed in passing: the buyer scorecard printed `buyerId.slice(0,8)`, a truncated uuid; buyers now show their names. Merge `/dashboard` into `/home` for owner/admin:
   home keeps its queue sections and gains a figures strip (OTD, DHU, efficiency, cash — each with
   denominator and as-of, exactly as the dashboard renders them); `/dashboard` becomes a redirect.
   Nav loses one entry. **Decision recorded here so it isn't relitigated:** home wins because the

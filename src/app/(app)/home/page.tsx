@@ -28,6 +28,7 @@ import {
 } from './home-copy'
 import { capsAssignedSection, deskCalmLinks, deskRoleFor, deskSections } from './desk-sections'
 import { HomeView, type HomeSection } from './home-view'
+import { OwnerFigures } from './owner-figures'
 
 /**
  * Your work — composed from existing signals, no work_items table.
@@ -297,7 +298,8 @@ export default async function HomePage() {
       ]
     : isOwnerView
       ? [
-          { href: '/dashboard', label: HOME_COPY.calmDashboard },
+          // The figures render on this page now (plan 2.1) — the calm link points at the
+          // order book, not at a dashboard that redirects straight back here.
           { href: '/orders', label: HOME_COPY.calmOrders },
         ]
       : [
@@ -305,7 +307,18 @@ export default async function HomePage() {
           { href: '/orders', label: HOME_COPY.calmOrders },
         ]
 
-  return <HomeView sections={sections} calm={calm} dayOne={dayOne} calmLinks={calmLinks} />
+  return (
+    <HomeView
+      sections={sections}
+      calm={calm}
+      dayOne={dayOne}
+      calmLinks={calmLinks}
+      /* The owner's second morning, folded into the first (plan 2.1): queues above because
+         they are actionable, figures below because they are context. Never for the
+         merchandiser branch — their figures live on their own desks. */
+      after={isOwnerView ? <OwnerFigures ctx={ctx} /> : undefined}
+    />
+  )
 }
 
 function quoteNeedCount(quotes: Awaited<ReturnType<typeof rfqBoard>>): number {

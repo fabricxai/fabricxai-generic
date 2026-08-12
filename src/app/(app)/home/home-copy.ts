@@ -54,7 +54,9 @@ export function exceptionHref(kind: ExceptionKind | string): string {
     case 'payroll_anomaly':
       return '/workforce'
     default:
-      return '/dashboard'
+      // The dashboard redirects home now (plan 2.1) — an exception with no better door
+      // stays on the screen the person is already reading.
+      return '/home'
   }
 }
 
@@ -104,7 +106,6 @@ export const HOME_COPY = {
   dayOneTitle: 'Nothing in the factory yet',
   dayOneBody:
     'Start by telling the system what your factory is made of — items, store locations, sewing lines, workers. Then add a buyer, and the first order can be booked. Nothing else has anything to show until an order exists.',
-  calmDashboard: 'Factory pulse',
   calmOrders: 'Order desk',
   decideEmpty: 'No drafts in your queue.',
   wrongEmpty: 'Nothing open in the feed.',
