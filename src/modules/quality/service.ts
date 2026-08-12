@@ -1398,10 +1398,16 @@ export async function seedDefaultDefectCodes(
  *
  * Two judgements live here rather than in the seam:
  *
- *  - **Whether the gate applies at all.** It is woven-only. A knit composite factory knits
- *    its own greige and grades it on the machine, so blocking its store on a 4-point sheet
- *    that nobody in the building produces would stop production for a document that does
- *    not exist.
+ *  - **Whether the gate applies to a given roll.** A knit composite factory knits its own
+ *    greige and grades it on the machine, so blocking its store on a 4-point sheet that
+ *    nobody in the building produces would stop production for a document that does not
+ *    exist. That exemption is about cloth the factory MADE, and it used to be written as a
+ *    company-wide `factoryType !== 'woven'` escape — which quietly exempted bought-in cloth
+ *    too. A knit-composite house making denim jackets imports woven denim by the container
+ *    with a mill 4-point sheet in the packet, and the three rolls that sheet failed went
+ *    onto the cutting table with the gate returning "passed" without looking (live-test kit,
+ *    Phase 4 · rolls R-D-19..21). A roll bought on a purchase order was not knitted here, so
+ *    the exemption cannot cover it.
  *  - **What "inspected" means.** A roll inherits its GRN's inspection when it has no
  *    inspection of its own, because inspectors grade a sample of a consignment, not every
  *    roll — that is what the 4-point system is for. A roll with its OWN failed inspection
@@ -1416,16 +1422,23 @@ export async function resolveFabricInspection(
 
   const { companyProfile } = await import('@/modules/settings/service')
   const profile = await companyProfile(ctx)
-  if ((profile?.factoryType ?? 'woven') !== 'woven') {
-    return { passed: true }
-  }
+  const knitsItsOwn = (profile?.factoryType ?? 'woven') !== 'woven'
 
-  const { grnLines, items, rolls } = await import('@/modules/store/schema')
+  const { grnLines, grns, items, rolls } = await import('@/modules/store/schema')
 
   const rollRows = await tx
-    .select({ id: rolls.id, rollNo: rolls.rollNo, grnId: grnLines.grnId, kind: items.kind })
+    .select({
+      id: rolls.id,
+      rollNo: rolls.rollNo,
+      grnId: grnLines.grnId,
+      kind: items.kind,
+      // Whether anybody sold this cloth to the factory. A purchase order behind the receipt
+      // means it arrived from a mill, with the mill's own inspection sheet in the packet.
+      supplierPoId: grns.supplierPoId,
+    })
     .from(rolls)
     .innerJoin(grnLines, eq(grnLines.id, rolls.grnLineId))
+    .innerJoin(grns, eq(grns.id, grnLines.grnId))
     .innerJoin(items, eq(items.id, rolls.itemId))
     .where(scoped(rolls, ctx, inArray(rolls.id, [...input.rollIds])))
 
@@ -1444,7 +1457,14 @@ export async function resolveFabricInspection(
   // which this store also tracks as rolls. Gating those would block a trim issue on an
   // inspection no factory on earth performs, and the storekeeper's only escape would be to
   // file a fictional one.
-  const fabricRolls = rollRows.filter((r) => r.kind === 'fabric')
+  const fabricRolls = rollRows.filter((r) => {
+    if (r.kind !== 'fabric') return false
+    // Own cloth in a knit house: knitted here, graded on the machine, no 4-point sheet to
+    // wait for. Bought cloth is gated whatever the factory type, because somebody else made
+    // it and the sheet that says whether it is good came in the box with it.
+    if (knitsItsOwn && !r.supplierPoId) return false
+    return true
+  })
   if (fabricRolls.length === 0) return { passed: true }
 
   const grnIds = [...new Set(fabricRolls.map((r) => r.grnId))]

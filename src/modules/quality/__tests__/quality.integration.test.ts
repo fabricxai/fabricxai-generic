@@ -41,6 +41,7 @@ import {
   closeDhuDay,
   createMeasurementSpec,
   inspectFabric,
+  resolveFabricInspection,
   recordMeasuredSet,
   recordMeasurementCheck,
   recordThirdPartyResult,
@@ -50,7 +51,8 @@ import {
   setFinalInspectionStatus,
   upsertDefectCode,
 } from '@/modules/quality/service'
-import { grnLines, grns, items } from '@/modules/store/schema'
+import { supplierPos, suppliers } from '@/modules/procurement/schema'
+import { grnLines, grns, items, locations, rolls } from '@/modules/store/schema'
 
 const client = createDirectClient()
 const db = createDirectDb(client)
@@ -838,5 +840,169 @@ describe('7.1 · a final inspection survives the network (plan 4.1)', () => {
     )
     expect(rows).toHaveLength(1)
     expect(rows[0]?.offlineKey).toBe(offlineKey)
+  })
+})
+
+/**
+ * The 4-point gate, and which rolls it is entitled to skip.
+ *
+ * The exemption is for cloth the factory MADE: a knit composite house knits its own greige
+ * and grades it on the machine, so waiting for a 4-point sheet nobody produces would stop
+ * its store. It used to be written as a company-wide `factoryType !== 'woven'` escape, and
+ * that quietly exempted cloth the factory BOUGHT as well — a knit house making denim
+ * jackets imports woven denim by the container, with the mill's own inspection sheet in the
+ * packet, and the rolls that sheet failed went to the cutting table with the gate returning
+ * "passed" without looking (live-test kit, Phase 4 · rolls R-D-19..21).
+ *
+ * A purchase order behind the receipt is what separates the two: somebody sold this cloth
+ * to the factory, so somebody else made it, so the exemption cannot reach it.
+ */
+describe('7.1 · the 4-point gate in a knit composite house', () => {
+  let boughtRollId: string
+  let ownRollId: string
+
+  beforeAll(async () => {
+    const { upsertCompanyProfile } = await import('@/modules/settings/service')
+    await upsertCompanyProfile({ ...ctx, roles: ['owner'] }, {
+      legalName: 'Knit Composite Ltd',
+      factoryType: 'knit-composite',
+    })
+
+    const [supplier] = await db
+      .insert(suppliers)
+      .values({ companyId: COMPANY, code: 'MILL', name: 'Foshan Denim Mills', type: 'fabric_mill', origin: 'import' })
+      .returning({ id: suppliers.id })
+    const [po] = await db
+      .insert(supplierPos)
+      .values({
+        companyId: COMPANY,
+        supplierId: supplier!.id,
+        poNumber: `SPO-${randomUUID().slice(0, 6)}`,
+        currency: 'USD',
+        totalValue: '1000.00',
+        createdBy: USER,
+      })
+      .returning({ id: supplierPos.id })
+
+    const [denim] = await db
+      .insert(items)
+      .values({ companyId: COMPANY, code: 'FAB-DEN', name: '12oz denim', kind: 'fabric', uom: 'yds' })
+      .returning({ id: items.id })
+    const [location] = await db
+      .insert(locations)
+      .values({ companyId: COMPANY, code: 'BOND', name: 'Bonded', kind: 'bonded' })
+      .returning({ id: locations.id })
+
+    // Bought: a GRN with a purchase order behind it.
+    const [boughtGrn] = await db
+      .insert(grns)
+      .values({
+        companyId: COMPANY,
+        challanNo: `IMP-${randomUUID().slice(0, 6)}`,
+        receivedAt: '2026-07-05',
+        supplierPoId: po!.id,
+        createdBy: USER,
+      })
+      .returning({ id: grns.id })
+    const [boughtLine] = await db
+      .insert(grnLines)
+      .values({ companyId: COMPANY, grnId: boughtGrn!.id, itemId: denim!.id, qty: '1300.00', unit: 'yds' })
+      .returning({ id: grnLines.id })
+    const [boughtRoll] = await db
+      .insert(rolls)
+      .values({
+        companyId: COMPANY,
+        grnLineId: boughtLine!.id,
+        itemId: denim!.id,
+        rollNo: 'R-D-19',
+        qty: '1300.00',
+        unit: 'yds',
+        locationId: location!.id,
+      })
+      .returning({ id: rolls.id })
+    boughtRollId = boughtRoll!.id
+
+    // Own: dyed here, no purchase order, nobody to send a claim to.
+    const [ownGrn] = await db
+      .insert(grns)
+      .values({ companyId: COMPANY, challanNo: `DYE-${randomUUID().slice(0, 6)}`, receivedAt: '2026-07-06', createdBy: USER })
+      .returning({ id: grns.id })
+    const [ownLine] = await db
+      .insert(grnLines)
+      .values({ companyId: COMPANY, grnId: ownGrn!.id, itemId: denim!.id, qty: '200.00', unit: 'yds' })
+      .returning({ id: grnLines.id })
+    const [ownRoll] = await db
+      .insert(rolls)
+      .values({
+        companyId: COMPANY,
+        grnLineId: ownLine!.id,
+        itemId: denim!.id,
+        rollNo: 'R-P-01',
+        qty: '200.00',
+        unit: 'yds',
+        locationId: location!.id,
+      })
+      .returning({ id: rolls.id })
+    ownRollId = ownRoll!.id
+
+    // The mill's sheet: this roll failed.
+    await inspectFabric(
+      ctx,
+      {
+        grnId: boughtGrn!.id,
+        rollId: boughtRollId,
+        // 1,000 points over 1,300 yd of 58" cloth is 47.7 per 100 sq yd, against a 40
+        // threshold — a consignment a mill would expect a claim for, not a borderline call.
+        points4: { 1: 100, 2: 100, 3: 100, 4: 100 },
+        inspectedLengthYards: '1300.00',
+        widthInches: '58.00',
+      },
+      POLICY as never,
+    )
+  })
+
+  it('blocks a bought roll the mill’s own sheet failed', async () => {
+    const verdict = await withTenantRead(ctx, (tx) =>
+      resolveFabricInspection(ctx, tx, { rollIds: [boughtRollId] }),
+    )
+    expect(verdict.passed).toBe(false)
+    expect(verdict.reasonKey).toBe('gates.fabric_inspection.failed')
+  })
+
+  it('still lets the factory issue the cloth it made itself', async () => {
+    const verdict = await withTenantRead(ctx, (tx) =>
+      resolveFabricInspection(ctx, tx, { rollIds: [ownRollId] }),
+    )
+    expect(verdict.passed).toBe(true)
+  })
+
+  it('blocks a bought roll nobody inspected at all', async () => {
+    const [denim] = await withTenantRead(ctx, (tx) =>
+      tx.select({ id: items.id }).from(items).where(eq(items.code, 'FAB-DEN')),
+    )
+    const [line] = await withTenantRead(ctx, (tx) =>
+      tx.select({ id: grnLines.id }).from(grnLines).where(eq(grnLines.itemId, denim!.id)),
+    )
+    const [location] = await withTenantRead(ctx, (tx) =>
+      tx.select({ id: locations.id }).from(locations).where(eq(locations.code, 'BOND')),
+    )
+    const [uninspected] = await db
+      .insert(rolls)
+      .values({
+        companyId: COMPANY,
+        grnLineId: line!.id,
+        itemId: denim!.id,
+        rollNo: 'R-D-99',
+        qty: '900.00',
+        unit: 'yds',
+        locationId: location!.id,
+      })
+      .returning({ id: rolls.id })
+
+    const verdict = await withTenantRead(ctx, (tx) =>
+      resolveFabricInspection(ctx, tx, { rollIds: [uninspected!.id] }),
+    )
+    expect(verdict.passed).toBe(false)
+    expect(verdict.reasonKey).toBe('gates.fabric_inspection.not_inspected')
   })
 })
