@@ -22,7 +22,7 @@ import { createDirectClient, createDirectDb } from '@/db/direct'
 import { approvalRules, companies, pendingChanges, users } from '@/db/schema/core'
 import { buyers } from '@/modules/buyers/schema'
 import type { RequestCtx } from '@/modules/core/ctx'
-import { approve } from '@/modules/core/pending-changes'
+import { approve, confirmDraft } from '@/modules/core/pending-changes'
 import { withTenantRead } from '@/modules/core/tenancy'
 import { mockProvider } from '@/modules/marbim/mock-provider'
 import {
@@ -147,6 +147,17 @@ const queue = (over: Record<string, unknown> = {}) =>
  * a test that hand-writes a fixed result cannot satisfy that generic. Everything the tests
  * actually assert on — the confidence map, the method, the refusals — stays fully typed.
  */
+/**
+ * The raiser checks the reading before anybody else is asked.
+ *
+ * An `ai_extraction` draft raised on somebody's behalf lands in `drafted`, not `pending`:
+ * the person who sent the document is the only one holding the paper, so they confirm what
+ * was read off it before it reaches an approver who cannot check it. These tests are about
+ * what happens AFTER that step, so they take it explicitly rather than pretending the
+ * inbox sees an unconfirmed reading.
+ */
+const confirmAsRaiser = (pendingChangeId: string) => confirmDraft(ctx, { pendingChangeId })
+
 const fakeProvider = (
   extract: (request: ExtractRequest<unknown>) => Promise<ExtractResult<unknown>>,
 ): MarbimProvider => ({
@@ -198,6 +209,7 @@ describe('X.2 · the extraction pipeline', () => {
     const queued = await queue()
     const { pendingChangeId } = await runExtraction(ctx, { jobId: queued.jobId }, POLICY)
 
+    await confirmAsRaiser(pendingChangeId!)
     const approved = await approve(ownerCtx, { pendingChangeId: pendingChangeId! })
     expect(approved.status).toBe('committed')
 
@@ -352,6 +364,7 @@ describe('X.2 · correction telemetry', () => {
     await reset()
 
     const v1 = await runExtraction(ctx, { jobId: (await queue()).jobId }, POLICY)
+    await confirmAsRaiser(v1.pendingChangeId!)
     await approve(ownerCtx, {
       pendingChangeId: v1.pendingChangeId!,
       corrections: { title: 'Basic crew tee (corrected)' },
@@ -362,6 +375,7 @@ describe('X.2 · correction telemetry', () => {
       { jobId: (await queue({ extractorVersion: '2.0.0' })).jobId },
       POLICY,
     )
+    await confirmAsRaiser(v2.pendingChangeId!)
     await approve(ownerCtx, { pendingChangeId: v2.pendingChangeId! })
 
     const scores = await extractorScores(ctx)

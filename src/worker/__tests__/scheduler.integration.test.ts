@@ -13,6 +13,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { createDirectClient, createDirectDb } from '@/db/direct'
 import { companies } from '@/db/schema/core'
+import { env } from '@/lib/env'
 import { getQueue, QUEUE, closeQueues } from '@/worker/queues'
 import {
   activeScheduledTasks,
@@ -157,9 +158,16 @@ describe('scheduler', () => {
      * skip rather than throwing, which `recordRun` closed as succeeded. Job health reported
      * green for a task that had extracted nothing and never would.
      *
-     * The integration environment runs with the flag off, which is the default and the
-     * honest setting today, so this asserts the off case directly.
+     * The flag is off by default, which is the honest setting today, and this asserts the
+     * off case directly. A developer running the copilot against real models has it ON in
+     * their own `.env` — so the case is SKIPPED there rather than failing, because a red
+     * that only means "your environment differs from CI" teaches people to ignore reds.
      */
+    if (env.MARBIM_ENABLED) {
+      console.log('[scheduler] MARBIM_ENABLED is on in this environment — skipping the off case')
+      return
+    }
+
     const marbimTasks = SCHEDULED_TASKS.filter(
       (task) => !activeScheduledTasks().some((active) => active.id === task.id),
     )
