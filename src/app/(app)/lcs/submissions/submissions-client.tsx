@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 
 import { InlineAlert, Modal } from '@/components/fx/feedback'
+import { ReadIntoForm, type ReadFields } from '@/components/shell/read-into-form'
 import { actionErrorMessage } from '@/lib/action-error'
 import { unwrap } from '@/lib/action-failure'
 import { Badge, Button } from '@/components/fx/primitives'
@@ -99,6 +100,31 @@ export function SubmissionsClient({
   const [realizing, setRealizing] = useState<Submission | null>(null)
   const [amount, setAmount] = useState('')
   const [reason, setReason] = useState('')
+  const [valueDate, setValueDate] = useState('')
+  const [adviceNote, setAdviceNote] = useState<string | null>(null)
+
+  /**
+   * The advice, into the dialog (build plan 3.1) — the last desk that typed everything
+   * from paper. The figures fill; the shortfall reason NEVER does, because a deduction
+   * this size is a dispute or a discount and the explanation is a judgement, not a
+   * transcription. Mismatched credit numbers are said, not silently accepted: an advice
+   * for another LC posted against this submission closes the wrong receivable.
+   */
+  function fillFromAdvice(read: ReadFields) {
+    const v = read.values
+    const str = (x: unknown) => (x === null || x === undefined ? '' : String(x))
+    if (v.realizedAmount !== undefined) setAmount(str(v.realizedAmount))
+    if (v.realizedAt !== undefined) setValueDate(str(v.realizedAt))
+
+    const notes: string[] = []
+    const advLc = str(v.lcNumber)
+    if (advLc && realizing && !advLc.startsWith(realizing.lcNumber) && !realizing.lcNumber.startsWith(advLc)) {
+      notes.push(`The advice names ${advLc} and this presentation is under ${realizing.lcNumber} — check you have the right one.`)
+    }
+    const deductions = Array.isArray(v.deductions) ? (v.deductions as unknown[]).map(str).filter(Boolean) : []
+    if (deductions.length > 0) notes.push(`Deductions on the advice: ${deductions.join(' · ')}.`)
+    setAdviceNote(notes.length > 0 ? notes.join(' ') : null)
+  }
 
   const [noted, setNoted] = useState<string | null>(null)
   const [failure, setFailure] = useState<string | null>(null)
@@ -158,7 +184,8 @@ export function SubmissionsClient({
             submissionId: realizing.id,
             lcId: realizing.lcId,
             realizedAmount: amount.trim(),
-            realizedAt: today,
+            // The advice's VALUE date when one was read; today when typed by hand.
+            realizedAt: valueDate || today,
             ...(reason.trim() ? { shortfallReason: reason.trim() } : {}),
           }),
         )
@@ -359,6 +386,13 @@ export function SubmissionsClient({
           }
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <ReadIntoForm
+              kindId="bank_advice"
+              prompt="the bank's realization advice"
+              onFilled={fillFromAdvice}
+            />
+            {adviceNote ? <InlineAlert tone="warning">{adviceNote}</InlineAlert> : null}
+
             <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <span style={fieldLabel}>Amount credited ({realizing.currency})</span>
               <input
@@ -368,6 +402,12 @@ export function SubmissionsClient({
                 style={control}
               />
             </label>
+
+            {valueDate ? (
+              <span style={{ font: "400 12px/1.4 var(--fx-font-mono)", color: 'var(--fx-text-tertiary)' }}>
+                value date {valueDate} — off the advice
+              </span>
+            ) : null}
 
             <span style={{ font: "400 12px/1.6 var(--fx-font-mono)", color: 'var(--fx-text-tertiary)' }}>
               Invoiced {realizing.invoicedAmount ?? '—'} {realizing.currency}

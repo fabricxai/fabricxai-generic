@@ -208,7 +208,33 @@ export const lcFromSwiftDraft = z.object({
   docsRequired: transcribedDocs,
 })
 
+/**
+ * A bank's export-proceeds realization advice, as a model reads it (build plan 3.1).
+ *
+ * The one field that stays deliberately human is the SHORTFALL REASON. `postRealization`
+ * demands a written reason above the policy threshold because a large deduction is a
+ * dispute or a discount, and the only chance to find out which is somebody writing it
+ * down — a model drafting that sentence would be inventing the explanation of a dispute
+ * it knows nothing about. The reader fills the figures; the person explains the gap.
+ */
+export const realizationFromAdviceDraft = z.object({
+  /** The bank's own reference — "EBL/TS/EXP/2026/18847". */
+  reference: z.string().max(120).optional().catch(undefined),
+  /** What actually landed, after the bank's deductions. */
+  realizedAmount: transcribedAmount,
+  /** The VALUE date — when the money credited, not when the advice printed. */
+  realizedAt: calendarDate.optional().catch(undefined),
+  /** What the advice says was invoiced — a check against the submission, never a write. */
+  documentValue: transcribedAmount.optional().catch(undefined),
+  /** The bank's own line items — "FOREIGN BANK CHARGES USD 68.50", as stated. */
+  deductions: z.array(z.string().max(200)).default([]).catch([]),
+  /** The credit and EXP the advice names, so the screen can say when they mismatch. */
+  lcNumber: z.string().max(60).optional().catch(undefined),
+  expNumber: z.string().max(60).optional().catch(undefined),
+})
+
 export const COMMERCIAL_ZOD_MAP = {
+  realization_from_advice_v1: realizationFromAdviceDraft,
   ud_from_scan_v1: udFromScanDraft,
   ud_override_v1: udOverrideDraft,
   lc_from_swift_v1: lcFromSwiftDraft,

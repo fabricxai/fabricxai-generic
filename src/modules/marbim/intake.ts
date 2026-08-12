@@ -200,6 +200,16 @@ export const INTAKE_KINDS: readonly IntakeKind[] = [
     fillsFormOnly: true,
   },
   {
+    id: 'bank_advice',
+    label: 'A realization advice',
+    hint: "The bank's export-proceeds advice. Fills what landed, when, and what was deducted.",
+    moduleId: 'commercial',
+    targetTable: 'doc_submissions',
+    zodSchemaKey: 'realization_from_advice_v1',
+    roles: ['finance', 'commercial'],
+    fillsFormOnly: true,
+  },
+  {
     id: 'ud_scan',
     label: 'A customs Utilization Declaration',
     hint: 'The UD paper for duty-free bonded material. Drafts the authorised items and quantities.',

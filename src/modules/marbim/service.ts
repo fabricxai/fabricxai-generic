@@ -124,6 +124,25 @@ const HISTORY_BUDGET_CHARS = 12_000
  * is the kind that has to be prevented at the instruction.
  */
 const TARGET_NOTES: Record<string, readonly string[]> = {
+  doc_submissions: [
+    'This is a bank\'s EXPORT PROCEEDS REALIZATION ADVICE — the letter saying the buyer\'s',
+    'payment landed.',
+    '',
+    'Two amounts appear and they are different on purpose: the DOCUMENT VALUE (what was',
+    'invoiced) and the AMOUNT REALIZED (what actually credited, after the bank\'s own',
+    'deductions). `realizedAmount` is the second one. Reading the invoice figure as the',
+    'realized one hides the deduction, which is the whole thing this document reports.',
+    '',
+    '`realizedAt` is the VALUE date — "VALUE 02 DEC 2026" — when the money credited, not',
+    'the date printed at the top of the advice.',
+    '',
+    'DEDUCTIONS: transcribe each line as written ("FOREIGN BANK CHARGES USD 68.50",',
+    '"COURIER USD 30.00"). Do not sum them, do not explain them — whether a deduction is',
+    'normal charges or a dispute is a judgement the person posting makes.',
+    '',
+    'A BDT-credited figure and an exchange rate often appear; they are the local leg and',
+    'not the realized amount, which stays in the invoice currency.',
+  ],
   cut_reports: [
     'This is a CUTTING SHEET from the table — handwritten, photographed, often with fabric',
     'dust on it.',

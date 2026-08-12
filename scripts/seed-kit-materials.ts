@@ -257,6 +257,7 @@ async function main(): Promise<void> {
     await fourPoint(ctx)
     await firstIssue(ctx, orderIds, itemIds)
     await report(ctx, udIds)
+    await phase3Fixtures(ctx, orderIds)
 
     console.log('\n[kit] done. Five traps are armed and unfired — see the header.')
   } finally {
@@ -797,6 +798,141 @@ async function firstIssue(
   console.log(
     `[kit] ISS-114 · ${free.length} shade-A rolls · ${total.toFixed(2)} kg → PO-BF-2044 · ${issued.warnings.length} warnings`,
   )
+}
+
+/**
+ * The Phase-3 fixtures (build plan 3.0) — the rows the last two AI doors need to exist
+ * before they can be tested against anything.
+ *
+ * · **A PP approval and an open lay for PO-BF-2044.** The cut-sheet reader refuses a
+ *   photograph naming a different lay, so the lay is created as the kit's own LAY-32, on
+ *   the rolls the kit assigns it, and left WITHOUT a cut report — an open lay is the state
+ *   the report screen exists for. The PP approval goes through the real sampling flow
+ *   (request → stages → dispatch → buyer verdict), because a lay behind an unapproved PP
+ *   would need the gate written around, and a gate a seed writes around has never run.
+ *
+ * · **A bank submission under LC-4471, accepted, invoiced at USD 122,400.** Exactly what
+ *   the kit's realization advice describes (BF-INV-2044-1, 18,000 pcs at 6.80), so the
+ *   advice reader posts against the submission the paper is actually about. Opened without
+ *   a shipment — the presentation is the fixture, not the logistics behind it — and walked
+ *   preparing → submitted → accepted through the machine, since a realization may only land
+ *   on an accepted presentation.
+ */
+async function phase3Fixtures(ctx: RequestCtx, orderIds: Map<string, string>): Promise<void> {
+  const { advanceStage, createSampleRequest, dispatchSample, recordFeedback } = await import(
+    '@/modules/sampling/service'
+  )
+  const { createLay, createMarker } = await import('@/modules/cutting/service')
+  const { openSubmission, setSubmissionStatus } = await import('@/modules/commercial/service')
+  const { sampleRequests } = await import('@/modules/sampling/schema')
+  const { lays, markers } = await import('@/modules/cutting/schema')
+  const { docSubmissions } = await import('@/modules/commercial/schema')
+  const { orderStyles } = await import('@/modules/orders/schema')
+  const { rolls } = await import('@/modules/store/schema')
+
+  const orderId = orderIds.get('PO-BF-2044')
+  if (!orderId) return
+
+  // ── the PP verdict that opens cutting ──
+  const [existingPp] = await withTenantRead(ctx, (tx) =>
+    tx.select({ id: sampleRequests.id }).from(sampleRequests).where(eq(sampleRequests.requestNo, 'SR-2610-PP')),
+  )
+  if (!existingPp) {
+    const { sampleRequestId } = await createSampleRequest(ctx, {
+      orderId,
+      type: 'pp',
+      styleCode: 'ST-2610',
+      requestNo: 'SR-2610-PP',
+      dueDate: '2026-09-20',
+    })
+    for (const [i, stage] of (['pattern', 'cutting', 'sewing', 'finishing', 'qc', 'dispatched'] as const).entries()) {
+      await advanceStage(ctx, {
+        sampleRequestId,
+        stage,
+        occurredAt: new Date(Date.UTC(2026, 8, 10 + i, 9, 30)).toISOString(),
+      })
+    }
+    await dispatchSample(ctx, {
+      sampleRequestId,
+      courier: 'DHL Express',
+      awb: '7412 9930 226',
+      dispatchedAt: new Date(Date.UTC(2026, 8, 16, 16, 0)).toISOString(),
+    })
+    // The kit's own document: 22-BSL-PP-approval-ST-2610 — the buyer said yes.
+    await recordFeedback(ctx, {
+      sampleRequestId,
+      verdict: 'approved',
+      recordedOn: '2026-09-22',
+    })
+    console.log('[kit] SR-2610-PP approved — cutting open on PO-BF-2044')
+  }
+
+  // ── the marker and the open lay ──
+  const [existingLay] = await withTenantRead(ctx, (tx) =>
+    tx.select({ id: lays.id }).from(lays).where(eq(lays.layNo, 'LAY-32')),
+  )
+  if (!existingLay) {
+    const [style] = await withTenantRead(ctx, (tx) =>
+      tx.select({ id: orderStyles.id }).from(orderStyles).where(eq(orderStyles.orderId, orderId)),
+    )
+    let [marker] = await withTenantRead(ctx, (tx) =>
+      tx.select({ id: markers.id }).from(markers).where(eq(markers.code, 'ST-2610-A')),
+    )
+    if (!marker) {
+      const created = await createMarker(ctx, {
+        code: 'ST-2610-A',
+        styleCode: 'ST-2610',
+        // The kit's ratio: S1 M2 L2 XL1 at 86.4% on 180cm cloth.
+        sizeRatio: { S: 1, M: 2, L: 2, XL: 1 },
+        layLengthMeters: '9.60',
+        efficiencyPct: '86.4',
+      })
+      marker = { id: created.markerId }
+    }
+
+    const kitRolls = await withTenantRead(ctx, (tx) =>
+      tx.select({ id: rolls.id, rollNo: rolls.rollNo }).from(rolls).where(inArray(rolls.rollNo, ['R-P-04', 'R-P-05'])),
+    )
+    await createLay(ctx, {
+      orderId,
+      orderStyleId: style!.id,
+      markerId: marker.id,
+      layNo: 'LAY-32',
+      color: 'White',
+      plies: 118,
+      layLengthMeters: '9.60',
+      rollsDrawn: kitRolls.map((r) => r.id),
+    })
+    console.log('[kit] LAY-32 spread on White · 118 plies · open, waiting for its cut report')
+  }
+
+  // ── the accepted presentation the realization advice pays ──
+  const [existingSub] = await withTenantRead(ctx, (tx) =>
+    tx
+      .select({ id: docSubmissions.id })
+      .from(docSubmissions)
+      .where(eq(docSubmissions.invoicedAmount, '122400.00')),
+  )
+  if (!existingSub) {
+    const [lc] = await withTenantRead(ctx, (tx) =>
+      tx.select({ id: lcs.id }).from(lcs).where(eq(lcs.number, 'LC-4471')),
+    )
+    if (lc) {
+      const { submissionId } = await openSubmission(ctx, {
+        lcId: lc.id,
+        docs: [
+          { kind: 'commercial_invoice', status: 'ready' },
+          { kind: 'packing_list', status: 'ready' },
+          { kind: 'bl', status: 'ready' },
+        ],
+        invoicedAmount: '122400.00',
+        currency: 'USD',
+      })
+      await setSubmissionStatus(ctx, { submissionId, bankStatus: 'submitted', submittedAt: '2026-11-14' })
+      await setSubmissionStatus(ctx, { submissionId, bankStatus: 'accepted' })
+      console.log('[kit] presentation under LC-4471 · USD 122,400 · accepted, awaiting realization')
+    }
+  }
 }
 
 /** What a person opening the screens next should see. */

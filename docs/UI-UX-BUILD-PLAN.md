@@ -138,13 +138,13 @@ Both follow the `fillsFormOnly` pattern established this week (schema → intake
 → ReadIntoForm in the dialog → verify against a real document). The blocker for both is fixture
 data, not code — do the fixtures first.
 
-- [ ] **3.0 🅜 Fixtures: a bank submission and a measurement spec in Test Textile.** Drive the
+- [x] **3.0 🅜 Fixtures. ✅** — narrower and deeper than planned: instead of driving SHP-2044-1's logistics, the seeder now raises the PP approval for ST-2610 through the real sampling flow, spreads the kit's own LAY-32 open on the kit's rolls, and opens an accepted USD 122,400 presentation under LC-4471 — exactly the submission the kit's advice pays. All idempotent, all through services. Drive the
   kit's shipment SHP-2044-1 far enough through the real services that a submission exists in
   `preparing`/`submitted` (packing → ex-factory → EXP → docs → submission), and confirm the
   measurement chart kind (`measurement_chart`, already queued-path) has a target order. Extend
   `seed-kit-materials.ts` behind an existence guard, same idempotency style as the rest.
   *Verify:* re-runnable; `doc_submissions` has one row for the kit shipment.
-- [ ] **3.1 🅜 Finance: the bank realization advice.** `realization_from_advice_v1` draft schema
+- [x] **3.1 🅜 Finance: the bank realization advice. ✅** — verified against the kit's EBL advice end to end: 122,301.50 read, value date 2026-12-02 off the paper (not today), both deductions transcribed verbatim as notes, posted through postRealization with the 0.08% shortfall computed. The shortfall reason stays human, as specified. `realization_from_advice_v1` draft schema
   (realized amount, value date, charges/deductions as stated-only fields — never zeroed, same
   `stated()` rule as the proforma), intake kind `bank_advice` (`fillsFormOnly`, roles finance +
   commercial), TARGET_NOTES for the advice's shape (the credited figure vs the invoice figure;
@@ -153,13 +153,13 @@ data, not code — do the fixtures first.
   Dialog on the submission row. Test against the kit's `16-bank-realization-advice-EBL.pdf`.
   *Verify:* the kit advice fills amount + date; shortfall reason field stays empty and required
   when the gap exceeds policy; the same hourly limit + ledger row as every reading.
-- [ ] **3.2 🅜 Quality: the measurement chart, inline.** The queued kind exists; add the inline
+- [ ] **3.2 🅜 Quality: the measurement chart, inline. DEFERRED** — the task's premise doesn't hold: `/quality/measurements` has no spec editor to fill (it records values against specs that arrive via the queued `measurement_chart` door, which works). An inline door means building the editor first — a bigger piece than this plan sized, and the queued path already covers chart→spec. The queued kind exists; add the inline
   door on `/quality/measurements` — "load the spec off the chart" filling the spec editor
   (points, spec values, tolerances with the fold-across rule the zod already has). Test against
   `19-measurement-sheet-PP-PHOTO.jpg`.
   *Verify:* the photo fills ≥ the chart's stated points; symmetric "Tol ±" folds to both columns;
   a size column the chart lacks stays absent.
-- [ ] **3.3 🅛 Drive the two untested doors end-to-end (cutting sheet, packing list).** Blocked
+- [x] **3.3 🅛 Drive the two untested doors. ✅ cutting / ⏸ packing** — the kit's LAY-32 photo fills White/L with 1216 (the tolerance trap, now armed on a real open lay) and says which sizes the sheet lacks rather than zeroing them. The packing-list door stays undriven for the right reason: PO-BF-2044 has nothing finished, so the over-pack gate would refuse every carton — which is the gate working. Needs finishing outputs first; falls to the mobile programme's carton work. Blocked
   on fixtures the same way: an open lay for `LAY-32` (cutting) and the 3.0 shipment mid-pack.
   Not new code — the audit's honest caveat closed.
   *Verify:* kit photo `09-cutting-sheet-LAY-32-PHOTO.jpg` fills the report's actual column;
