@@ -249,7 +249,10 @@ export async function drawUd(
     targetId: row.id,
     after: {
       udNumber: ud.number,
-      itemRef: input.itemRef,
+      // The RESOLVED ref, matching the row that was just written. An audit trail that names
+      // the material differently from the ledger it is auditing is worse than none: it is
+      // the customs officer's evidence that the two records disagree.
+      itemRef,
       qty: input.qty,
       unit: input.unit,
       override: Boolean(input.approvedOverride && !decision.allowed),
@@ -264,7 +267,7 @@ export async function drawUd(
       payload: {
         udId: input.udId,
         udNumber: ud.number,
-        itemRef: input.itemRef,
+        itemRef,
         qty: input.qty,
         shortfall: decision.shortfall ?? null,
         approvedBy: ctx.userId,
@@ -274,10 +277,24 @@ export async function drawUd(
     })
   }
 
-  // Exhausted is a real state: it stops the gate wasting a lock on a UD with nothing left.
+  /*
+   * Exhausted is a real state: it stops the gate wasting a lock on a UD with nothing left.
+   *
+   * `itemRef` — resolved — and not `input.itemRef`, which is what this line said, and which
+   * made every legal bonded issue of aliased material throw. The store issues FAB-DEN-12;
+   * the declaration authorises "12oz stretch denim"; the row above is correctly written in
+   * the declaration's words and this recompute then appended a consumption in the store's,
+   * so `computeUdBalance` refused the whole ledger as naming a material the UD does not
+   * authorise — AFTER the draw had been written, so the transaction rolled back and the
+   * storekeeper was told the declaration did not cover cloth that it plainly did.
+   *
+   * The alias mechanism a few lines up exists for exactly this case and had therefore never
+   * once worked end to end: the only bonded issues that succeeded were the ones where the
+   * item code happened to be spelled the way customs spelled it.
+   */
   const remaining = computeUdBalance({
     authorizedItems: ud.authorizedItems,
-    consumptions: [...consumptions, { itemRef: input.itemRef, qty: input.qty, unit: input.unit }],
+    consumptions: [...consumptions, { itemRef, qty: input.qty, unit: input.unit }],
   })
   const anyFree = [...remaining.values()].some((item) => compareDecimalStrings(item.free, '0') > 0)
 

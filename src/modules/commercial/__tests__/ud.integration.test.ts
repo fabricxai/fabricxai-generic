@@ -320,3 +320,72 @@ describe('2.2 · the overdraw override', () => {
     expect(Number(overrides[0]!.qty)).toBe(overdraw)
   })
 })
+
+/**
+ * The customs paper and the store speak different languages, and the ledger must be kept in
+ * the paper's.
+ *
+ * `drawUd` takes aliases for exactly this: a declaration authorises "12oz stretch denim"
+ * because that is what the customs officer wrote, and the storekeeper issues FAB-DEN-12
+ * because that is what is on the shelf label. The resolution worked and then the same
+ * function recomputed the balance under the store's word, so `computeUdBalance` refused the
+ * ledger as naming an unauthorised material — after the row was written, so the whole issue
+ * rolled back and the storekeeper was told the declaration did not cover cloth it plainly
+ * did (live-test kit, Phase 4).
+ *
+ * Which means the alias path had never once completed. These two assert both halves: that
+ * the draw goes through, and that what it wrote is in the declaration's vocabulary.
+ */
+describe('2.2 · the declaration’s vocabulary, not the store’s', () => {
+  const ALIASED = randomUUID()
+
+  it('draws against an alias and keeps the ledger consistent', async () => {
+    await db.insert(uds).values({
+      id: ALIASED,
+      companyId: COMPANY_A,
+      number: 'UD/DHK/2026/0421',
+      validUntil: '2026-12-31',
+      authorizedItems: [{ itemRef: '12oz stretch denim', qty: '24000.00', unit: 'yds' }],
+      createdBy: USER_A,
+    })
+
+    const { decision } = await drawUdStandalone(ctxA, {
+      udId: ALIASED,
+      // What the store calls it …
+      itemRef: 'FAB-DEN-12',
+      // … and what customs called it.
+      itemRefAliases: ['12oz stretch denim'],
+      qty: '1200.00',
+      unit: 'yds',
+      today: TODAY,
+    })
+
+    expect(decision.allowed).toBe(true)
+    expect(decision.itemRef).toBe('12oz stretch denim')
+
+    // The balance still reads, which is the assertion that actually failed before: a ledger
+    // holding both names is one `computeUdBalance` refuses outright.
+    const balance = await getUdBalance(ctxA, ALIASED)
+    const item = balance.items.find((i) => i.itemRef === '12oz stretch denim')!
+    expect(item.free).toBe('22800.00')
+  })
+
+  it('records the consumption under the declaration’s wording', async () => {
+    const rows = await withTenantRead(ctxA, (tx) =>
+      tx.select().from(udConsumptions).where(eq(udConsumptions.udId, ALIASED)),
+    )
+    expect(rows).toHaveLength(1)
+    expect(rows[0]!.itemRef).toBe('12oz stretch denim')
+
+    // And the audit row agrees with the ledger row. It used to say FAB-DEN-12 — an audit
+    // trail naming the material differently from the record it audits is the customs
+    // officer's evidence that the two disagree.
+    const audit = await db.execute<{ item_ref: string }>(sql`
+      select after ->> 'itemRef' as item_ref
+      from audit_log
+      where company_id = ${COMPANY_A} and target_table = 'ud_consumptions' and target_id = ${rows[0]!.id}
+    `)
+    const auditRows = Array.isArray(audit) ? audit : ((audit as { rows?: unknown[] }).rows ?? [])
+    expect((auditRows as { item_ref: string }[])[0]!.item_ref).toBe('12oz stretch denim')
+  })
+})
