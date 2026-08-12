@@ -139,6 +139,22 @@ export const INTAKE_KINDS: readonly IntakeKind[] = [
     fillsFormOnly: true,
   },
   {
+    /*
+     * The quote screen did not exist and neither did this. `recordSupplierQuote` has been in
+     * the service since 5.5, reachable only from the approve inbox's commit handler — so a
+     * procurement officer holding three proformas could compare nothing, because there was
+     * nowhere to put any of them.
+     */
+    id: 'supplier_proforma',
+    label: 'A supplier proforma or quotation',
+    hint: 'The price a mill or trader sent back. Drafts the quote, its lines and the terms.',
+    moduleId: 'procurement',
+    targetTable: 'supplier_quotes',
+    zodSchemaKey: 'quote_from_proforma_v1',
+    roles: ['procurement', 'commercial'],
+    fillsFormOnly: true,
+  },
+  {
     id: 'ud_scan',
     label: 'A customs Utilization Declaration',
     hint: 'The UD paper for duty-free bonded material. Drafts the authorised items and quantities.',

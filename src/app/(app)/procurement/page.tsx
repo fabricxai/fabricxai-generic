@@ -11,6 +11,7 @@ import { canWrite, NAV } from '@/components/shell/nav'
 import { getCtx } from '@/modules/core/session'
 import { companyProfile } from '@/modules/settings/service'
 import { NewRequisitionButton } from './new-requisition'
+import { NewQuoteButton } from './new-quote'
 import { NewSupplierButton } from './new-supplier'
 
 import {
@@ -37,10 +38,11 @@ export default async function ProcurementPage() {
   if (!ctx) redirect('/login')
 
   const now = new Date()
-  const [pos, suppliers, requisitions] = await Promise.all([
+  const [pos, suppliers, requisitions, items] = await Promise.all([
     purchaseOrders(ctx, { now }),
     supplierBook(ctx),
     openRequisitions(ctx, { now }),
+    itemList(ctx),
   ])
 
   const ungated = pos.filter((p) => p.importWithoutBtb)
@@ -64,7 +66,16 @@ export default async function ProcurementPage() {
         actions={
           mayWrite ? (
             <div style={{ display: 'flex', gap: 10 }}>
-              <NewRequisitionButton items={await itemList(ctx)} />
+              <NewRequisitionButton items={items} />
+              <NewQuoteButton
+                requisitions={requisitions.map((r) => ({
+                  id: r.id,
+                  prNo: r.prNo,
+                  neededBy: r.neededBy,
+                }))}
+                suppliers={suppliers.map((s) => ({ id: s.id, name: s.name, origin: s.origin }))}
+                items={items}
+              />
               <NewSupplierButton />
             </div>
           ) : undefined

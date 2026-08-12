@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react'
 
 import { InlineAlert } from '@/components/fx/feedback'
 import { ReadIntoForm, type ReadFields } from '@/components/shell/read-into-form'
+import { matchItem } from '@/lib/match-item'
 import { SyncPill } from '@/components/fx/floor'
 import { useT } from '@/components/fx/locale'
 import { Button } from '@/components/fx/primitives'
@@ -33,54 +34,6 @@ interface LocationOption {
   code: string
   name: string
   kind: string
-}
-
-/**
- * The supplier's words for a material against this factory's own list.
- *
- * Exact code, then exact name, then the same WORDS in any order — because a challan writes
- * "Cotton Yarn 30/1 Combed" for the item somebody set up as "30/1 combed cotton yarn", and
- * those are the same thing to everyone except a string comparison. Overlap alone is not
- * enough: "cotton yarn" would then match every cotton item in the store, so the match has to
- * be the whole token set, both ways.
- *
- * No match returns null and the screen SAYS so. A near-miss silently resolved to the wrong
- * item is a receipt against the wrong material, which is worse than a question.
- */
-function matchItem(
-  items: readonly { id: string; code: string; name: string }[],
-  code: string,
-  name: string,
-): { id: string; code: string; name: string } | null {
-  const tokens = (value: string) =>
-    new Set(
-      value
-        .toLowerCase()
-        .replace(/[^a-z0-9/.]+/g, ' ')
-        .split(' ')
-        .filter(Boolean),
-    )
-
-  const wantedCode = code.trim().toLowerCase()
-  if (wantedCode) {
-    const byCode = items.find((i) => i.code.toLowerCase() === wantedCode)
-    if (byCode) return byCode
-  }
-
-  const wantedName = name.trim().toLowerCase()
-  if (!wantedName) return null
-
-  const exact = items.find((i) => i.name.toLowerCase() === wantedName)
-  if (exact) return exact
-
-  const wanted = tokens(wantedName)
-  const sameWords = items.find((i) => {
-    const mine = tokens(i.name)
-    if (mine.size !== wanted.size) return false
-    for (const token of wanted) if (!mine.has(token)) return false
-    return true
-  })
-  return sameWords ?? null
 }
 
 interface RollDraft {

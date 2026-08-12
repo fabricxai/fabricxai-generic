@@ -124,6 +124,31 @@ const HISTORY_BUDGET_CHARS = 12_000
  * is the kind that has to be prevented at the instruction.
  */
 const TARGET_NOTES: Record<string, readonly string[]> = {
+  supplier_quotes: [
+    'This is a PROFORMA INVOICE or quotation from a mill, trader or accessories supplier.',
+    '',
+    'ITEMS: `itemName` is the supplier\'s own description, word for word — "12 OZ STRETCH',
+    'DENIM, 98PCT COTTON 2PCT SPANDEX, CUTTABLE WIDTH 58IN, INDIGO". Do not shorten it or',
+    'translate it into a category: the screen matches it against this factory\'s list and',
+    'shows what it matched, and a tidied description matches the wrong thing. An article',
+    'or style number ("ART GR-1288S") goes in `itemCode`.',
+    '',
+    'PRICES: `unitPrice` is per unit, not the line total. "USD 3.35/YD" is 3.35. The total',
+    'is a check, not a field — if the line says 23,500 YDS at USD 3.35 and totals 78,725,',
+    'the unit price is 3.35.',
+    '',
+    'THE TERMS ARE IN THE PROSE, and they are what makes two quotes comparable:',
+    '',
+    '  · `leadTimeDays` — "SHIPMENT: WITHIN 25 DAYS AFTER RECEIPT OF WORKABLE L/C" is 25.',
+    '    A calendar date instead of a number of days is not a lead time; leave it out.',
+    '  · `priceTerm` — CFR, CIF, FOB, EXW, DDP, exactly as printed. This decides whether',
+    '    freight is already in the price, and a buyer comparing an FOB quote with a CFR one',
+    '    on unit price alone has compared nothing.',
+    '  · `moq` — a stated minimum order quantity, when there is one.',
+    '',
+    'Do NOT invent freight or duty. If the paper does not state a figure, leave the field',
+    'out — a zero is a claim that shipping is free, and it will be ranked as one.',
+  ],
   grns: [
     'This is a DELIVERY CHALLAN — a supplier\'s note of what was sent, usually a phone',
     'photograph of a carbon-copy pad, often handwritten, sometimes at an angle.',
