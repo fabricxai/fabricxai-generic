@@ -1,0 +1,27 @@
+Dhaka Trims House
+148/A Tejgaon Industrial Area, Dhaka 1208, Bangladesh
+
+QUOTATION — DTH-Q-2026-337 · 2026-09-18
+
+To: Test Textile Ltd, Attn: Procurement
+Ref: your RFQ for style ST-2815, NKA-PO-70318
+Quotation no: DTH-Q-2026-337
+Date: 2026-09-18
+Valid until: 2026-10-31
+Price term: EXW Dhaka
+Currency: BDT
+
+Item ref        Description                                              Qty   Unit  Rate BDT   Amount BDT     MOQ  Lead
+TRM-ZIP-OE65    YKK #5 moulded open-end zipper 65 cm, auto-lock          42,840  pcs      34.50  1,477,980.00   10,000  21 d
+TRM-CORD-8      flat drawcord 8 mm × 130 cm, heat tipped                 43,260  pcs       7.20    311,472.00   20,000  14 d
+TRM-EYELET-8    metal eyelet 8 mm, nickel-free antique silver            86,520  pcs       1.15     99,498.00   50,000  14 d
+TRM-LBL-MAIN    woven main label, size-specific                          42,840  pcs       2.60    111,384.00    5,000  18 d
+TRM-LBL-CARE    printed care and content label, 5 language               42,840  pcs       1.40     59,976.00    5,000  18 d
+Total, EXW Dhaka                                                                         2,060,310.00
+
+TERMS
+Payment: 30 days from delivery against challan
+Delivery: to your Ashulia gate, our transport
+Part delivery: allowed, minimum 25% per drop
+Zipper origin: YKK Bangladesh, Ishwardi EPZ
+Rates exclude VAT.

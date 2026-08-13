@@ -1,0 +1,61 @@
+{
+  "_intakeKind": "supplier_proforma",
+  "_door": "/procurement → New quote → 'read a proforma'",
+  "reference": "DTH-Q-2026-337",
+  "quotedOn": "2026-09-18",
+  "validUntil": "2026-10-31",
+  "currency": "BDT",
+  "priceTerm": "EXW Dhaka",
+  "lines": [
+    {
+      "itemCode": "TRM-ZIP-OE65",
+      "itemName": "YKK #5 moulded open-end zipper 65 cm, auto-lock",
+      "qty": "42840",
+      "unit": "pcs",
+      "unitPrice": "34.50",
+      "leadTimeDays": 21,
+      "moq": "10000"
+    },
+    {
+      "itemCode": "TRM-CORD-8",
+      "itemName": "flat drawcord 8 mm × 130 cm, heat tipped",
+      "qty": "43260",
+      "unit": "pcs",
+      "unitPrice": "7.20",
+      "leadTimeDays": 14,
+      "moq": "20000"
+    },
+    {
+      "itemCode": "TRM-EYELET-8",
+      "itemName": "metal eyelet 8 mm, nickel-free antique silver",
+      "qty": "86520",
+      "unit": "pcs",
+      "unitPrice": "1.15",
+      "leadTimeDays": 14,
+      "moq": "50000"
+    },
+    {
+      "itemCode": "TRM-LBL-MAIN",
+      "itemName": "woven main label, size-specific",
+      "qty": "42840",
+      "unit": "pcs",
+      "unitPrice": "2.60",
+      "leadTimeDays": 18,
+      "moq": "5000"
+    },
+    {
+      "itemCode": "TRM-LBL-CARE",
+      "itemName": "printed care and content label, 5 language",
+      "qty": "42840",
+      "unit": "pcs",
+      "unitPrice": "1.40",
+      "leadTimeDays": 18,
+      "moq": "5000"
+    }
+  ],
+  "_notes": [
+    "Currency is BDT, not USD. The schema defaults to USD when it cannot read one — a quote that comes back in dollars at BDT rates prices a zipper at USD 34.50 and the costing studio will believe it.",
+    "Five lines. Rates carry two decimals including 1.15 and 7.20; a rate that arrives as 1.2 or 7.2 has been through a float.",
+    "freight and dutyPct are absent from this paper — both must come back absent."
+  ]
+}

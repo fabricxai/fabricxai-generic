@@ -1,0 +1,33 @@
+Test Textile Ltd
+FABRIC INSPECTION REPORT — 4-POINT SYSTEM (ASTM D5430)
+Lot HL-L1-CHM · challan ZJH-DC-8842
+
+Report no: FI-FAB-2815-01
+Inspection date: 2026-11-13
+Material: FAB-FLC-280 brushed fleece 280 g/m2
+Supplier: Zhejiang Hualing Knitting Co., Ltd
+Colour: Charcoal Melange
+Lot received: 60 rolls · 1,567.0 kg
+Rolls inspected: 12 (20%)
+Acceptance limit: 20 points per 100 sq yd
+
+Roll     Shade  Yards inspected  Defect points  Points/100 sq yd  Verdict
+R-F-03   A                  128              9               3.5  pass
+R-F-08   A                  131             14               5.3  pass
+R-F-12   A                  126              6               2.4  pass
+R-F-17   A                  129             24               9.2  FAIL
+R-F-21   A                  134             11               4.1  pass
+R-F-26   A                  127             17               6.6  pass
+R-F-33   A                  130              8               3.0  pass
+R-F-39   B                  128             13               5.0  pass
+R-F-44   B                  132             27              10.1  FAIL
+R-F-49   B                  129             12               4.6  pass
+R-F-54   B                  126             15               5.9  pass
+R-F-58   B                  131             22               8.3  FAIL
+
+RESULT
+Inspected: 12 rolls · Passed: 9 · Failed: 3
+Lot verdict: ACCEPTED WITH SEGREGATION
+
+R-F-17, R-F-44, R-F-58 are quarantined for claim against the mill and must not be issued
+to cutting. Shade groups A and B are to be issued to separate lays.

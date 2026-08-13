@@ -109,13 +109,20 @@ export const INTAKE_KINDS: readonly IntakeKind[] = [
      * `rfqs` was already a registered pending target with a schema, so this is the entry and
      * nothing else: the enquiry's buyer is the one id the email cannot carry, and the picker
      * that answers it is the same one a PO uses.
+     *
+     * It pointed at `rfq` — the MANUAL-ENTRY payload — and no reading against it ever
+     * finished: a required `buyerId` uuid and a string-only `targetPrice`, failing every
+     * document at the provider call with "buyerId Invalid UUID; targetPrice expected a money
+     * amount". `rfq_from_enquiry_v1` is the document-shaped twin, the same way `buyer_po` has
+     * `order_from_po_v1` and `lc_swift` has `lc_from_swift_v1`. Naming the strict payload
+     * here again is the bug, not a shortcut.
      */
     id: 'buyer_enquiry',
     label: 'A buyer enquiry',
     hint: 'The email or sheet a buyer asks for a price with. Drafts the RFQ, its quantities and target price.',
     moduleId: 'rfq',
     targetTable: 'rfqs',
-    zodSchemaKey: 'rfq',
+    zodSchemaKey: 'rfq_from_enquiry_v1',
     roles: ['merchandiser'],
     context: [{ field: 'buyerId', label: 'Which buyer sent it?', source: 'buyers' }],
   },

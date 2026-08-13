@@ -1,0 +1,121 @@
+{
+  "_intakeKind": "tech_pack",
+  "_door": "/marbim/intake → 'A tech pack'",
+  "styleCode": "ST-2815",
+  "lines": [
+    {
+      "lineGroup": "fabric",
+      "itemRef": "FAB-FLC-280",
+      "spec": "brushed back fleece 280 g/m², 80% cotton / 20% polyester, tubular 185 cm, self shade",
+      "consumption": "0.560",
+      "uom": "kg",
+      "wastagePct": "8.00",
+      "sourcePage": 2
+    },
+    {
+      "lineGroup": "fabric",
+      "itemRef": "FAB-RIB-1X1",
+      "spec": "1×1 rib 240 g/m², 95% cotton / 5% elastane, cuff, hem and hood binding, self shade",
+      "consumption": "0.045",
+      "uom": "kg",
+      "wastagePct": "8.00",
+      "sourcePage": 2
+    },
+    {
+      "lineGroup": "trims",
+      "itemRef": "TRM-ZIP-OE65",
+      "spec": "YKK #5 moulded open-end zipper, 65 cm, auto-lock puller, tape dyed to shade",
+      "consumption": "1",
+      "uom": "pcs",
+      "wastagePct": "2.00",
+      "sourcePage": 2
+    },
+    {
+      "lineGroup": "trims",
+      "itemRef": "TRM-CORD-8",
+      "spec": "flat drawcord 8 mm × 130 cm, cut and heat-tipped, self shade",
+      "consumption": "1",
+      "uom": "pcs",
+      "wastagePct": "3.00",
+      "sourcePage": 2
+    },
+    {
+      "lineGroup": "trims",
+      "itemRef": "TRM-EYELET-8",
+      "spec": "metal eyelet 8 mm, nickel-free, antique silver finish",
+      "consumption": "2",
+      "uom": "pcs",
+      "wastagePct": "3.00",
+      "sourcePage": 2
+    },
+    {
+      "lineGroup": "trims",
+      "itemRef": "TRM-LBL-MAIN",
+      "spec": "woven main label, Nordkap, size-specific, folded and stitched at CB neck",
+      "consumption": "1",
+      "uom": "pcs",
+      "wastagePct": "2.00",
+      "sourcePage": 2
+    },
+    {
+      "lineGroup": "trims",
+      "itemRef": "TRM-LBL-CARE",
+      "spec": "printed care and content label, 5 languages, side seam left",
+      "consumption": "1",
+      "uom": "pcs",
+      "wastagePct": "2.00",
+      "sourcePage": 2
+    },
+    {
+      "lineGroup": "trims",
+      "itemRef": "TRM-THR-40",
+      "spec": "sewing thread 40/2 spun polyester, colour matched",
+      "consumption": "145",
+      "uom": "m",
+      "wastagePct": "5.00",
+      "sourcePage": 2
+    },
+    {
+      "lineGroup": "embellishment",
+      "itemRef": "EMB-PRINT-CB",
+      "spec": "centre-back plastisol print 180 × 120 mm, 3 colours, phthalate free",
+      "consumption": "1",
+      "uom": "pcs",
+      "wastagePct": "3.00",
+      "sourcePage": 2
+    },
+    {
+      "lineGroup": "packing",
+      "itemRef": "PKG-POLY",
+      "spec": "polybag 300 × 420 mm, 0.04 mm LDPE 30% recycled, vent holes, suffocation warning",
+      "consumption": "1",
+      "uom": "pcs",
+      "wastagePct": "2.00",
+      "sourcePage": 2
+    },
+    {
+      "lineGroup": "packing",
+      "itemRef": "PKG-HANGTAG",
+      "spec": "hangtag 55 × 90 mm FSC board + cotton string, price ticket applied by buyer",
+      "consumption": "1",
+      "uom": "set",
+      "wastagePct": "2.00",
+      "sourcePage": 2
+    },
+    {
+      "lineGroup": "packing",
+      "itemRef": "PKG-CTN-5PLY",
+      "spec": "5-ply export carton 600 × 400 × 350 mm, 24 pcs solid size solid colour",
+      "consumption": "0.0417",
+      "uom": "pcs",
+      "wastagePct": "1.00",
+      "sourcePage": 2
+    }
+  ],
+  "_notes": [
+    "12 lines across all four line groups. A reading that drops the packing group (it sits at the bottom of the table) is the common failure.",
+    "`sourcePage` is the page of THIS pdf the table is on (2), not the 'p.4' the tech pack prints — that column refers to the buyer's own full tech pack, which the factory does not have. Either 2 or absent is right; 4/6/7/9 means the model read the wrong column.",
+    "consumption is per piece and wastage is separate. 0.560 kg with 8.00% is correct; 0.6048 in consumption means the model did arithmetic it was not asked to do, and the costing studio will then double-count wastage.",
+    "TRM-THR-40 is 145 m per piece — a large number with a unit that is not kg or pcs. Check it did not land as 145 pcs."
+  ]
+}

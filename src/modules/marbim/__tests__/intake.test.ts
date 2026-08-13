@@ -93,22 +93,40 @@ describe('MARBIM intake kinds', () => {
     expect(() => assertIntakeKinds()).not.toThrow()
   })
 
+  /**
+   * No required UUID. Not "none the picker cannot supply" — NONE.
+   *
+   * This test used to exempt a field a context picker declared, on the reasoning that the
+   * person supplies what the paper cannot. That reasoning describes the wrong pipeline, and
+   * `buyer_enquiry` shipped broken underneath it for exactly that reason: `rfqPayload`
+   * required `buyerId`, the kind declared a `buyerId` picker, the test passed, and every
+   * single reading failed in production with "buyerId Invalid UUID".
+   *
+   * The ordering is the whole point. `service.ts` folds `contextValues` in over
+   * `result.value` — and `result.value` is what the provider ALREADY validated against this
+   * schema. The picker's answer arrives after the door it was meant to open has closed. So a
+   * context field makes a uuid *supplied*, never *satisfiable*, and the schema still has to
+   * let the model leave it out.
+   *
+   * `buyer_po` and `lc_swift` were only ever green here by luck: both authors reached
+   * `.optional().catch(undefined)` on their own, and `lcFromSwiftDraft` carries the comment
+   * explaining why. This assertion is that comment, enforced.
+   */
   it.each(INTAKE_KINDS.map((kind) => [kind.id, kind] as const))(
     '%s can actually be completed from a document',
     (_id, kind) => {
       const schema = schemaOf(kind)
-
-      // A declared context field is an id the PERSON picks, so the document not carrying it
-      // is fine. Anything left over is a field nobody can supply.
       const supplied = new Set((kind.context ?? []).map((field) => field.field))
-      const impossible = requiredUuidPaths(schema as ZodType).filter((path) => !supplied.has(path))
+      const required = requiredUuidPaths(schema as ZodType)
 
-      // The message names the fields, because the fix is one of three things: declare a
-      // context field, give the module a document-shaped schema that resolves names to ids
-      // at commit, or drop the kind.
+      const why = (path: string) =>
+        supplied.has(path)
+          ? `${path} (the "${kind.id}" picker supplies it, but contextValues are merged AFTER the provider validates against this schema — make it .optional().catch(undefined) and let the merge fill it)`
+          : `${path} (no document contains a UUID and no context field supplies this one)`
+
       expect(
-        impossible,
-        `intake kind "${kind.id}" requires ${impossible.join(', ')} — UUIDs a document cannot contain and no context field supplies, so no extraction can ever satisfy it`,
+        required.map(why),
+        `intake kind "${kind.id}" cannot be satisfied by any reading`,
       ).toEqual([])
     },
   )

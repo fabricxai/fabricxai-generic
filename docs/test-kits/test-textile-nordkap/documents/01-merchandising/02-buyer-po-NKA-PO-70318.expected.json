@@ -1,0 +1,104 @@
+{
+  "_intakeKind": "buyer_po",
+  "_door": "/marbim/intake → \"A buyer's purchase order\" · or /orders → New order",
+  "_context": {
+    "buyerId": "picked from the Buyer dropdown — Nordkap Apparel AB (NKA); never in the document"
+  },
+  "poNumbers": [
+    "NKA-PO-70318"
+  ],
+  "totalValue": "375900.00",
+  "currency": "USD",
+  "plannedExFactoryDate": "2027-01-28",
+  "styles": [
+    {
+      "styleCode": "ST-2815",
+      "description": "ladies' brushed-fleece full-zip hoodie",
+      "contractedQty": 42000,
+      "unitPrice": "8.95",
+      "currency": "USD",
+      "breakdown": [
+        {
+          "color": "Charcoal Melange",
+          "size": "XS",
+          "qty": 1800
+        },
+        {
+          "color": "Charcoal Melange",
+          "size": "S",
+          "qty": 3600
+        },
+        {
+          "color": "Charcoal Melange",
+          "size": "M",
+          "qty": 5400
+        },
+        {
+          "color": "Charcoal Melange",
+          "size": "L",
+          "qty": 3600
+        },
+        {
+          "color": "Charcoal Melange",
+          "size": "XL",
+          "qty": 1800
+        },
+        {
+          "color": "Deep Navy",
+          "size": "XS",
+          "qty": 1600
+        },
+        {
+          "color": "Deep Navy",
+          "size": "S",
+          "qty": 3200
+        },
+        {
+          "color": "Deep Navy",
+          "size": "M",
+          "qty": 4800
+        },
+        {
+          "color": "Deep Navy",
+          "size": "L",
+          "qty": 3200
+        },
+        {
+          "color": "Deep Navy",
+          "size": "XL",
+          "qty": 1600
+        },
+        {
+          "color": "Off White",
+          "size": "XS",
+          "qty": 1200
+        },
+        {
+          "color": "Off White",
+          "size": "S",
+          "qty": 2400
+        },
+        {
+          "color": "Off White",
+          "size": "M",
+          "qty": 3600
+        },
+        {
+          "color": "Off White",
+          "size": "L",
+          "qty": 2700
+        },
+        {
+          "color": "Off White",
+          "size": "XL",
+          "qty": 1500
+        }
+      ]
+    }
+  ],
+  "_notes": [
+    "ONE style with a 15-cell breakdown — not 15 styles, and not 3. The grid is the most repetitive thing on the page and the schema has exactly one home for it (styles[0].breakdown).",
+    "The three colours do NOT share a size ratio: Off White runs 1200/2400/3600/2700/1500. An extraction that applies Charcoal's ratio to all three colours produces a 44,100-piece order and is a finding.",
+    "Cells must sum to contractedQty = 42,000. Check the sum on the approve screen before approving."
+  ]
+}

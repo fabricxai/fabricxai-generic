@@ -1,0 +1,26 @@
+{
+  "_intakeKind": "buyer_enquiry",
+  "_door": "/marbim/intake → 'A buyer enquiry'",
+  "_context": {
+    "buyerId": "picked from the Buyer dropdown — Nordkap Apparel AB (NKA). Never in the document. Create the buyer first (lead → convert)."
+  },
+  "title": "ladies' brushed-fleece full-zip hoodie — AW-27 core",
+  "productType": "ladies' knitted hooded sweatshirt, full zip",
+  "quantity": 42000,
+  "unit": "pcs",
+  "targetPrice": "8.40",
+  "targetCurrency": "USD",
+  "currency": "USD",
+  "sizeRatio": {
+    "XS": 1,
+    "S": 2,
+    "M": 3,
+    "L": 2,
+    "XL": 1
+  },
+  "deadline": "2026-08-27",
+  "_notes": [
+    "styleCode is NOT on this paper — the buyer quotes their own article NK-90455 and asks the factory to advise a style. An extraction that invents ST-2815 here is a finding: the style did not exist yet.",
+    "requestedShipDate is stated in prose ('last week of January 2027'), not as a date. Either 2027-01-25..31 or absent is defensible; a confident single date at high confidence is not."
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "_intakeKind": "delivery_challan",
+  "_door": "/store/receive → the drop zone (fills the GRN form; nothing is queued)",
+  "challanNo": "ZJH-DC-8842",
+  "receivedAt": "2026-11-12",
+  "supplierName": "Zhejiang Hualing Knitting Co., Ltd",
+  "lines": [
+    {
+      "itemCode": "FAB-FLC-280",
+      "itemName": "Brushed fleece 280 gsm — Charcoal Melange",
+      "qty": "1567.0",
+      "unit": "kg",
+      "rolls": []
+    }
+  ],
+  "_notes": [
+    "This is a PHOTOGRAPH, not a scan and not a clean PDF. Attach the .jpg with nothing pasted, and the confidence should visibly pay for the light and the skew. Then run it again with the .paste.txt and compare the two maps — that difference IS the feature.",
+    "ONE line, not two. Row 2 of the challan restates row 1 as a roll count, the way challan books do; reading it as a second material creates a phantom 'rolls' item in the store.",
+    "The 60 individual rolls are NOT on this challan — they are on the mill's packing list (12-mill-packing-list-roll-wise.xlsx). rolls[] should come back empty here. Type them from the spreadsheet, or the receipt has no roll traceability and the shade groups never exist.",
+    "The red handwriting ('3 rolls damaged — see QC') is the storekeeper's own note. It is not a field. If it lands in a quantity, that is a finding."
+  ]
+}

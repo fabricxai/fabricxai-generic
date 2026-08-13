@@ -1,0 +1,17 @@
+NORDKAP APPAREL AB — NOMINATED INSPECTION
+FINAL RANDOM INSPECTION REPORT
+ST-2815 · NKA-PO-70318 · shipment 1 of 3
+
+Report: FI-2815-01
+Date: 2027-01-18
+Offered quantity: 12,000 pcs in 500 cartons
+Standard: ISO 2859-1, single sampling, normal
+Inspection level: GII   Sample size code: M   Sample size: 315 pcs
+AQL: 2.5 major / 4.0 minor
+
+Class     AQL   Accept  Reject  Found  Result
+Critical  0     0       1       0      PASS
+Major     2.5   14      15      9      PASS
+Minor     4.0   21      22      18     PASS
+
+OVERALL RESULT: PASSED. The lot of 12,000 pcs is approved for shipment.

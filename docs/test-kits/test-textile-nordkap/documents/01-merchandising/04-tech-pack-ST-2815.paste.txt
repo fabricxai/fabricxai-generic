@@ -1,0 +1,45 @@
+Nordkap Apparel AB
+TECHNICAL PACKAGE — ST-2815 · Rev 2 · 2026-09-05
+
+Style: ST-2815
+Buyer article: NK-90455
+Description: ladies' brushed-fleece full-zip hoodie
+Season: AW-27 Core
+Revision: Rev 2
+Issued: 2026-09-05
+Supersedes: Rev 1 dated 2026-08-29
+Against PO: NKA-PO-70318
+
+Rev 2 changes: pocket opening widened 0.5 cm across all sizes; care label moved from CB
+neck to left side seam; carton pack changed from 20 to 24 pcs.
+
+BILL OF MATERIALS — ST-2815 Rev 2
+Consumption is stated per finished piece. Wastage is the allowance to be added on top when
+booking; it is not included in the consumption figure.
+
+Group         Item ref        Specification                                                  Cons/pc UoM  Wastage %  Page
+fabric        FAB-FLC-280     brushed back fleece 280 g/m², 80% cotton / 20% polyester, tubula     0.560 kg      8.00   p.4
+fabric        FAB-RIB-1X1     1×1 rib 240 g/m², 95% cotton / 5% elastane, cuff, hem and hood b     0.045 kg      8.00   p.4
+trims         TRM-ZIP-OE65    YKK #5 moulded open-end zipper, 65 cm, auto-lock puller, tape dy         1 pcs     2.00   p.6
+trims         TRM-CORD-8      flat drawcord 8 mm × 130 cm, cut and heat-tipped, self shade             1 pcs     3.00   p.6
+trims         TRM-EYELET-8    metal eyelet 8 mm, nickel-free, antique silver finish                    2 pcs     3.00   p.6
+trims         TRM-LBL-MAIN    woven main label, Nordkap, size-specific, folded and stitched at         1 pcs     2.00   p.7
+trims         TRM-LBL-CARE    printed care and content label, 5 languages, side seam left              1 pcs     2.00   p.7
+trims         TRM-THR-40      sewing thread 40/2 spun polyester, colour matched                      145 m       5.00   p.6
+embellishment EMB-PRINT-CB    centre-back plastisol print 180 × 120 mm, 3 colours, phthalate f         1 pcs     3.00   p.8
+packing       PKG-POLY        polybag 300 × 420 mm, 0.04 mm LDPE 30% recycled, vent holes, suf         1 pcs     2.00   p.9
+packing       PKG-HANGTAG     hangtag 55 × 90 mm FSC board + cotton string, price ticket appli         1 set     2.00   p.9
+packing       PKG-CTN-5PLY    5-ply export carton 600 × 400 × 350 mm, 24 pcs solid size solid     0.0417 pcs     1.00   p.9
+
+CONSTRUCTION
+Shoulder, side and sleeve seams — overlock 4-thread, 504 — 11-12 SPI
+Cuff and hem attach — overlock 4-thread + coverstitch topstitch — 11-12 SPI
+Hood attach and CB neck tape — overlock + single needle lockstitch 301 — 12 SPI
+Zipper attach — single needle lockstitch 301, 0.6 cm topstitch — 12 SPI
+Pocket attach — coverstitch 602, twin needle 0.6 cm — 11 SPI
+Eyelet set — hand press, 2 per hood, 3.5 cm either side of CF
+Bartack — hand pocket mouth x2, zip base x1
+
+PACKING
+1 pc per polybag, folded to 300 x 420 mm. 24 pcs per carton, solid colour
+solid size. Carton 600 x 400 x 350 mm, 5-ply.

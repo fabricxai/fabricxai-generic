@@ -1,0 +1,45 @@
+Nordkap Apparel AB
+Lindholmsallén 32
+417 55 Göteborg, Sweden
+
+PURCHASE ORDER — NKA-PO-70318
+
+Supplier: Test Textile Ltd, Plot 44–46, Sector 3, Karnaphuli EPZ Road, Ashulia, Savar, Dhaka 1341, Bangladesh
+Vendor code: NK-BD-0219
+PO number: NKA-PO-70318
+PO date: 2026-09-02
+Against enquiry: NKA-ENQ-4471
+Season: AW-27 Core
+Buyer article: NK-90455
+Currency: USD
+
+Style      Description                                              Qty (pcs)  Unit price   Amount
+ST-2815    ladies' brushed-fleece full-zip hoodie                          42,000     8.95   375,900.00
+           Ladies' full-zip hooded sweatshirt, brushed back fleece 280 g/m², two-panel lined hood, kangaroo pocket, 1×1 rib cuff and hem
+TOTAL FOB CHATTOGRAM (USD)                                             42,000              375,900.00
+
+COLOUR AND SIZE BREAKDOWN
+Colour              Code       XS        S        M        L       XL     Total
+Charcoal Melange    CHM     1,800    3,600    5,400    3,600    1,800    16,200
+Deep Navy           NVY     1,600    3,200    4,800    3,200    1,600    14,400
+Off White           OFW     1,200    2,400    3,600    2,700    1,500    11,400
+Total                        4,600    9,200   13,800    9,500    4,900    42,000
+
+DELIVERY AND TERMS
+Price term: FOB Chattogram
+Ex-factory date: 2027-01-28
+Port of loading: Chattogram, Bangladesh
+Port of discharge: Gothenburg, Sweden
+Payment: irrevocable L/C at 120 days from B/L
+Partial shipment: allowed
+Packing: 24 pcs solid colour solid size per carton
+
+CONDITIONS
+1. Tech pack ST-2815 Rev 2 dated 2026-09-05 governs construction,
+   measurements and packing.
+2. PP sample approval is required before bulk cutting.
+3. All trims from nominated suppliers; substitutions in writing only.
+4. Final inspection at AQL 2.5 major / 4.0 minor, level GII, by our nominated inspector.
+5. Code of Conduct audit findings must be closed to plan.
+6. Late shipment: 3% of order value per commenced week, air freight at supplier's cost
+   beyond 2 weeks.

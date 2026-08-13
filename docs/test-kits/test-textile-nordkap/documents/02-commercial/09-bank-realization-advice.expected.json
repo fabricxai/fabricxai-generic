@@ -1,0 +1,19 @@
+{
+  "_intakeKind": "bank_advice",
+  "_door": "/lcs → Submissions → the accepted presentation → 'read the advice'",
+  "reference": "KMB/EXP/2027/09117",
+  "realizedAmount": "106994.00",
+  "realizedAt": "2027-02-18",
+  "documentValue": "107400.00",
+  "deductions": [
+    "Foreign bank charges USD 92.50",
+    "Courier charges USD 45.00",
+    "Negotiation commission 0.25% USD 268.50"
+  ],
+  "lcNumber": "LC-7712",
+  "expNumber": "EXP-2027-KMB-041182",
+  "_notes": [
+    "realizedAmount is the NET — what landed (106,994.00) — not the gross (107,400.00). The advice states both and the gross is the larger, more prominent number; a reading that takes it has silently overstated realized export proceeds, which is a Bangladesh Bank reporting problem, not a rounding one.",
+    "There are three deductions. The BDT conversion line at the bottom is NOT a deduction — it is how the net was split between two accounts."
+  ]
+}

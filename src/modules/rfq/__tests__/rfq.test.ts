@@ -24,6 +24,7 @@ import {
   wonPayload,
   type CostSheetSnapshot,
 } from '../rfq'
+import { rfqFromEnquiryDraft, rfqPayload } from '../zod'
 
 const SHEET: CostSheetSnapshot = {
   costSheetId: 'cs-1',
@@ -221,5 +222,84 @@ describe('rfqStatusMachine', () => {
 
   it('22 · won is terminal — it is an order now', () => {
     expect(() => rfqStatusMachine.assert('won', 'quoted')).toThrow()
+  })
+})
+
+/**
+ * What a model actually hands back when it reads an enquiry.
+ *
+ * The kit-fixture suite in `docs/__tests__` proves the schema accepts a PERFECT reading —
+ * every value already a normalised string. That is a real check and it is not this one: it
+ * would not have caught `targetPrice`, because a hand-written fixture naturally says
+ * `"8.40"`, and the provider says `8.40`.
+ *
+ * A structured-output model given a field called `targetPrice` and a page reading
+ * "USD 8.40 per piece, FOB Chattogram" returns a JSON number, or the string with the
+ * currency still on it. `money()` is `z.string().regex(...)` and rejected both — the second
+ * half of the production failure "buyerId Invalid UUID; targetPrice expected a money amount".
+ *
+ * So these vectors are the shapes the wire actually carries, not the shapes a schema author
+ * would think to write down.
+ */
+describe('rfqFromEnquiryDraft · what a provider actually returns', () => {
+  const base = {
+    title: "ladies' brushed-fleece full-zip hoodie — AW-27 core",
+    productType: "ladies' knitted hooded sweatshirt, full zip",
+    quantity: 42000,
+  }
+
+  it('23 · parses with no buyerId at all — the moment the provider is judged in', () => {
+    // contextValues are merged AFTER the provider validates (marbim/service.ts). A required
+    // buyerId here is a door that never opens, however good the reading.
+    const result = rfqFromEnquiryDraft.safeParse(base)
+    expect(result.success, JSON.stringify(result.error?.issues)).toBe(true)
+    expect(result.data?.buyerId).toBeUndefined()
+  })
+
+  it.each([
+    ['a JSON number', 8.4, '8.4'],
+    ['a decimal string', '8.40', '8.40'],
+    ['the currency still attached', 'USD 8.40', '8.40'],
+    ['a price phrase', 'USD 8.40 per piece FOB', '8.40'],
+    ['thousands grouped', '12,500.00', '12500.00'],
+  ])('24 · targetPrice survives %s', (_label, input, expected) => {
+    const result = rfqFromEnquiryDraft.safeParse({ ...base, targetPrice: input })
+    expect(result.success, JSON.stringify(result.error?.issues)).toBe(true)
+    expect(result.data?.targetPrice).toBe(expected)
+  })
+
+  it.each([
+    ['a JSON number', 42000],
+    ['a grouped string', '42,000'],
+    ['a string with its unit', '42,000 pcs'],
+  ])('25 · quantity survives %s', (_label, input) => {
+    const result = rfqFromEnquiryDraft.safeParse({ ...base, quantity: input })
+    expect(result.success, JSON.stringify(result.error?.issues)).toBe(true)
+    expect(result.data?.quantity).toBe(42000)
+  })
+
+  it('26 · a ship date stated in prose is dropped, not fatal', () => {
+    // The enquiry says "last week of January 2027". That is not a date, and losing the whole
+    // reading over one unparseable field is how an extractor earns its reputation.
+    const result = rfqFromEnquiryDraft.safeParse({
+      ...base,
+      requestedShipDate: 'last week of January 2027',
+      deadline: '2026-08-27',
+    })
+    expect(result.success, JSON.stringify(result.error?.issues)).toBe(true)
+    expect(result.data?.requestedShipDate).toBeUndefined()
+    expect(result.data?.deadline).toBe('2026-08-27')
+  })
+
+  it('27 · a reading is marked ai_extracted without being told to', () => {
+    expect(rfqFromEnquiryDraft.parse(base).source).toBe('ai_extracted')
+  })
+
+  it('28 · the strict payload still refuses what the draft tolerated', () => {
+    // The whole point of two schemas. `commitRfq` re-parses with `rfqPayload`, so a draft
+    // with no buyer cannot become an RFQ no matter what the approve screen does.
+    const draft = rfqFromEnquiryDraft.parse(base)
+    expect(rfqPayload.safeParse(draft).success).toBe(false)
+    expect(rfqPayload.safeParse({ ...draft, buyerId: crypto.randomUUID() }).success).toBe(true)
   })
 })

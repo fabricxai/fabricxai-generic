@@ -1,0 +1,70 @@
+{
+  "_intakeKind": "wage_gazette",
+  "_door": "/marbim/intake → 'A wage gazette notification' (hr only)",
+  "version": "SRO-2026-11",
+  "effectiveFrom": "2026-12-01",
+  "grades": [
+    {
+      "grade": "1",
+      "basic": "10400",
+      "houseRent": "5200",
+      "medical": "750",
+      "transport": "450",
+      "food": "1250"
+    },
+    {
+      "grade": "2",
+      "basic": "9750",
+      "houseRent": "4875",
+      "medical": "750",
+      "transport": "450",
+      "food": "1250"
+    },
+    {
+      "grade": "3",
+      "basic": "9100",
+      "houseRent": "4550",
+      "medical": "750",
+      "transport": "450",
+      "food": "1250"
+    },
+    {
+      "grade": "4",
+      "basic": "8600",
+      "houseRent": "4300",
+      "medical": "750",
+      "transport": "450",
+      "food": "1250"
+    },
+    {
+      "grade": "5",
+      "basic": "8150",
+      "houseRent": "4075",
+      "medical": "750",
+      "transport": "450",
+      "food": "1250"
+    },
+    {
+      "grade": "6",
+      "basic": "7750",
+      "houseRent": "3875",
+      "medical": "750",
+      "transport": "450",
+      "food": "1250"
+    },
+    {
+      "grade": "7",
+      "basic": "7400",
+      "houseRent": "3700",
+      "medical": "750",
+      "transport": "450",
+      "food": "1250"
+    }
+  ],
+  "_notes": [
+    "TENANT-WIDE, not order-specific. Only run this if the tenant does not already carry an active gazette — approving a second one changes every payroll on the tenant, including the other kit's. It lands INACTIVE and must be activated by hand; that two-step is the thing to verify.",
+    "Seven grades. The Gross column is the SUM of the other five and is not a field — a gazette whose basic comes back as 17,250 has read the gross.",
+    "Amounts are whole taka as strings: '10400', not '10,400' and not 10400.00.",
+    "Role wall: only hr (and owner/admin) may file this. A merchandiser who can reach the chip is a finding."
+  ]
+}

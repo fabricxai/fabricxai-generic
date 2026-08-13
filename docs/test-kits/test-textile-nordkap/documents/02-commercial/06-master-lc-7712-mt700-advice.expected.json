@@ -1,0 +1,28 @@
+{
+  "_intakeKind": "lc_swift",
+  "_door": "/marbim/intake → 'A letter of credit' · or /lcs → New credit",
+  "_context": {
+    "buyerId": "picked from the Buyer dropdown — Nordkap Apparel AB (NKA). Field 50 names the applicant, but which record that is, is a human's call."
+  },
+  "number": "LC-7712",
+  "value": "375900.00",
+  "currency": "USD",
+  "tolerancePct": "5",
+  "issueDate": "2026-09-15",
+  "latestShipmentDate": "2027-02-10",
+  "expiryDate": "2027-02-25",
+  "docsRequired": [
+    "Signed commercial invoice in 3 fold",
+    "Full set 3/3 original clean on board ocean bills of lading made out to order and blank endorsed, marked freight collect, notify applicant",
+    "Packing list in 3 fold showing carton wise contents, gross and net weight",
+    "Certificate of origin GSP Form A issued by the Export Promotion Bureau, Bangladesh",
+    "Beneficiary's certificate that one set of non-negotiable documents has been sent to the applicant by courier within 3 days of shipment",
+    "Inspection certificate issued and signed by the applicant"
+  ],
+  "_notes": [
+    "The three dates are SWIFT six-digit: 31C 260915, 44C 270210, 31D 270225. Every one must come out as a four-digit ISO year. A 44C read as 2026-02-10 or as 2027-10-02 is the single highest-value bug this document can catch.",
+    "39A is '5/5' — a tolerance PAIR. tolerancePct is one number: 5.",
+    "32B is 'USD 375,900.00' — the comma is a thousands separator. 375900.00, never 375.90 and never 375900000.",
+    "docsRequired should be 6 entries. The credit's :47A: conditions are NOT documents; folding them in is a finding."
+  ]
+}

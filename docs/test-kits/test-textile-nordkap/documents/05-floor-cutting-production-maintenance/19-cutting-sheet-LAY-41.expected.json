@@ -1,0 +1,34 @@
+{
+  "_intakeKind": "cut_sheet",
+  "_door": "/cutting/report → the drop zone (fills the form; nothing is queued)",
+  "layNo": "LAY-41",
+  "color": "Charcoal Melange",
+  "plies": 96,
+  "cells": [
+    {
+      "size": "XS",
+      "cut": 96
+    },
+    {
+      "size": "S",
+      "cut": 192
+    },
+    {
+      "size": "M",
+      "cut": 286
+    },
+    {
+      "size": "L",
+      "cut": 192
+    },
+    {
+      "size": "XL",
+      "cut": 96
+    }
+  ],
+  "_notes": [
+    "THE TRAP OF THIS DOCUMENT: three numeric rows, and only the bottom one is the answer. 'Marker ratio' (1/2/3/2/1) and 'Should cut' (96/192/288/192/96) are both on the sheet, and 'Should cut' is the plausible wrong read — it differs from ACTUAL CUT in one cell only (M: 288 vs 286).",
+    "The schema's own comment says it: 'What actually came off the table for this size. Never the marker's ratio.' If M comes back 288, the two rejected panels have been silently manufactured back into existence and the bundle count will not reconcile downstream.",
+    "Total should be 862, not 864."
+  ]
+}

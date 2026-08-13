@@ -1,0 +1,315 @@
+{
+  "_intakeKind": "measurement_chart",
+  "_door": "/marbim/intake → 'A measurement chart'",
+  "styleCode": "ST-2815",
+  "unit": "cm",
+  "_pointCount": 50,
+  "points": [
+    {
+      "name": "A Chest width, 1 cm below armhole — size XS",
+      "spec": "51.0",
+      "tolPlus": "1.5",
+      "tolMinus": "1.5"
+    },
+    {
+      "name": "A Chest width, 1 cm below armhole — size S",
+      "spec": "53.5",
+      "tolPlus": "1.5",
+      "tolMinus": "1.5"
+    },
+    {
+      "name": "A Chest width, 1 cm below armhole — size M",
+      "spec": "56.0",
+      "tolPlus": "1.5",
+      "tolMinus": "1.5"
+    },
+    {
+      "name": "A Chest width, 1 cm below armhole — size L",
+      "spec": "58.5",
+      "tolPlus": "1.5",
+      "tolMinus": "1.5"
+    },
+    {
+      "name": "A Chest width, 1 cm below armhole — size XL",
+      "spec": "61.0",
+      "tolPlus": "1.5",
+      "tolMinus": "1.5"
+    },
+    {
+      "name": "B Body length from HPS — size XS",
+      "spec": "62.0",
+      "tolPlus": "1.0",
+      "tolMinus": "1.0"
+    },
+    {
+      "name": "B Body length from HPS — size S",
+      "spec": "64.0",
+      "tolPlus": "1.0",
+      "tolMinus": "1.0"
+    },
+    {
+      "name": "B Body length from HPS — size M",
+      "spec": "66.0",
+      "tolPlus": "1.0",
+      "tolMinus": "1.0"
+    },
+    {
+      "name": "B Body length from HPS — size L",
+      "spec": "68.0",
+      "tolPlus": "1.0",
+      "tolMinus": "1.0"
+    },
+    {
+      "name": "B Body length from HPS — size XL",
+      "spec": "70.0",
+      "tolPlus": "1.0",
+      "tolMinus": "1.0"
+    },
+    {
+      "name": "C Across shoulder — size XS",
+      "spec": "40.5",
+      "tolPlus": "1.0",
+      "tolMinus": "1.0"
+    },
+    {
+      "name": "C Across shoulder — size S",
+      "spec": "42.0",
+      "tolPlus": "1.0",
+      "tolMinus": "1.0"
+    },
+    {
+      "name": "C Across shoulder — size M",
+      "spec": "43.5",
+      "tolPlus": "1.0",
+      "tolMinus": "1.0"
+    },
+    {
+      "name": "C Across shoulder — size L",
+      "spec": "45.0",
+      "tolPlus": "1.0",
+      "tolMinus": "1.0"
+    },
+    {
+      "name": "C Across shoulder — size XL",
+      "spec": "46.5",
+      "tolPlus": "1.0",
+      "tolMinus": "1.0"
+    },
+    {
+      "name": "D Sleeve length from CB — size XS",
+      "spec": "78.0",
+      "tolPlus": "1.0",
+      "tolMinus": "1.0"
+    },
+    {
+      "name": "D Sleeve length from CB — size S",
+      "spec": "80.0",
+      "tolPlus": "1.0",
+      "tolMinus": "1.0"
+    },
+    {
+      "name": "D Sleeve length from CB — size M",
+      "spec": "82.0",
+      "tolPlus": "1.0",
+      "tolMinus": "1.0"
+    },
+    {
+      "name": "D Sleeve length from CB — size L",
+      "spec": "84.0",
+      "tolPlus": "1.0",
+      "tolMinus": "1.0"
+    },
+    {
+      "name": "D Sleeve length from CB — size XL",
+      "spec": "86.0",
+      "tolPlus": "1.0",
+      "tolMinus": "1.0"
+    },
+    {
+      "name": "E Armhole straight — size XS",
+      "spec": "22.5",
+      "tolPlus": "0.8",
+      "tolMinus": "0.8"
+    },
+    {
+      "name": "E Armhole straight — size S",
+      "spec": "23.5",
+      "tolPlus": "0.8",
+      "tolMinus": "0.8"
+    },
+    {
+      "name": "E Armhole straight — size M",
+      "spec": "24.5",
+      "tolPlus": "0.8",
+      "tolMinus": "0.8"
+    },
+    {
+      "name": "E Armhole straight — size L",
+      "spec": "25.5",
+      "tolPlus": "0.8",
+      "tolMinus": "0.8"
+    },
+    {
+      "name": "E Armhole straight — size XL",
+      "spec": "26.5",
+      "tolPlus": "0.8",
+      "tolMinus": "0.8"
+    },
+    {
+      "name": "F Cuff width relaxed — size XS",
+      "spec": "8.5",
+      "tolPlus": "0.5",
+      "tolMinus": "0.5"
+    },
+    {
+      "name": "F Cuff width relaxed — size S",
+      "spec": "8.5",
+      "tolPlus": "0.5",
+      "tolMinus": "0.5"
+    },
+    {
+      "name": "F Cuff width relaxed — size M",
+      "spec": "9.0",
+      "tolPlus": "0.5",
+      "tolMinus": "0.5"
+    },
+    {
+      "name": "F Cuff width relaxed — size L",
+      "spec": "9.0",
+      "tolPlus": "0.5",
+      "tolMinus": "0.5"
+    },
+    {
+      "name": "F Cuff width relaxed — size XL",
+      "spec": "9.5",
+      "tolPlus": "0.5",
+      "tolMinus": "0.5"
+    },
+    {
+      "name": "G Bottom rib width relaxed — size XS",
+      "spec": "38.0",
+      "tolPlus": "1.5",
+      "tolMinus": "1.5"
+    },
+    {
+      "name": "G Bottom rib width relaxed — size S",
+      "spec": "40.5",
+      "tolPlus": "1.5",
+      "tolMinus": "1.5"
+    },
+    {
+      "name": "G Bottom rib width relaxed — size M",
+      "spec": "43.0",
+      "tolPlus": "1.5",
+      "tolMinus": "1.5"
+    },
+    {
+      "name": "G Bottom rib width relaxed — size L",
+      "spec": "45.5",
+      "tolPlus": "1.5",
+      "tolMinus": "1.5"
+    },
+    {
+      "name": "G Bottom rib width relaxed — size XL",
+      "spec": "48.0",
+      "tolPlus": "1.5",
+      "tolMinus": "1.5"
+    },
+    {
+      "name": "H Hood height — size XS",
+      "spec": "35.0",
+      "tolPlus": "0.8",
+      "tolMinus": "0.8"
+    },
+    {
+      "name": "H Hood height — size S",
+      "spec": "35.5",
+      "tolPlus": "0.8",
+      "tolMinus": "0.8"
+    },
+    {
+      "name": "H Hood height — size M",
+      "spec": "36.0",
+      "tolPlus": "0.8",
+      "tolMinus": "0.8"
+    },
+    {
+      "name": "H Hood height — size L",
+      "spec": "36.5",
+      "tolPlus": "0.8",
+      "tolMinus": "0.8"
+    },
+    {
+      "name": "H Hood height — size XL",
+      "spec": "37.0",
+      "tolPlus": "0.8",
+      "tolMinus": "0.8"
+    },
+    {
+      "name": "I Hood width at base — size XS",
+      "spec": "24.0",
+      "tolPlus": "0.5",
+      "tolMinus": "0.5"
+    },
+    {
+      "name": "I Hood width at base — size S",
+      "spec": "24.5",
+      "tolPlus": "0.5",
+      "tolMinus": "0.5"
+    },
+    {
+      "name": "I Hood width at base — size M",
+      "spec": "25.0",
+      "tolPlus": "0.5",
+      "tolMinus": "0.5"
+    },
+    {
+      "name": "I Hood width at base — size L",
+      "spec": "25.5",
+      "tolPlus": "0.5",
+      "tolMinus": "0.5"
+    },
+    {
+      "name": "I Hood width at base — size XL",
+      "spec": "26.0",
+      "tolPlus": "0.5",
+      "tolMinus": "0.5"
+    },
+    {
+      "name": "J Pocket opening — size XS",
+      "spec": "15.5",
+      "tolPlus": "0.5",
+      "tolMinus": "0.5"
+    },
+    {
+      "name": "J Pocket opening — size S",
+      "spec": "16.0",
+      "tolPlus": "0.5",
+      "tolMinus": "0.5"
+    },
+    {
+      "name": "J Pocket opening — size M",
+      "spec": "16.5",
+      "tolPlus": "0.5",
+      "tolMinus": "0.5"
+    },
+    {
+      "name": "J Pocket opening — size L",
+      "spec": "17.0",
+      "tolPlus": "0.5",
+      "tolMinus": "0.5"
+    },
+    {
+      "name": "J Pocket opening — size XL",
+      "spec": "17.5",
+      "tolPlus": "0.5",
+      "tolMinus": "0.5"
+    }
+  ],
+  "_notes": [
+    "FIFTY points, not ten. A graded row is one point PER SIZE — the schema says so in its own description. Ten points with five values each cannot be stored and will fail, or worse, keep only the first size.",
+    "The chart prints ONE 'Tol ±' column. The schema folds a single stated magnitude across both directions, so tolPlus and tolMinus should both come back as that number. Both absent means the fold did not run.",
+    "Negative test worth running: paste this file as ONE line (join every row with spaces) and extract again. Columns pair with the wrong size at high confidence — a real historical failure. The approve inbox is where a human is supposed to catch it, so check that it is catchable.",
+    "Row F (cuff width) repeats 8.5 for XS and S and 9.0 for M and L. Repeated values across adjacent sizes are where an off-by-one column read hides."
+  ]
+}
