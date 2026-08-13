@@ -302,4 +302,64 @@ describe('rfqFromEnquiryDraft · what a provider actually returns', () => {
     expect(rfqPayload.safeParse(draft).success).toBe(false)
     expect(rfqPayload.safeParse({ ...draft, buyerId: crypto.randomUUID() }).success).toBe(true)
   })
+
+  /**
+   * The first LIVE reading, verbatim from the production log — the payload that validated,
+   * rode through approve, and died in Postgres as `rfqs_owner_user_id_users_id_fk` with
+   * `owner_user_id = ''`. Vectors 23–28 above are the shapes a provider was imagined to
+   * return; this is the one it actually did.
+   */
+  const LIVE_READING = {
+    title: 'REQUEST FOR QUOTATION',
+    productType: "ladies' knitted hooded sweatshirt, full zip",
+    description:
+      "Ladies' full-zip hooded sweatshirt, brushed back fleece 280 g/m², two-panel lined " +
+      'hood, kangaroo pocket, 1×1 rib cuff and hem, Our article NK-90455',
+    styleCode: '',
+    quantity: 42000,
+    unit: 'pcs',
+    sizeRatio: { XS: 1, S: 2, M: 3, L: 2, XL: 1 },
+    targetPrice: '8.40',
+    targetCurrency: 'USD',
+    currency: 'USD',
+    deadline: '2026-08-27',
+    source: 'manual',
+    ownerUserId: '',
+  }
+
+  it('29 · a model-invented ownerUserId is stripped, never stored', () => {
+    // `""` passed `z.string()`, defeated `?? ctx.userId` (not nullish), and reached the FK.
+    // A user id is the buyerId lesson one field over: no document carries one, so the draft
+    // schema must not even offer it.
+    const draft = rfqFromEnquiryDraft.parse(LIVE_READING)
+    expect('ownerUserId' in draft).toBe(false)
+  })
+
+  it('30 · the model cannot declare its own reading manual', () => {
+    // Provenance on the field audits read. The model, shown the enum, picked 'manual'.
+    expect(rfqFromEnquiryDraft.parse(LIVE_READING).source).toBe('ai_extracted')
+  })
+
+  it('31 · an empty-string styleCode becomes absence, not a style named ""', () => {
+    const draft = rfqFromEnquiryDraft.parse(LIVE_READING)
+    expect(draft.styleCode).toBeUndefined()
+    expect(draft.description).toContain('NK-90455')
+  })
+
+  it('32 · the live reading commits: draft + picked buyer satisfies the strict payload', () => {
+    // End to end through both schemas, exactly as approve does it: parse the stored payload
+    // with the draft schema, merge nothing but the picker's buyer, re-parse strict.
+    const draft = rfqFromEnquiryDraft.parse(LIVE_READING)
+    const committed = rfqPayload.safeParse({ ...draft, buyerId: crypto.randomUUID() })
+    expect(committed.success, JSON.stringify(committed.error?.issues)).toBe(true)
+    expect(committed.data?.ownerUserId).toBeUndefined() // commitRfq falls back to ctx.userId
+  })
+
+  it('33 · the strict payload now refuses "" as an owner outright', () => {
+    // If any other path ever produces it again, the refusal happens in zod with a typed
+    // error — not in ri_triggers.c with a toast.
+    const result = rfqPayload.safeParse({ ...LIVE_READING, buyerId: crypto.randomUUID() })
+    expect(result.success).toBe(false)
+    expect(result.error?.issues.some((issue) => issue.path[0] === 'ownerUserId')).toBe(true)
+  })
 })

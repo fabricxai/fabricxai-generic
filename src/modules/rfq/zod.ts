@@ -28,7 +28,10 @@ export const rfqPayload = z.object({
   deadline: isoDate.optional(),
   requestedShipDate: isoDate.optional(),
   source: z.enum(['manual', 'ai_extracted']).default('manual'),
-  ownerUserId: z.string().optional(),
+  // min(1): `""` is not a user, and it defeats the `?? ctx.userId` fallback in `commitRfq`
+  // (an empty string is not nullish) — it reached Postgres once and died on the FK there,
+  // which is the wrong place for this refusal to live.
+  ownerUserId: z.string().min(1).optional(),
 })
 
 /**
@@ -95,20 +98,44 @@ const transcribedCount = z.preprocess((value) => {
  * enquiry that says "last week of January 2027" should lose the ship date, not the reading.
  * `rfqPayload` still guards the commit — `commitRfq` re-parses with it — so an RFQ with no
  * buyer remains impossible to create.
+ *
+ * And two fields of `rfqPayload` are OMITTED rather than loosened, because the first live
+ * reading proved that offering them at all is the bug:
+ *
+ * - `ownerUserId` is a user id — the buyerId lesson one field over, except it is
+ *   `z.string()` rather than `z.uuid()`, so the model's invention (`""`) VALIDATED, rode
+ *   the draft through approve, defeated `?? ctx.userId` (empty string is not nullish), and
+ *   died in Postgres as `rfqs_owner_user_id_users_id_fk` — surfacing to the approving
+ *   manager as a minified React error. Omitted, zod strips whatever the model offers, and
+ *   `commitRfq` falls back to the approver's own id.
+ * - `source` is provenance. The model, shown an enum, picked `'manual'` — a false statement
+ *   about how the row came to exist, on the field audits read. Pinned, not defaulted.
+ *
+ * `blank()` exists for the same reading: a structured-output model fills a field the page
+ * does not answer with `""` rather than omitting it, and `""` passes an optional
+ * `z.string()`. Absence and emptiness must collapse to the same thing here or every screen
+ * downstream learns to check for both.
  */
-export const rfqFromEnquiryDraft = rfqPayload.extend({
-  buyerId: z.uuid().optional().catch(undefined),
-  quantity: transcribedCount,
-  targetPrice: transcribedMoney.optional().catch(undefined),
-  targetCurrency: z.string().length(3).optional().catch(undefined),
-  currency: z.string().length(3).catch('USD').default('USD'),
-  deadline: isoDate.optional().catch(undefined),
-  requestedShipDate: isoDate.optional().catch(undefined),
-  sizeRatio: z.record(z.string().min(1), z.number().int().min(0)).catch({}).default({}),
-  // A reading is an extraction whatever the paper looks like; the manual path sets 'manual'.
-  source: z.enum(['manual', 'ai_extracted']).catch('ai_extracted').default('ai_extracted'),
-  ownerUserId: z.string().optional().catch(undefined),
-})
+const blank = <T extends z.ZodType>(schema: T) =>
+  z.preprocess((value) => (value === '' ? undefined : value), schema.optional().catch(undefined))
+
+export const rfqFromEnquiryDraft = rfqPayload
+  .omit({ ownerUserId: true, source: true })
+  .extend({
+    buyerId: z.uuid().optional().catch(undefined),
+    quantity: transcribedCount,
+    styleCode: blank(z.string().max(60)),
+    description: blank(z.string().max(4000)),
+    targetPrice: blank(transcribedMoney),
+    targetCurrency: blank(z.string().length(3)),
+    currency: z.string().length(3).catch('USD').default('USD'),
+    deadline: blank(isoDate),
+    requestedShipDate: blank(isoDate),
+    sizeRatio: z.record(z.string().min(1), z.number().int().min(0)).catch({}).default({}),
+    // A reading is an extraction whatever the model claims; the manual path sets 'manual'
+    // through `rfqPayload`, never through here.
+    source: z.literal('ai_extracted').catch('ai_extracted').default('ai_extracted'),
+  })
 
 export const RFQ_ZOD_MAP = {
   // Kept, and not merely for the manual path: drafts raised before the enquiry door had its
