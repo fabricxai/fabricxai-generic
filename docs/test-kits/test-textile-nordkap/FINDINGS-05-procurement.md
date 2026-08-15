@@ -254,6 +254,27 @@ Fixed: `RankedQuote` now carries `quotedUnitPrice` and `quotedCurrency` beside t
 figures, and the PO is issued from those. A unit test asserts the two stay distinct — that a
 taka quote compared in dollars keeps its 34.50.
 
+## F20 · HIGH — a purchase order cannot be cancelled from any screen
+
+Found when cancelling `PO-2815-F`. `updatePoStatus` exists in the actions layer, the state
+machine allows `issued → cancelled` (and `confirmed`/`in_production` too, until goods start
+arriving), and `supplier_pos` is a ⚖ table whose every change is audited. But nothing in
+`src/app` calls the action — grep returns no caller. So a PO can be issued and never
+confirmed, never cancelled, never moved along at all by a person.
+
+That is the whole lifecycle after issue: a mill acknowledges an order, a buyer cancels one
+that was raised in error, goods ship — none of it is reachable. And a factory's answer to a
+PO raised by mistake becomes "leave it there", which is how a supplier ends up weaving
+against an order nobody meant to place.
+
+Cancelling this one needed a one-off container running `setPoStatus` directly. That is the
+right *mechanism* — the state machine approved the transition and `recordChange` wrote the
+audit row naming the actor, the role and `issued → cancelled` — but it is not something a
+procurement officer can do.
+
+**Fix:** a status control on the PO row, at minimum confirm and cancel, with the same
+role wall the action already declares.
+
 ## F17 · Kit gap — §5 assumes items that no seed creates
 
 `pnpm seed:kit` seeds the older kit's six items (`YRN-30-1`, `FAB-PIQ-180`, `TRM-PLK` …).
@@ -275,6 +296,10 @@ Created during this walk, all recoverable:
 - Supplier quote · Zhejiang Hualing on `PR-2815-F2` — USD, freight typed by hand
 - Supplier quote · Dhaka Trims House on `PR-2815-T` — BDT, 5 lines
 
-Pre-existing and **worth correcting**: `PO-2815-F` (USD 123,190) rides `BTB-4471-01`
-(USD 34,500, under `LC-4471`). It is the evidence for F1; once F1 is fixed, cancel it and
-re-issue against `BTB-7712-01`.
+- `PO-2815-F2` — the kit's §5d import PO, **USD 123,190.00** at the mill's own 4.8500,
+  against `BTB-7712-01`, the credit opened for exactly that figure. Before F19 it would have
+  been written at 124,968 and then refused by F1's gate.
+
+`PO-2815-F` — the order that rode a credit a quarter its size, and the evidence for F1 — is
+now **cancelled** (audited: `day0-…-procurement`, `issued → cancelled`). It had no receipts
+against it, so the state machine allowed it.
