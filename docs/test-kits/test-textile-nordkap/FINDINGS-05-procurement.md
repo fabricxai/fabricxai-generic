@@ -5,6 +5,10 @@ Walked 2026-08-16 against **baraka.fabricxai.com** (image `da49a62a`, commit `79
 (`a94a2baa-…`). Every claim below was checked twice: once through the UI, once against the
 rows the UI wrote.
 
+> **F1–F6 fixed in `0333cf3`** (2026-08-16). The findings below are left as written — a
+> record of what the walk found, not a to-do list to be edited into agreement with the
+> code. What each fix changed is noted under the finding it closes. F7–F17 remain open.
+
 **Verdict: the reading works, the money gate does not.** MARBIM read both papers close to
 the letter — the trims quotation came back in taka with all five lines and its awkward
 decimals intact, which is the thing §5c exists to catch. But an import purchase order for
@@ -46,6 +50,12 @@ this BTB > BTB value`, with the shortfall named in the refusal. Separately, refu
 whose master LC is not the credit behind the order the requisition belongs to — funding a
 Nordkap PO from `LC-4471` should never be offerable.
 
+**Fixed in `0333cf3`.** `totalValue` now precedes the gate; the order is checked against its
+credit with every other PO on that credit counted alongside it; a PO in a currency the credit
+is not in is refused rather than netted. Three integration tests cover it, including two
+orders that each fit alone and overdraw together. The master-LC linkage check is **not** in
+this fix and stays open.
+
 ## F2 · HIGH — the BTB picker has no "none", and defaults to whatever is first
 
 `requisition-client.tsx:73` seeds the selection with `btbs[0]?.id`, and line 449 offers an
@@ -59,6 +69,8 @@ empty option *only when the list is empty*. Consequences, both live:
 
 **Fix:** no pre-selection. An unchosen credit is an unanswered question, and for an import
 supplier the button should stay disabled until it is answered.
+
+**Fixed in `0333cf3`**, exactly so.
 
 ## F3 · HIGH — blank duty, freight and MOQ are stored as zero
 
@@ -78,6 +90,11 @@ prevent.
 **Fix:** drop the defaults; keep the columns nullable; render an unstated duty as "—" and
 say so where the two quotes differ in what they stated.
 
+**Fixed in `0333cf3`.** Migration `0086` makes the three columns nullable, the zod no longer
+defaults them, and the comparison reports `unstated` per quote — the screen now reads "duty
+not stated" and "landed total, without duty". A duty a supplier really quoted as 0% stays a
+stated zero; a unit test holds the two apart.
+
 ## F4 · HIGH — `validUntil` is read, shown, and then thrown away
 
 The reader extracts it (2026-10-15 for the proforma, 2026-10-31 for the trims), the field
@@ -86,6 +103,8 @@ nullable, so both quotes recorded today have `valid_until = NULL`.
 
 A proforma's validity window is what tells a buyer the price is stale. Silently discarding
 it makes an expired quote look current forever.
+
+**Fixed in `0333cf3`** — both `validUntil` and `documentId` now travel with the quote.
 
 ## F5 · HIGH — the paper the model read is not attached to the quote
 
@@ -96,6 +115,8 @@ false on both quotes.
 The whole justification for reading a document with a model is that a person can check the
 figures against the original. Here the original is uploaded, read, and then unfindable.
 
+**Fixed in `0333cf3`** — see F4.
+
 ## F6 · MEDIUM — the confidence the copy promises is never rendered
 
 The reader says *"the percentages say where to look first"*. No percentage appears anywhere
@@ -104,6 +125,9 @@ which `new-order.tsx`, `new-lc.tsx` and `new-ud.tsx` all do.
 
 The kit leans on this ("a scan that comes back at 1.000 on every field has not been read"),
 and on this door there is nothing to lean on.
+
+**Fixed in `0333cf3`** — the marks now render on quoted-on, valid-until, currency and price
+term, the same way orders, credits and UDs already did.
 
 ## F7 · MEDIUM — freight was not extracted from the proforma
 
