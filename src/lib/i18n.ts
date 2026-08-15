@@ -437,6 +437,13 @@ export const MESSAGES: Catalogue = {
       'The master credit is not active, so nothing is funding this back-to-back.',
     'gates.btb_headroom.currency_mismatch':
       'The back-to-back and its master credit are in different currencies ({btbCurrency} against {masterCurrency}), and no rate has been stated to net them.',
+    // The credit must FUND the order, not merely be attached to it. Headroom answers a
+    // different question — whether the credits fit under their master — and passed happily
+    // while a PO four times the size of its credit was written against it.
+    'gates.btb_headroom.po_exceeds_btb':
+      'This purchase order is larger than the credit funding it. {btbNumber} is {creditValue} {currency}, {committed} is already committed to it, and this order is {poValue} — short by {shortfall}.',
+    'gates.btb_headroom.po_currency_mismatch':
+      'This purchase order is in {poCurrency} and {btbNumber} is in {btbCurrency}. No rate has been stated to net one against the other.',
     'gates.exp_number.missing':
       'No EXP number on this shipment. Bangladesh Bank requires one before documents can be presented, so the handoff is blocked rather than delayed.',
     'gates.lc_date.after_latest_shipment':
@@ -831,6 +838,10 @@ export const MESSAGES: Catalogue = {
       'এই ব্যাক-টু-ব্যাকের পেছনের মাস্টার ক্রেডিট নেই, তাই এর হেডরুম মেলানো যাচ্ছে না।',
     'gates.btb_headroom.master_not_active':
       'মাস্টার ক্রেডিট সক্রিয় নয়, তাই এই ব্যাক-টু-ব্যাকের পেছনে কোনো টাকার উৎস নেই।',
+    'gates.btb_headroom.po_exceeds_btb':
+      'এই পারচেজ অর্ডার তার ফান্ডিং ক্রেডিটের চেয়ে বড়। {btbNumber} হলো {creditValue} {currency}, তাতে ইতিমধ্যে {committed} প্রতিশ্রুত, আর এই অর্ডার {poValue} — {shortfall} কম পড়ছে।',
+    'gates.btb_headroom.po_currency_mismatch':
+      'এই পারচেজ অর্ডার {poCurrency}-তে আর {btbNumber} {btbCurrency}-তে। একটির সঙ্গে অন্যটি মেলানোর কোনো রেট বলা হয়নি।',
     'gates.btb_headroom.currency_mismatch':
       'ব্যাক-টু-ব্যাক আর তার মাস্টার ক্রেডিট আলাদা মুদ্রায় ({btbCurrency} বনাম {masterCurrency}), আর মেলানোর মতো কোনো রেট বলা হয়নি।',
     'gates.fabric_inspection.not_inspected':

@@ -232,6 +232,121 @@ describe('3.2 · the BTB headroom gate', () => {
     expect(result.currency).toBe('USD')
   })
 
+  it('blocks an import PO larger than the credit funding it', async () => {
+    await clearPos()
+    // The failure this gate was found by: a PO of 123,190 rode a credit worth 34,500 and
+    // saved without a word, because headroom asks whether the CREDITS fit under their
+    // master and never whether the ORDER fits inside its credit. Here: 25,000 × 2.15 =
+    // 53,750 against a 20,000 credit.
+    await db.delete(btbLcs).where(eq(btbLcs.id, btbHugeId))
+
+    await expect(
+      issuePo(
+        ctx,
+        poInput({
+          supplierId: importSupplierId,
+          btbLcId: btbSmallId,
+          lines: [{ itemId, qty: '25000.00', unit: 'm', unitPrice: '2.1500' }],
+        }),
+        POLICY,
+      ),
+    ).rejects.toThrow(/po_exceeds_btb/)
+
+    const rows = await db.select().from(supplierPos).where(eq(supplierPos.companyId, COMPANY))
+    expect(rows).toHaveLength(0)
+
+    const [restored] = await db
+      .insert(btbLcs)
+      .values({
+        companyId: COMPANY,
+        masterLcId,
+        number: `BTB-H-${randomUUID().slice(0, 6)}`,
+        supplierId: importSupplierId,
+        value: '90000.00',
+        currency: 'USD',
+        status: 'active',
+        createdBy: USER,
+      })
+      .returning({ id: btbLcs.id })
+    btbHugeId = restored!.id
+  })
+
+  it('counts the POs already riding that credit, not just this one', async () => {
+    await clearPos()
+    // Two orders that each fit alone still overdraw the credit together — which is how a
+    // credit gets quietly spent twice.
+    await db.delete(btbLcs).where(eq(btbLcs.id, btbHugeId))
+
+    const first = await issuePo(
+      ctx,
+      poInput({
+        supplierId: importSupplierId,
+        btbLcId: btbSmallId,
+        lines: [{ itemId, qty: '6000.00', unit: 'm', unitPrice: '2.1500' }],
+      }),
+      POLICY,
+    )
+    expect(first.totalValue).toBe('12900.00')
+
+    await expect(
+      issuePo(
+        ctx,
+        poInput({
+          supplierId: importSupplierId,
+          btbLcId: btbSmallId,
+          lines: [{ itemId, qty: '6000.00', unit: 'm', unitPrice: '2.1500' }],
+        }),
+        POLICY,
+      ),
+    ).rejects.toThrow(/po_exceeds_btb/)
+
+    const rows = await db.select().from(supplierPos).where(eq(supplierPos.companyId, COMPANY))
+    expect(rows).toHaveLength(1)
+
+    const [restored] = await db
+      .insert(btbLcs)
+      .values({
+        companyId: COMPANY,
+        masterLcId,
+        number: `BTB-H-${randomUUID().slice(0, 6)}`,
+        supplierId: importSupplierId,
+        value: '90000.00',
+        currency: 'USD',
+        status: 'active',
+        createdBy: USER,
+      })
+      .returning({ id: btbLcs.id })
+    btbHugeId = restored!.id
+  })
+
+  it('refuses to net a PO against a credit in another currency', async () => {
+    await clearPos()
+    await db.delete(btbLcs).where(eq(btbLcs.id, btbHugeId))
+
+    await expect(
+      issuePo(
+        ctx,
+        poInput({ supplierId: importSupplierId, btbLcId: btbSmallId, currency: 'BDT' }),
+        POLICY,
+      ),
+    ).rejects.toThrow(/po_currency_mismatch/)
+
+    const [restored] = await db
+      .insert(btbLcs)
+      .values({
+        companyId: COMPANY,
+        masterLcId,
+        number: `BTB-H-${randomUUID().slice(0, 6)}`,
+        supplierId: importSupplierId,
+        value: '90000.00',
+        currency: 'USD',
+        status: 'active',
+        createdBy: USER,
+      })
+      .returning({ id: btbLcs.id })
+    btbHugeId = restored!.id
+  })
+
   it('refuses to check headroom against an unstated ceiling', async () => {
     await clearPos()
     await expect(

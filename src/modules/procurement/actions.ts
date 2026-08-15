@@ -89,6 +89,10 @@ export async function recordQuote(input: {
   supplierId: string
   currency: string
   quotedOn: string
+  /** The date the price stops standing. Absent when the paper did not say. */
+  validUntil?: string
+  /** The proforma itself, so an approver can check the figures against it. */
+  documentId?: string
   lines: {
     itemId: string
     unitPrice: string

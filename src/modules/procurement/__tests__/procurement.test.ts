@@ -72,6 +72,51 @@ describe('compareQuotes · landed cost, not unit price', () => {
     expect(result.ranked[0]!.landedTotal).toBe('11625.00')
   })
 
+  it('3b · an unstated duty is reported as unstated, never ranked as zero', () => {
+    // The proforma said nothing about duty. The landed total is still the best reading of
+    // the quote, but the ranking says out loud that it is missing a figure — otherwise a
+    // silent 0% makes an import quote look like it clears customs free.
+    const result = compareQuotes(
+      [quote({ unitPrice: '2.10', dutyPct: null, freight: '600.00' })],
+      { ...REQUIRED, quotedOn: '2026-07-01' },
+    )
+
+    expect(result.ranked[0]!.unstated).toEqual(['duty'])
+    expect(result.ranked[0]!.dutyValue).toBe('0.00')
+    expect(result.ranked[0]!.landedTotal).toBe('11100.00')
+  })
+
+  it('3c · a duty the supplier actually quoted as 0% is NOT unstated', () => {
+    // The distinction the nullable column exists for: "we charge no duty" is a fact about
+    // the quote; "the paper did not say" is a hole in it. They must not look the same.
+    const result = compareQuotes([quote({ unitPrice: '2.10', dutyPct: '0' })], {
+      ...REQUIRED,
+      quotedOn: '2026-07-01',
+    })
+
+    expect(result.ranked[0]!.unstated).toEqual([])
+  })
+
+  it('3d · unstated freight is named too, and both can be missing at once', () => {
+    const result = compareQuotes(
+      [quote({ unitPrice: '2.10', dutyPct: null, freight: null })],
+      { ...REQUIRED, quotedOn: '2026-07-01' },
+    )
+
+    expect(result.ranked[0]!.unstated).toEqual(['duty', 'freight'])
+    expect(result.ranked[0]!.landedTotal).toBe('10500.00')
+  })
+
+  it('3e · no MOQ stated is no minimum — the requirement stands alone', () => {
+    const result = compareQuotes([quote({ unitPrice: '2.10', moq: null })], {
+      ...REQUIRED,
+      quotedOn: '2026-07-01',
+    })
+
+    expect(result.ranked[0]!.chargedQty).toBe('5000.00')
+    expect(result.ranked[0]!.surplusQty).toBe('0.00')
+  })
+
   it('4 · a MOQ above the requirement is charged in full', () => {
     // The mill will not run 5,000 m. Buying 8,000 at 2.05 costs more than 5,000 at 2.15,
     // and the surplus sits in the store for a year.

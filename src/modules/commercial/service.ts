@@ -511,6 +511,37 @@ export async function checkBtbHeadroomIn(
         }
 }
 
+/**
+ * What one back-to-back credit is worth, for a caller deciding whether it funds something.
+ *
+ * `checkBtbHeadroomIn` answers a different question — whether the CREDITS fit under their
+ * master — and answering it says nothing about whether any particular purchase order fits
+ * inside the credit it names. Procurement needs the credit's own figures to decide that, and
+ * `btb_lcs` is this module's table (rule 11), so it reads them through here rather than
+ * touching the rows.
+ *
+ * Takes the transaction, like its neighbour, so a caller mid-write does not open a second
+ * connection against a row it has already locked.
+ */
+export async function btbCreditIn(
+  ctx: AnyCtx,
+  tx: TenantDb,
+  btbLcId: string,
+): Promise<{ id: string; number: string; value: string; currency: string; masterLcId: string } | null> {
+  const [btb] = await tx
+    .select({
+      id: btbLcs.id,
+      number: btbLcs.number,
+      value: btbLcs.value,
+      currency: btbLcs.currency,
+      masterLcId: btbLcs.masterLcId,
+    })
+    .from(btbLcs)
+    .where(scoped(btbLcs, ctx, eq(btbLcs.id, btbLcId)))
+
+  return btb ?? null
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // 2.1 LC Register & Bank Docs ⚖
 // ─────────────────────────────────────────────────────────────────────────────

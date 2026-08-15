@@ -74,9 +74,12 @@ export const supplierQuotePayload = z.object({
         itemId: z.string().uuid(),
         unitPrice: money(4),
         leadTimeDays: z.number().int().min(0),
-        moq: qty.default('0'),
-        freight: money().default('0'),
-        dutyPct: pct.default('0'),
+        // Optional, never defaulted. A blank box on the dialog means the quote did not
+        // state it, and `.default('0')` turned that into a figure the comparison then
+        // ranked on — free shipping, zero duty, no minimum, none of it quoted.
+        moq: qty.optional(),
+        freight: money().optional(),
+        dutyPct: pct.optional(),
       }),
     )
     .min(1),

@@ -199,10 +199,17 @@ export const supplierQuoteLines = pgTable(
 
     unitPrice: numeric('unit_price', { precision: 14, scale: 4 }).notNull(),
     leadTimeDays: integer('lead_time_days').notNull(),
+    /*
+     * Null means the paper did not say — which is NOT the same as a stated zero, and storing
+     * it as one is how an unstated duty became "0.00 duty" on the comparison screen and made
+     * an import quote look cheaper than it is. The read schema has always modelled absence
+     * ("a missing freight figure must stay missing, because a zero would be ranked as free
+     * shipping"); the write path defaulted it to '0' and undid that.
+     */
     /** Minimum the supplier will run. Above the requirement, the surplus is still bought. */
-    moq: numeric('moq', { precision: 12, scale: 2 }).notNull().default('0'),
-    freight: numeric('freight', { precision: 14, scale: 2 }).notNull().default('0'),
-    dutyPct: numeric('duty_pct', { precision: 5, scale: 2 }).notNull().default('0'),
+    moq: numeric('moq', { precision: 12, scale: 2 }),
+    freight: numeric('freight', { precision: 14, scale: 2 }),
+    dutyPct: numeric('duty_pct', { precision: 5, scale: 2 }),
 
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },

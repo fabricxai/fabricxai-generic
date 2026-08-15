@@ -70,7 +70,15 @@ export function RequisitionClient({
   const [pending, startTransition] = useTransition()
 
   const [chosen, setChosen] = useState<Record<string, string>>({})
-  const [btbId, setBtbId] = useState(btbs[0]?.id ?? '')
+  /*
+   * No pre-selection, deliberately.
+   *
+   * This used to seed itself with `btbs[0]`, so a buyer who never opened the dropdown funded
+   * an import PO from whatever credit happened to sort first — including one belonging to
+   * another order entirely. An unchosen credit is an unanswered question, and the button
+   * below stays disabled until it is answered.
+   */
+  const [btbId, setBtbId] = useState('')
   const [poNumber, setPoNumber] = useState(`PO-${prNo.replace(/^PR-/, '')}`)
   const [fxRate, setFxRate] = useState(rate ?? '0.0083')
   const [noted, setNoted] = useState<string | null>(null)
@@ -241,12 +249,21 @@ export function RequisitionClient({
                       <span style={sub}>landed / {line.unit}</span>
                     </span>
                     <span style={cell}>
-                      {quote.dutyValue}
-                      <span style={sub}>duty</span>
+                      {/* An unstated duty is a hole in this ranking, not a zero. Saying
+                          "not stated" is what stops the cheapest row reading as settled
+                          when the row beneath it actually quoted its duty. */}
+                      {quote.unstated.includes('duty') ? '—' : quote.dutyValue}
+                      <span style={sub}>
+                        {quote.unstated.includes('duty') ? 'duty not stated' : 'duty'}
+                      </span>
                     </span>
                     <span style={cell}>
                       {quote.landedTotal}
-                      <span style={sub}>landed total</span>
+                      <span style={sub}>
+                        {quote.unstated.length > 0
+                          ? `landed total, without ${quote.unstated.join(' or ')}`
+                          : 'landed total'}
+                      </span>
                     </span>
                     <span style={{ textAlign: 'right' }}>
                       {cheapest ? <Badge tone="warning">cheapest landed</Badge> : null}
@@ -446,7 +463,9 @@ export function RequisitionClient({
             <label style={{ display: 'flex', flexDirection: 'column', gap: 5, flex: '1 1 280px' }}>
               <span style={fieldLabel}>Back-to-back credit</span>
               <select value={btbId} onChange={(e) => setBtbId(e.target.value)} style={control}>
-                {btbs.length === 0 ? <option value="">no active BTB</option> : null}
+                <option value="">
+                  {btbs.length === 0 ? 'no active BTB' : 'Choose the credit that funds it'}
+                </option>
                 {btbs.map((b) => (
                   <option key={b.id} value={b.id}>
                     {b.number} · {b.value} {b.currency} · under {b.masterNumber}
@@ -456,7 +475,12 @@ export function RequisitionClient({
             </label>
           ) : null}
 
-          <Button variant="primary" size="lg" disabled={!answered || pending} onClick={issue}>
+          <Button
+            variant="primary"
+            size="lg"
+            disabled={!answered || pending || (needsBtb && btbId === '')}
+            onClick={issue}
+          >
             {pending ? 'Issuing…' : 'Issue the purchase order'}
           </Button>
         </div>
@@ -474,7 +498,9 @@ export function RequisitionClient({
             : needsBtb
               ? btbs.length === 0
                 ? 'this supplier is an import mill and there is no active back-to-back credit — the gate will refuse, and nothing will be written'
-                : 'an import PO is funded from the back-to-back credit; the gate checks the headroom before anything is written'
+                : btbId === ''
+                  ? 'choose the credit that funds this order — an import PO is paid from a back-to-back, and which one is not a default'
+                  : 'an import PO is funded from the back-to-back credit; the gate checks that it covers this order before anything is written'
               : 'a local supplier is paid in BDT — no back-to-back credit is involved'}
         </p>
       </section>

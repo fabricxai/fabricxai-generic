@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { InlineAlert, Modal } from '@/components/fx/feedback'
 import { DateInput, TextInput } from '@/components/fx/forms'
 import { Button } from '@/components/fx/primitives'
-import { ReadIntoForm, type ReadFields } from '@/components/shell/read-into-form'
+import { ReadIntoForm, ReadMark, type ReadFields } from '@/components/shell/read-into-form'
 import { actionErrorMessage } from '@/lib/action-error'
 import { matchItem } from '@/lib/match-item'
 import { recordQuote } from '@/modules/procurement/actions'
@@ -97,6 +97,16 @@ export function NewQuoteButton({
   const [validUntil, setValidUntil] = useState('')
   const [priceTerm, setPriceTerm] = useState('')
   const [lines, setLines] = useState<LineDraft[]>([blankLine(0)])
+  /**
+   * The proforma the reading came from, kept so it travels with the quote.
+   *
+   * The document is already uploaded by the time the fields are filled — reading it required
+   * that. Dropping its id here is what left an approver with figures and no paper to check
+   * them against, which is the whole justification for letting a model read it at all.
+   */
+  const [documentId, setDocumentId] = useState<string | null>(null)
+  /** Per-field confidence from the reading, so each filled box can say how sure it was. */
+  const [confidence, setConfidence] = useState<Record<string, number | null>>({})
 
   const filled = lines.filter((l) => l.itemId && l.unitPrice.trim())
   const ready = prId !== '' && supplierId !== '' && quotedOn !== '' && filled.length > 0
@@ -114,6 +124,9 @@ export function NewQuoteButton({
   function fill(read: ReadFields) {
     const v = read.values
     const str = (x: unknown) => (x === null || x === undefined ? '' : String(x))
+
+    setDocumentId(read.document.documentId)
+    setConfidence(read.confidence)
 
     if (v.currency !== undefined) setCurrency(str(v.currency))
     if (v.quotedOn !== undefined) setQuotedOn(str(v.quotedOn))
@@ -169,6 +182,11 @@ export function NewQuoteButton({
           supplierId,
           currency: currency.trim().toUpperCase(),
           quotedOn,
+          // The validity window and the paper itself, both of which the screen already had
+          // and neither of which it used to send. An expired proforma that looks current is
+          // a price somebody quotes back to a mill that has moved on.
+          ...(validUntil ? { validUntil } : {}),
+          ...(documentId ? { documentId } : {}),
           lines: filled.map((line) => ({
             itemId: line.itemId,
             unitPrice: line.unitPrice.trim(),
@@ -182,6 +200,8 @@ export function NewQuoteButton({
         )
         setOpen(false)
         setReadNote(null)
+        setDocumentId(null)
+        setConfidence({})
         router.refresh()
       } catch (error) {
         setFailure(actionErrorMessage(error, 'The quote was not recorded.'))
@@ -202,6 +222,8 @@ export function NewQuoteButton({
         onClose={() => {
           setOpen(false)
           setReadNote(null)
+          setDocumentId(null)
+          setConfidence({})
         }}
         width={760}
         title="Record a supplier quote"
@@ -239,10 +261,10 @@ export function NewQuoteButton({
           </div>
 
           <div className="fx-stack-tablet" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 110px 1fr', gap: 12 }}>
-            <Field label="Quoted on">
+            <Field label="Quoted on" read={confidence.quotedOn}>
               <DateInput value={quotedOn} onChange={setQuotedOn} style={BOX} />
             </Field>
-            <Field label="Valid until">
+            <Field label="Valid until" read={confidence.validUntil}>
               <DateInput value={validUntil} onChange={setValidUntil} style={BOX} />
             </Field>
             <TextInput
@@ -250,13 +272,22 @@ export function NewQuoteButton({
               mono
               value={currency}
               onChange={(e) => setCurrency(e.target.value.toUpperCase())}
+              {...(confidence.currency !== undefined
+                ? { hint: <ReadMark confidence={confidence.currency} /> }
+                : {})}
             />
             <TextInput
               label="Price term"
               mono
               value={priceTerm}
               onChange={(e) => setPriceTerm(e.target.value.toUpperCase())}
-              hint="CFR, FOB, EXW"
+              hint={
+                confidence.priceTerm !== undefined ? (
+                  <ReadMark confidence={confidence.priceTerm} />
+                ) : (
+                  'CFR, FOB, EXW'
+                )
+              }
             />
           </div>
 
@@ -366,11 +397,21 @@ const BOX: React.CSSProperties = {
   width: '100%',
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({
+  label,
+  children,
+  read,
+}: {
+  label: string
+  children: React.ReactNode
+  /** How sure the reading was of this field. Absent for anything a person typed. */
+  read?: number | null
+}) {
   return (
     <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       <span style={{ font: "500 13px/1.3 var(--fx-font-sans)" }}>{label}</span>
       {children}
+      {read !== undefined ? <ReadMark confidence={read} /> : null}
     </label>
   )
 }

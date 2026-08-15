@@ -343,9 +343,10 @@ async function recordSupplierQuoteIn(
         itemId: line.itemId,
         unitPrice: line.unitPrice,
         leadTimeDays: line.leadTimeDays,
-        moq: line.moq,
-        freight: line.freight,
-        dutyPct: line.dutyPct,
+        // Absent stays absent all the way to the column (nullable since plan 5.x fix F3).
+        moq: line.moq ?? null,
+        freight: line.freight ?? null,
+        dutyPct: line.dutyPct ?? null,
       })),
     )
 
@@ -511,6 +512,19 @@ export async function issuePo(
       throw conflict('procurement.errors.supplier_inactive', { supplierId: supplier.id })
     }
 
+    /*
+     * The order's value, computed BEFORE the gate rather than after it.
+     *
+     * This sat below the gate, which meant the one figure the gate most needed did not exist
+     * when the gate ran — and so the gate could only ever check that a credit was attached,
+     * never that it covered anything. PO-2815-F (USD 123,190) was issued against a credit
+     * worth USD 34,500 and saved without a word.
+     */
+    const totalValue = payload.lines.reduce(
+      (sum, line) => sum + mulScaled4Truncating(toMinor(line.qty), toMinor(line.unitPrice)),
+      0n,
+    )
+
     if (supplier.origin === 'import') {
       if (!payload.btbLcId) {
         throw new AppError('gate_blocked', 'gates.btb_headroom.no_btb', {
@@ -529,7 +543,7 @@ export async function issuePo(
       // the deadlock shape `saveBreakdownIn` documents — and a headroom answer already
       // stale by the time the PO was written. `openBtb` locks the master on its own path;
       // now both callers deciding against one ceiling queue instead of racing.
-      const { checkBtbHeadroomIn } = await import('../commercial/service')
+      const { btbCreditIn, checkBtbHeadroomIn } = await import('../commercial/service')
       assertGate(
         GATES.btbHeadroom,
         await checkBtbHeadroomIn(ctx, tx, {
@@ -538,12 +552,65 @@ export async function issuePo(
           lock: true,
         }),
       )
-    }
 
-    const totalValue = payload.lines.reduce(
-      (sum, line) => sum + mulScaled4Truncating(toMinor(line.qty), toMinor(line.unitPrice)),
-      0n,
-    )
+      /*
+       * And now the question the gate above never asked: does this credit fund THIS order?
+       *
+       * Headroom is about the credits fitting under their master. It passes happily while a
+       * purchase order four times the size of its credit is written against it — the factory
+       * committed to a mill with nothing behind the difference, discovered at the bank, months
+       * later, when the mill presents documents. The supplier has already woven the fabric by
+       * then; the PO is what they wove it on.
+       *
+       * Counted against every other PO already riding the same credit, because two orders
+       * that each fit alone can still overdraw it together.
+       */
+      const btb = await btbCreditIn(ctx, tx, payload.btbLcId)
+      if (!btb) {
+        throw new AppError('gate_blocked', 'gates.btb_headroom.btb_not_found', {
+          gate: GATES.btbHeadroom,
+          btbLcId: payload.btbLcId,
+        })
+      }
+
+      if (btb.currency !== payload.currency) {
+        // Netting an order against a credit in another currency needs a rate nobody has
+        // stated. Same refusal the headroom check makes for a BTB against its master.
+        throw new AppError('gate_blocked', 'gates.btb_headroom.po_currency_mismatch', {
+          gate: GATES.btbHeadroom,
+          btbNumber: btb.number,
+          btbCurrency: btb.currency,
+          poCurrency: payload.currency,
+        })
+      }
+
+      const committedRows = await tx
+        .select({ value: supplierPos.totalValue })
+        .from(supplierPos)
+        .where(
+          scoped(
+            supplierPos,
+            ctx,
+            and(eq(supplierPos.btbLcId, payload.btbLcId), sql`${supplierPos.status} <> 'cancelled'`),
+          ),
+        )
+
+      const committed = sumMinor(...committedRows.map((row) => toMinor(row.value)))
+      const credit = toMinor(btb.value)
+      const wanted = sumMinor(committed, totalValue)
+
+      if (wanted > credit) {
+        throw new AppError('gate_blocked', 'gates.btb_headroom.po_exceeds_btb', {
+          gate: GATES.btbHeadroom,
+          btbNumber: btb.number,
+          creditValue: btb.value,
+          committed: fromMinor(committed),
+          poValue: fromMinor(totalValue),
+          shortfall: fromMinor(sumMinor(wanted, -credit)),
+          currency: btb.currency,
+        })
+      }
+    }
 
     const [row] = await tx
       .insert(supplierPos)
@@ -1044,6 +1111,14 @@ function toMinor(value: string): bigint {
 function mulScaled4Truncating(a: bigint, b: bigint): bigint {
   return (a * b) / 10_000n
 }
+
+/**
+ * Sum scaled integers. Named, not inline, for the reason `procurement.ts` gives at its own
+ * copy: `no-float-money` reads variable NAMES, and `committed + totalValue` looks exactly
+ * like the float arithmetic the rule exists to stop. Routing it through here says "these are
+ * scaled integers" where a reader would otherwise have to infer it.
+ */
+const sumMinor = (...values: readonly bigint[]): bigint => values.reduce((a, b) => a + b, 0n)
 
 function fromMinor(minor: bigint): string {
   const rounded = (minor + 50n) / 100n

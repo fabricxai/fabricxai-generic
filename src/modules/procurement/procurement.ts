@@ -62,10 +62,15 @@ export interface QuoteForComparison {
   unitPrice: string
   currency: string
   leadTimeDays: number
+  /*
+   * Null means the quote did not state it. Kept distinct from '0' all the way through the
+   * comparison: an unstated duty is a hole in the ranking, a stated 0% is a fact about the
+   * quote, and collapsing the two ranks an import quote as though it clears customs free.
+   */
   /** Minimum the supplier will run. Above the requirement, the surplus is still bought. */
-  moq: string
-  freight: string
-  dutyPct: string
+  moq: string | null
+  freight: string | null
+  dutyPct: string | null
 }
 
 export interface ComparisonRequirement {
@@ -93,6 +98,14 @@ export interface RankedQuote {
   landedUnitCost: string
   arrivesOn: string
   currency: string
+  /**
+   * What this quote never stated, and so is missing from its landed cost.
+   *
+   * The total is still the best available reading of the quote — it simply cannot include a
+   * figure nobody gave. Naming the gap is what stops the cheapest row being read as settled
+   * when the row beneath it stated its duty and this one did not.
+   */
+  unstated: readonly ('duty' | 'freight')[]
 }
 
 export interface QuoteComparison {
@@ -160,15 +173,22 @@ export function compareQuotes(
       continue
     }
 
-    const moq = toMinor(q.moq, 'MOQ')
+    // No MOQ stated is no minimum — the requirement stands on its own.
+    const moq = q.moq === null ? 0n : toMinor(q.moq, 'MOQ')
     const chargedQty = moq > required ? moq : required
     const rate = q.currency === baseCurrency ? SCALE_FACTOR : toMinor(ratesUsed[q.currency]!, 'rate')
 
     const unitPrice = mul(toMinor(q.unitPrice, 'unit price'), rate)
     const goods = mul(unitPrice, chargedQty)
     // Duty is charged on the goods value at the border — freight is not dutiable here.
-    const duty = mul(goods, toMinor(q.dutyPct, 'duty percentage')) / 100n
-    const freight = mul(toMinor(q.freight, 'freight'), rate)
+    // An unstated duty or freight contributes nothing and is REPORTED as unstated, rather
+    // than being quietly treated as a quote of zero.
+    const unstated: ('duty' | 'freight')[] = []
+    if (q.dutyPct === null) unstated.push('duty')
+    if (q.freight === null) unstated.push('freight')
+
+    const duty = q.dutyPct === null ? 0n : mul(goods, toMinor(q.dutyPct, 'duty percentage')) / 100n
+    const freight = q.freight === null ? 0n : mul(toMinor(q.freight, 'freight'), rate)
     const landed = sumMinor(goods, duty, freight)
 
     ranked.push({
@@ -185,6 +205,7 @@ export function compareQuotes(
       landedUnitCost: toDecimal((landed * SCALE_FACTOR) / required),
       arrivesOn,
       currency: baseCurrency,
+      unstated,
     })
   }
 
