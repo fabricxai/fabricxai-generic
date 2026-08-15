@@ -9,6 +9,7 @@ import {
 } from 'react'
 
 import { actionErrorMessage } from '@/lib/action-error'
+import { unwrap } from '@/lib/action-failure'
 import {
   extractionJobStatus,
   intakeContext,
@@ -160,11 +161,15 @@ export const ReadDocumentFlow = forwardRef<
   async function submit(kind: Kind, values: Record<string, string>) {
     setPhase({ step: 'queueing', kind })
     try {
-      const result = await readDocument({
-        kindId: kind.id,
-        documentId: attachment.documentId,
-        contextValues: values,
-      })
+      // A refusal comes back as a value (production masks thrown messages); `unwrap`
+      // re-throws it locally so the catch below shows the server's real sentence.
+      const result = unwrap(
+        await readDocument({
+          kindId: kind.id,
+          documentId: attachment.documentId,
+          contextValues: values,
+        }),
+      )
       setPhase({ step: 'watching', kind, jobId: result.jobId })
     } catch (error) {
       setPhase({

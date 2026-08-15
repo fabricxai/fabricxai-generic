@@ -11,7 +11,7 @@ import { env } from '@/lib/env'
 import { FloorTabs } from '@/components/shell/floor-tabs'
 import { getCtx } from '@/modules/core/session'
 import { withTenantRead } from '@/modules/core/tenancy'
-import { INTAKE_KINDS } from '@/modules/marbim/intake'
+import { intakeKindsFor } from '@/modules/marbim/intake'
 import { extractionJobs } from '@/modules/marbim/schema'
 
 import { IntakeClient } from './intake-client'
@@ -59,6 +59,15 @@ export default async function IntakePage() {
    */
   if (!env.MARBIM_ENABLED) return <LockedState what="document intake" />
 
+  /*
+   * The same rule as the wall, never the raw list. This page offered all of `INTAKE_KINDS`,
+   * including the eight form-filling kinds `readDocument` refuses for everybody — so "a
+   * supplier proforma" sat here as a chip whose submit could only ever be refused (and, the
+   * throw being masked in production, refused as React #441). Those kinds are read from
+   * their own screens; the proforma's home is the procurement quote dialog.
+   */
+  const kinds = intakeKindsFor(ctx.roles)
+
   const recent = await withTenantRead(ctx, (tx) =>
     tx
       .select({
@@ -87,13 +96,13 @@ export default async function IntakePage() {
         back={{ href: '/marbim', label: 'MARBIM' }}
         eyebrow="MARBIM · document intake"
         title="Give MARBIM something to read"
-        meta={`${INTAKE_KINDS.length} kinds it knows how to file`}
+        meta={`${kinds.length} kinds it knows how to file`}
         ownsAmber
       />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 30 }}>
         <IntakeClient
-          kinds={INTAKE_KINDS.map((k) => ({
+          kinds={kinds.map((k) => ({
             id: k.id,
             label: k.label,
             hint: k.hint,

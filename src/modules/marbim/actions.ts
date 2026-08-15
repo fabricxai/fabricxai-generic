@@ -248,134 +248,138 @@ export async function readDocument(input: {
   sourceText?: string
   documentId?: string
   contextValues?: Record<string, string>
-}): Promise<{ jobId: string; label: string }> {
+}): Promise<{ jobId: string; label: string } | ActionFailure> {
   const ctx = await requireRole(await headers(), ...INTAKE_ROLES)
 
-  /*
-   * Nothing queues into a void (plan 6.1, audit AI-B1).
-   *
-   * `runQueuedExtractions` skips the whole batch when no provider is registered — correctly,
-   * because the backlog is intact and will run when one is configured. What was wrong is
-   * what happened before it: this action accepted the document, told the operator it was
-   * queued, and left it in a pile nothing would ever read. A person who has typed out a
-   * buyer's PO deserves to be told the copilot is not available, at the moment they press
-   * the button, rather than to discover it by the draft never arriving.
-   *
-   * Checked at the door rather than in `queueExtraction`, because the job row is the thing
-   * that should not exist — a refusal after the insert would leave exactly the pile this
-   * prevents.
-   */
-  if (!env.MARBIM_ENABLED || !hasProvider()) {
-    throw new AppError('validation_failed', 'marbim.errors.unavailable', {
-      enabled: env.MARBIM_ENABLED,
-      provider: hasProvider(),
-    })
-  }
-
-  const policy = await getPolicy<MarbimPolicy>(ctx, 'marbim')
-
-  const kind = intakeKind(input.kindId)
-
-  /*
-   * The wall, not the filter. `listIntakeKinds` decides which chips appear; this decides
-   * what may actually be queued, and a screen is never the thing that decides.
-   */
-  if (!mayFileKind(kind, ctx.roles)) {
-    throw new AppError('forbidden', 'marbim.errors.kind_not_your_desk', { kindId: kind.id })
-  }
-
-  /*
-   * A form-filling kind has no proposable target, so queueing it would create a job that can
-   * only die at `propose` — after the upload, after the wait, in a status list. Refused at
-   * the door, the same way an unreadable file is.
-   */
-  if (kind.fillsFormOnly) {
-    throw new AppError('validation_failed', 'marbim.errors.kind_is_inline_only', {
-      kindId: kind.id,
-    })
-  }
-
-  /*
-   * The one-of-them-is-readable gate, checked before any work is queued.
-   *
-   * A file-only submission is only accepted when the file can actually be read — by the
-   * extract model directly (PDF, photographs) or by the server's own converter first
-   * (Word, Excel, CSV). Checked against the document row, not the client's word, because
-   * the mime the server stored at upload is the one the worker will fetch. Refusing here
-   * beats a job that queues, runs, and fails where only the status list would say why.
-   *
-   * The upload allowlist stays WIDER than this on purpose: a legacy `.doc` or a HEIC photo
-   * is worth keeping as evidence against a GRN even though nothing can draft from it.
-   */
-  const sourceText = input.sourceText?.trim() ? input.sourceText : undefined
-  if (!sourceText) {
-    if (!input.documentId) {
-      throw new AppError('validation_failed', 'marbim.errors.nothing_to_read', {})
-    }
-    const { documentMeta } = await import('@/modules/core/documents')
-    const meta = await documentMeta(ctx, input.documentId)
-    if (!MODEL_READABLE_MIME.has(meta.mimeType) && !TEXT_EXTRACTABLE_MIME.has(meta.mimeType)) {
-      throw new AppError('validation_failed', 'marbim.errors.file_unreadable', {
-        mimeType: meta.mimeType,
-      })
-    }
-  }
-
-  /**
-   * Context ids are checked against the caller's OWN options, not merely parsed.
-   *
-   * These values are merged into the payload and scored 1.0, so an unchecked one would be
-   * a way to write a chosen id into a draft wearing full confidence. Re-resolving the list
-   * server-side means an id from another company is not in it, and the tenancy-scoped
-   * query is what makes that true rather than a check somebody has to remember.
-   */
-  const contextValues: Record<string, string> = {}
-  for (const field of kind.context ?? []) {
-    const chosen = input.contextValues?.[field.field]
-    if (!chosen) {
-      throw new AppError('validation_failed', 'marbim.errors.context_required', {
-        field: field.field,
+  // Refusals return as values, exactly as in `readIntoForm` below: production masks thrown
+  // messages, so before this wrap every gate in here reached the operator as React #441.
+  return surfaced(async () => {
+    /*
+     * Nothing queues into a void (plan 6.1, audit AI-B1).
+     *
+     * `runQueuedExtractions` skips the whole batch when no provider is registered — correctly,
+     * because the backlog is intact and will run when one is configured. What was wrong is
+     * what happened before it: this action accepted the document, told the operator it was
+     * queued, and left it in a pile nothing would ever read. A person who has typed out a
+     * buyer's PO deserves to be told the copilot is not available, at the moment they press
+     * the button, rather than to discover it by the draft never arriving.
+     *
+     * Checked at the door rather than in `queueExtraction`, because the job row is the thing
+     * that should not exist — a refusal after the insert would leave exactly the pile this
+     * prevents.
+     */
+    if (!env.MARBIM_ENABLED || !hasProvider()) {
+      throw new AppError('validation_failed', 'marbim.errors.unavailable', {
+        enabled: env.MARBIM_ENABLED,
+        provider: hasProvider(),
       })
     }
 
-    const options = await contextOptions(ctx, field.source)
-    if (!options.some((option) => option.id === chosen)) {
-      throw new AppError('validation_failed', 'marbim.errors.context_unknown', {
-        field: field.field,
+    const policy = await getPolicy<MarbimPolicy>(ctx, 'marbim')
+
+    const kind = intakeKind(input.kindId)
+
+    /*
+     * The wall, not the filter. `listIntakeKinds` decides which chips appear; this decides
+     * what may actually be queued, and a screen is never the thing that decides.
+     */
+    if (!mayFileKind(kind, ctx.roles)) {
+      throw new AppError('forbidden', 'marbim.errors.kind_not_your_desk', { kindId: kind.id })
+    }
+
+    /*
+     * A form-filling kind has no proposable target, so queueing it would create a job that can
+     * only die at `propose` — after the upload, after the wait, in a status list. Refused at
+     * the door, the same way an unreadable file is.
+     */
+    if (kind.fillsFormOnly) {
+      throw new AppError('validation_failed', 'marbim.errors.kind_is_inline_only', {
+        kindId: kind.id,
       })
     }
 
-    contextValues[field.field] = chosen
-  }
+    /*
+     * The one-of-them-is-readable gate, checked before any work is queued.
+     *
+     * A file-only submission is only accepted when the file can actually be read — by the
+     * extract model directly (PDF, photographs) or by the server's own converter first
+     * (Word, Excel, CSV). Checked against the document row, not the client's word, because
+     * the mime the server stored at upload is the one the worker will fetch. Refusing here
+     * beats a job that queues, runs, and fails where only the status list would say why.
+     *
+     * The upload allowlist stays WIDER than this on purpose: a legacy `.doc` or a HEIC photo
+     * is worth keeping as evidence against a GRN even though nothing can draft from it.
+     */
+    const sourceText = input.sourceText?.trim() ? input.sourceText : undefined
+    if (!sourceText) {
+      if (!input.documentId) {
+        throw new AppError('validation_failed', 'marbim.errors.nothing_to_read', {})
+      }
+      const { documentMeta } = await import('@/modules/core/documents')
+      const meta = await documentMeta(ctx, input.documentId)
+      if (!MODEL_READABLE_MIME.has(meta.mimeType) && !TEXT_EXTRACTABLE_MIME.has(meta.mimeType)) {
+        throw new AppError('validation_failed', 'marbim.errors.file_unreadable', {
+          mimeType: meta.mimeType,
+        })
+      }
+    }
 
-  const { jobId } = await queueExtraction(
-    ctx,
-    {
-      moduleId: kind.moduleId,
-      targetTable: kind.targetTable,
-      zodSchemaKey: kind.zodSchemaKey,
-      extractorName: `intake.${kind.id}`,
-      // Versioned so a rewritten extractor's results are never pooled with its
-      // predecessor's — the whole reason the field is required. It was the literal `'1'`
-      // until plan 6.4, which made the correction-rate report one lifetime average across
-      // every prompt and every model the system had ever run.
-      extractorVersion: extractorVersionFor({
-        // A file read is a different population from a text read for the correction-rate
-        // report: it includes the model's own reading of the pages, not just of somebody's
-        // transcription. The suffix keeps the two from pooling.
-        promptVersion: sourceText ? EXTRACTOR_PROMPT_VERSION : `${EXTRACTOR_PROMPT_VERSION}f`,
-        model: modelForRole('extract'),
-      }),
-      sourceText,
-      sourceDocumentId: input.documentId,
-      contextValues: Object.keys(contextValues).length > 0 ? contextValues : undefined,
-    },
-    policy,
-  )
+    /**
+     * Context ids are checked against the caller's OWN options, not merely parsed.
+     *
+     * These values are merged into the payload and scored 1.0, so an unchecked one would be
+     * a way to write a chosen id into a draft wearing full confidence. Re-resolving the list
+     * server-side means an id from another company is not in it, and the tenancy-scoped
+     * query is what makes that true rather than a check somebody has to remember.
+     */
+    const contextValues: Record<string, string> = {}
+    for (const field of kind.context ?? []) {
+      const chosen = input.contextValues?.[field.field]
+      if (!chosen) {
+        throw new AppError('validation_failed', 'marbim.errors.context_required', {
+          field: field.field,
+        })
+      }
 
-  revalidatePath('/approve')
+      const options = await contextOptions(ctx, field.source)
+      if (!options.some((option) => option.id === chosen)) {
+        throw new AppError('validation_failed', 'marbim.errors.context_unknown', {
+          field: field.field,
+        })
+      }
 
-  return { jobId, label: kind.label }
+      contextValues[field.field] = chosen
+    }
+
+    const { jobId } = await queueExtraction(
+      ctx,
+      {
+        moduleId: kind.moduleId,
+        targetTable: kind.targetTable,
+        zodSchemaKey: kind.zodSchemaKey,
+        extractorName: `intake.${kind.id}`,
+        // Versioned so a rewritten extractor's results are never pooled with its
+        // predecessor's — the whole reason the field is required. It was the literal `'1'`
+        // until plan 6.4, which made the correction-rate report one lifetime average across
+        // every prompt and every model the system had ever run.
+        extractorVersion: extractorVersionFor({
+          // A file read is a different population from a text read for the correction-rate
+          // report: it includes the model's own reading of the pages, not just of somebody's
+          // transcription. The suffix keeps the two from pooling.
+          promptVersion: sourceText ? EXTRACTOR_PROMPT_VERSION : `${EXTRACTOR_PROMPT_VERSION}f`,
+          model: modelForRole('extract'),
+        }),
+        sourceText,
+        sourceDocumentId: input.documentId,
+        contextValues: Object.keys(contextValues).length > 0 ? contextValues : undefined,
+      },
+      policy,
+    )
+
+    revalidatePath('/approve')
+
+    return { jobId, label: kind.label }
+  })
 }
 
 /**

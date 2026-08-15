@@ -5,6 +5,7 @@ import { useRef, useState, useTransition } from 'react'
 
 import { InlineAlert } from '@/components/fx/feedback'
 import { actionErrorMessage } from '@/lib/action-error'
+import { unwrap } from '@/lib/action-failure'
 import { Button } from '@/components/fx/primitives'
 import { SectionHeading } from '@/components/fx/signature'
 import { uploadDocument } from '@/lib/upload-document'
@@ -165,12 +166,16 @@ export function IntakeClient({ kinds }: { kinds: readonly Kind[] }) {
 
     startTransition(async () => {
       try {
-        const result = await readDocument({
-          kindId: kind.id,
-          sourceText: text.trim() === '' ? undefined : text,
-          documentId: attachment.state === 'attached' ? attachment.documentId : undefined,
-          contextValues,
-        })
+        // A refusal comes back as a value (production masks thrown messages); `unwrap`
+        // re-throws it locally so the catch below shows the server's real sentence.
+        const result = unwrap(
+          await readDocument({
+            kindId: kind.id,
+            sourceText: text.trim() === '' ? undefined : text,
+            documentId: attachment.state === 'attached' ? attachment.documentId : undefined,
+            contextValues,
+          }),
+        )
         setQueued(result.label)
         setChosen(null)
         setText('')
