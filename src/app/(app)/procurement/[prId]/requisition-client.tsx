@@ -160,9 +160,19 @@ export function RequisitionClient({
               itemId: l.itemId,
               qty: ranked?.chargedQty ?? l.qty,
               unit: l.unit,
-              // The quoted landed unit cost, not the headline price — it is what the
-              // comparison ranked on and what the PO commits to.
-              unitPrice: ranked?.landedUnitCost ?? '0.00',
+              /*
+               * What the SUPPLIER quoted, in the supplier's own currency.
+               *
+               * This sent `landedUnitCost`, reasoning that it was "what the comparison
+               * ranked on". But landed cost is converted to the base currency and carries
+               * duty and freight, and a PO is a promise to pay this mill what this mill
+               * asked. For an import supplier that overstated the commitment by money owed
+               * to customs and a forwarder — enough that the order no longer matched the
+               * credit opened for it. For a local supplier quoting in taka it was worse:
+               * the PO is denominated in BDT and was being priced with a USD figure, so a
+               * 34.50 zipper went on the order at 0.01.
+               */
+              unitPrice: ranked?.quotedUnitPrice ?? '0.00',
             }
           }),
           }),

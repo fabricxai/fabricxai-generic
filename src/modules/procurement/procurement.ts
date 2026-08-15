@@ -139,6 +139,17 @@ export interface RankedQuote {
   freightValue: string
   landedTotal: string
   landedUnitCost: string
+  /**
+   * What the supplier actually asked, in the supplier's own currency.
+   *
+   * Carried beside the landed figure because the two answer different questions and are NOT
+   * interchangeable. Landed cost — converted to the base currency, duty and freight added —
+   * is a ranking instrument. A purchase order is a promise to pay THIS supplier, in the
+   * currency it invoices, at the price it quoted; duty is owed to customs and freight to a
+   * forwarder, and neither is the mill's to collect.
+   */
+  quotedUnitPrice: string
+  quotedCurrency: string
   arrivesOn: string
   currency: string
   /**
@@ -246,6 +257,8 @@ export function compareQuotes(
       // Per unit REQUIRED, not per unit charged — the surplus is a cost of this quote,
       // not free stock, and dividing by the charged quantity would hide it.
       landedUnitCost: toDecimal((landed * SCALE_FACTOR) / required),
+      quotedUnitPrice: q.unitPrice,
+      quotedCurrency: q.currency,
       arrivesOn,
       currency: baseCurrency,
       unstated,

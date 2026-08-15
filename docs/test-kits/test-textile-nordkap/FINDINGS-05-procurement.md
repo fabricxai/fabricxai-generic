@@ -228,6 +228,32 @@ same way, so each will reach somebody as literal `{free}` or `{rolls}` the momen
 Each needs its service to compose a `reason` the way procurement now does. Worth doing before
 §6 is walked, since the UD overdraw is one of that section's headline refusals.
 
+## F19 · CRITICAL — the PO was issued at landed cost, in the wrong currency
+
+Found while watching F1's refusal name its figures: the order came to **124,968**, not the
+123,190 the proforma totals. The issue-PO call sent `landedUnitCost` as the line's unit
+price, reasoning that it was "what the comparison ranked on".
+
+But landed cost is a ranking instrument: it is converted into the comparison's **base**
+currency and carries duty and freight — money owed to customs and to a forwarder, neither of
+which the mill collects. A purchase order is a promise to pay *this supplier*, in the
+currency it invoices, at the price it asked.
+
+Two consequences, and the second is the severe one:
+
+- **Import.** The order overstated the commitment by freight (and would by duty, once anyone
+  stated one), so it no longer matched the credit opened for it. `BTB-7712-01` is exactly
+  123,190.00 — the proforma total — so with F1's gate now live, the kit's own §5d step would
+  have been refused for being 1,778 too big.
+- **Local.** The PO is denominated in the *supplier's* currency while the price came from the
+  comparison's base currency. A Dhaka Trims zipper quoted at **34.50 BDT** ranks at 0.01 USD
+  landed and would have gone onto the purchase order as **0.01 BDT** — a 42,840-piece order
+  written for 428 taka.
+
+Fixed: `RankedQuote` now carries `quotedUnitPrice` and `quotedCurrency` beside the landed
+figures, and the PO is issued from those. A unit test asserts the two stay distinct — that a
+taka quote compared in dollars keeps its 34.50.
+
 ## F17 · Kit gap — §5 assumes items that no seed creates
 
 `pnpm seed:kit` seeds the older kit's six items (`YRN-30-1`, `FAB-PIQ-180`, `TRM-PLK` …).

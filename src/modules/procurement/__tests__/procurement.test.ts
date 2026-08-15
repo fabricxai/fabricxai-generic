@@ -199,6 +199,31 @@ describe('compareQuotes · landed cost, not unit price', () => {
   })
 })
 
+describe('compareQuotes · what is ranked and what is owed are different numbers', () => {
+  it('16b · carries the supplier’s own price beside the landed one, unconverted', () => {
+    // A purchase order is a promise to pay THIS mill, in the currency it invoices, at the
+    // price it asked. Landed cost is converted and carries duty and freight — money owed to
+    // customs and a forwarder. Issuing a PO at the landed figure overstated an import order
+    // and, for a taka supplier compared in dollars, put a 34.50 zipper on it at 0.01.
+    const result = compareQuotes(
+      [quote({ unitPrice: '34.50', currency: 'BDT', freight: null, dutyPct: null })],
+      {
+        ...REQUIRED,
+        quotedOn: '2026-07-01',
+        baseCurrency: 'USD',
+        rates: { BDT: '0.0083' },
+      },
+    )
+
+    const ranked = result.ranked[0]!
+    expect(ranked.quotedUnitPrice).toBe('34.50')
+    expect(ranked.quotedCurrency).toBe('BDT')
+    // The landed figure is still there, still in the base currency, still for ranking.
+    expect(ranked.currency).toBe('USD')
+    expect(ranked.landedUnitCost).not.toBe('34.50')
+  })
+})
+
 describe('btbFundingRefusal · the figures ARE the refusal', () => {
   it('17 · names the credit, the order and the shortfall', () => {
     // The live failure this gate was built from: 123,190 against a 34,500 credit.
