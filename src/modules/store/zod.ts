@@ -203,15 +203,29 @@ export const grnFromChallanDraft = z.object({
   receivedAt: calendarDate.optional(),
   /** What the supplier calls itself on its own paper — matched against the supplier list. */
   supplierName: z.string().optional(),
+  /*
+   * Permissive per row, strict about the SET.
+   *
+   * `itemName` was `.min(1)` with a comment saying it is always present. A challan book
+   * breaks that: `ZJH-DC-8842` restates its one material on a second row as a roll count,
+   * the model returned that row with an empty name, and one strict field then threw away a
+   * perfectly good first line — the storekeeper, standing next to a truck, got "that
+   * document could not be read" and a blank form.
+   *
+   * So a row is parsed loosely, rows with no material identity are dropped as the
+   * restatements they are, and the reading is refused only if NOTHING readable survives.
+   * The screen already treats a row that names a different material as a separate line, so
+   * a real second material still arrives as one.
+   */
   lines: z
     .array(
       z.object({
         /** The code if the challan prints one — many do, shared with the supplier. */
         itemCode: z.string().optional(),
-        /** What the paper calls the material. Always present; the code often is not. */
-        itemName: z.string().min(1),
-        qty: transcribedQty,
-        unit: z.string().min(1).max(20),
+        /** What the paper calls the material. Often the only identity a challan carries. */
+        itemName: z.string().optional(),
+        qty: transcribedQty.optional(),
+        unit: z.string().max(20).optional(),
         /** Rolls or bales listed individually, when the challan itemises them. */
         rolls: z
           .array(
@@ -225,7 +239,12 @@ export const grnFromChallanDraft = z.object({
           .default([]),
       }),
     )
-    .min(1),
+    .transform((rows) =>
+      rows.filter((row) => (row.itemCode ?? '').trim() !== '' || (row.itemName ?? '').trim() !== ''),
+    )
+    .refine((rows) => rows.length > 0, {
+      message: 'no line on this challan names a material',
+    }),
 })
 
 export const STORE_ZOD_MAP = {
