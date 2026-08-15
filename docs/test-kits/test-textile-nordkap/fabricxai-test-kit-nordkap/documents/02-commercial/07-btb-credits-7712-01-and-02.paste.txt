@@ -1,0 +1,30 @@
+Karnaphuli Mercantile Bank Ltd — BACK-TO-BACK DOCUMENTARY CREDIT ISSUE ADVICE
+
+CREDIT 1
+Our credit no: BTB-7712-01
+Date of issue: 2026-09-22
+Applicant: Test Textile Ltd
+Beneficiary: Zhejiang Hualing Knitting Co., Ltd, No. 88 Binhai Industrial Road, Keqiao District, Shaoxing, Zhejiang 312030, P.R. China
+Amount: USD 123,190.00
+Tenor: 120 days from B/L date
+Latest shipment: 2026-11-30
+Expiry: 2026-12-15
+Master credit: LC-7712 dated 2026-09-15
+Goods: 25,400 KG BRUSHED BACK FLEECE 280 GSM 80/20 CVC, TUBULAR 185 CM, IN THREE
+SHADES AS PER PROFORMA INVOICE HL-PI-26-0914 DATED 2026-09-14. CFR CHATTOGRAM.
+
+CREDIT 2
+Our credit no: BTB-7712-02
+Date of issue: 2026-09-30
+Beneficiary: Shantou Weiye Textile Trading Co., Ltd, Shantou, Guangdong, P.R. China
+Amount: USD 26,400.00
+Tenor: 90 days from B/L date
+Latest shipment: 2026-11-20
+Expiry: 2026-12-05
+Goods: 2,050 KG 1X1 RIB 240 GSM 95/5 COTTON ELASTANE AND ASSORTED IMPORTED TRIMS.
+
+BOND AND MARGIN
+Master credit value (32B):                     USD 375,900.00
+Back-to-back ceiling at 70% of master:      USD 263,130.00
+Total issued after these two credits:          USD 149,590.00
+Headroom remaining:                            USD 113,540.00

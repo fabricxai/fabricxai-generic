@@ -1,0 +1,494 @@
+{
+  "_intakeKind": "packing_list",
+  "_door": "/shipment → Pack → the drop zone",
+  "reference": "NKA-PO-70318 shipment 1 pallet 1",
+  "_cartonCount": 40,
+  "cartons": [
+    {
+      "cartonNo": "NKA-0001",
+      "contents": [
+        {
+          "color": "Charcoal Melange",
+          "size": "XS",
+          "qty": 24
+        }
+      ],
+      "grossKg": "15.50",
+      "netKg": "14.52"
+    },
+    {
+      "cartonNo": "NKA-0002",
+      "contents": [
+        {
+          "color": "Charcoal Melange",
+          "size": "XS",
+          "qty": 24
+        }
+      ],
+      "grossKg": "15.50",
+      "netKg": "14.52"
+    },
+    {
+      "cartonNo": "NKA-0003",
+      "contents": [
+        {
+          "color": "Charcoal Melange",
+          "size": "XS",
+          "qty": 24
+        }
+      ],
+      "grossKg": "15.50",
+      "netKg": "14.52"
+    },
+    {
+      "cartonNo": "NKA-0004",
+      "contents": [
+        {
+          "color": "Charcoal Melange",
+          "size": "XS",
+          "qty": 24
+        }
+      ],
+      "grossKg": "15.50",
+      "netKg": "14.52"
+    },
+    {
+      "cartonNo": "NKA-0005",
+      "contents": [
+        {
+          "color": "Charcoal Melange",
+          "size": "XS",
+          "qty": 24
+        }
+      ],
+      "grossKg": "15.50",
+      "netKg": "14.52"
+    },
+    {
+      "cartonNo": "NKA-0006",
+      "contents": [
+        {
+          "color": "Charcoal Melange",
+          "size": "XS",
+          "qty": 24
+        }
+      ],
+      "grossKg": "15.50",
+      "netKg": "14.52"
+    },
+    {
+      "cartonNo": "NKA-0007",
+      "contents": [
+        {
+          "color": "Charcoal Melange",
+          "size": "XS",
+          "qty": 24
+        }
+      ],
+      "grossKg": "15.50",
+      "netKg": "14.52"
+    },
+    {
+      "cartonNo": "NKA-0008",
+      "contents": [
+        {
+          "color": "Charcoal Melange",
+          "size": "XS",
+          "qty": 24
+        }
+      ],
+      "grossKg": "15.50",
+      "netKg": "14.52"
+    },
+    {
+      "cartonNo": "NKA-0009",
+      "contents": [
+        {
+          "color": "Charcoal Melange",
+          "size": "XS",
+          "qty": 24
+        }
+      ],
+      "grossKg": "15.50",
+      "netKg": "14.52"
+    },
+    {
+      "cartonNo": "NKA-0010",
+      "contents": [
+        {
+          "color": "Charcoal Melange",
+          "size": "XS",
+          "qty": 24
+        }
+      ],
+      "grossKg": "15.50",
+      "netKg": "14.52"
+    },
+    {
+      "cartonNo": "NKA-0011",
+      "contents": [
+        {
+          "color": "Charcoal Melange",
+          "size": "XS",
+          "qty": 24
+        }
+      ],
+      "grossKg": "15.50",
+      "netKg": "14.52"
+    },
+    {
+      "cartonNo": "NKA-0012",
+      "contents": [
+        {
+          "color": "Charcoal Melange",
+          "size": "XS",
+          "qty": 24
+        }
+      ],
+      "grossKg": "15.50",
+      "netKg": "14.52"
+    },
+    {
+      "cartonNo": "NKA-0013",
+      "contents": [
+        {
+          "color": "Charcoal Melange",
+          "size": "XS",
+          "qty": 24
+        }
+      ],
+      "grossKg": "15.50",
+      "netKg": "14.52"
+    },
+    {
+      "cartonNo": "NKA-0014",
+      "contents": [
+        {
+          "color": "Charcoal Melange",
+          "size": "XS",
+          "qty": 24
+        }
+      ],
+      "grossKg": "15.50",
+      "netKg": "14.52"
+    },
+    {
+      "cartonNo": "NKA-0015",
+      "contents": [
+        {
+          "color": "Charcoal Melange",
+          "size": "XS",
+          "qty": 24
+        }
+      ],
+      "grossKg": "15.50",
+      "netKg": "14.52"
+    },
+    {
+      "cartonNo": "NKA-0016",
+      "contents": [
+        {
+          "color": "Charcoal Melange",
+          "size": "XS",
+          "qty": 24
+        }
+      ],
+      "grossKg": "15.50",
+      "netKg": "14.52"
+    },
+    {
+      "cartonNo": "NKA-0017",
+      "contents": [
+        {
+          "color": "Charcoal Melange",
+          "size": "XS",
+          "qty": 24
+        }
+      ],
+      "grossKg": "15.50",
+      "netKg": "14.52"
+    },
+    {
+      "cartonNo": "NKA-0018",
+      "contents": [
+        {
+          "color": "Charcoal Melange",
+          "size": "XS",
+          "qty": 24
+        }
+      ],
+      "grossKg": "15.50",
+      "netKg": "14.52"
+    },
+    {
+      "cartonNo": "NKA-0019",
+      "contents": [
+        {
+          "color": "Charcoal Melange",
+          "size": "XS",
+          "qty": 24
+        }
+      ],
+      "grossKg": "15.50",
+      "netKg": "14.52"
+    },
+    {
+      "cartonNo": "NKA-0020",
+      "contents": [
+        {
+          "color": "Charcoal Melange",
+          "size": "XS",
+          "qty": 24
+        }
+      ],
+      "grossKg": "15.50",
+      "netKg": "14.52"
+    },
+    {
+      "cartonNo": "NKA-0021",
+      "contents": [
+        {
+          "color": "Charcoal Melange",
+          "size": "XS",
+          "qty": 24
+        }
+      ],
+      "grossKg": "15.50",
+      "netKg": "14.52"
+    },
+    {
+      "cartonNo": "NKA-0022",
+      "contents": [
+        {
+          "color": "Charcoal Melange",
+          "size": "XS",
+          "qty": 24
+        }
+      ],
+      "grossKg": "15.50",
+      "netKg": "14.52"
+    },
+    {
+      "cartonNo": "NKA-0023",
+      "contents": [
+        {
+          "color": "Charcoal Melange",
+          "size": "XS",
+          "qty": 24
+        }
+      ],
+      "grossKg": "15.50",
+      "netKg": "14.52"
+    },
+    {
+      "cartonNo": "NKA-0024",
+      "contents": [
+        {
+          "color": "Charcoal Melange",
+          "size": "XS",
+          "qty": 24
+        }
+      ],
+      "grossKg": "15.50",
+      "netKg": "14.52"
+    },
+    {
+      "cartonNo": "NKA-0025",
+      "contents": [
+        {
+          "color": "Charcoal Melange",
+          "size": "XS",
+          "qty": 24
+        }
+      ],
+      "grossKg": "15.50",
+      "netKg": "14.52"
+    },
+    {
+      "cartonNo": "NKA-0026",
+      "contents": [
+        {
+          "color": "Charcoal Melange",
+          "size": "XS",
+          "qty": 24
+        }
+      ],
+      "grossKg": "15.50",
+      "netKg": "14.52"
+    },
+    {
+      "cartonNo": "NKA-0027",
+      "contents": [
+        {
+          "color": "Charcoal Melange",
+          "size": "XS",
+          "qty": 24
+        }
+      ],
+      "grossKg": "15.50",
+      "netKg": "14.52"
+    },
+    {
+      "cartonNo": "NKA-0028",
+      "contents": [
+        {
+          "color": "Charcoal Melange",
+          "size": "XS",
+          "qty": 24
+        }
+      ],
+      "grossKg": "15.50",
+      "netKg": "14.52"
+    },
+    {
+      "cartonNo": "NKA-0029",
+      "contents": [
+        {
+          "color": "Charcoal Melange",
+          "size": "XS",
+          "qty": 24
+        }
+      ],
+      "grossKg": "15.50",
+      "netKg": "14.52"
+    },
+    {
+      "cartonNo": "NKA-0030",
+      "contents": [
+        {
+          "color": "Charcoal Melange",
+          "size": "XS",
+          "qty": 24
+        }
+      ],
+      "grossKg": "15.50",
+      "netKg": "14.52"
+    },
+    {
+      "cartonNo": "NKA-0031",
+      "contents": [
+        {
+          "color": "Charcoal Melange",
+          "size": "XS",
+          "qty": 24
+        }
+      ],
+      "grossKg": "15.50",
+      "netKg": "14.52"
+    },
+    {
+      "cartonNo": "NKA-0032",
+      "contents": [
+        {
+          "color": "Charcoal Melange",
+          "size": "XS",
+          "qty": 24
+        }
+      ],
+      "grossKg": "15.50",
+      "netKg": "14.52"
+    },
+    {
+      "cartonNo": "NKA-0033",
+      "contents": [
+        {
+          "color": "Charcoal Melange",
+          "size": "XS",
+          "qty": 24
+        }
+      ],
+      "grossKg": "15.50",
+      "netKg": "14.52"
+    },
+    {
+      "cartonNo": "NKA-0034",
+      "contents": [
+        {
+          "color": "Charcoal Melange",
+          "size": "XS",
+          "qty": 24
+        }
+      ],
+      "grossKg": "15.50",
+      "netKg": "14.52"
+    },
+    {
+      "cartonNo": "NKA-0035",
+      "contents": [
+        {
+          "color": "Charcoal Melange",
+          "size": "XS",
+          "qty": 24
+        }
+      ],
+      "grossKg": "15.50",
+      "netKg": "14.52"
+    },
+    {
+      "cartonNo": "NKA-0036",
+      "contents": [
+        {
+          "color": "Charcoal Melange",
+          "size": "XS",
+          "qty": 24
+        }
+      ],
+      "grossKg": "15.50",
+      "netKg": "14.52"
+    },
+    {
+      "cartonNo": "NKA-0037",
+      "contents": [
+        {
+          "color": "Charcoal Melange",
+          "size": "XS",
+          "qty": 24
+        }
+      ],
+      "grossKg": "15.50",
+      "netKg": "14.52"
+    },
+    {
+      "cartonNo": "NKA-0038",
+      "contents": [
+        {
+          "color": "Charcoal Melange",
+          "size": "XS",
+          "qty": 24
+        }
+      ],
+      "grossKg": "15.50",
+      "netKg": "14.52"
+    },
+    {
+      "cartonNo": "NKA-0039",
+      "contents": [
+        {
+          "color": "Charcoal Melange",
+          "size": "XS",
+          "qty": 24
+        }
+      ],
+      "grossKg": "15.50",
+      "netKg": "14.52"
+    },
+    {
+      "cartonNo": "NKA-0040",
+      "contents": [
+        {
+          "color": "Charcoal Melange",
+          "size": "XS",
+          "qty": 24
+        }
+      ],
+      "grossKg": "15.50",
+      "netKg": "14.52"
+    }
+  ],
+  "_notes": [
+    "40 cartons, each with exactly ONE content line — solid colour, solid size. A carton that comes back with an assortment has invented one.",
+    "The TOTAL row is not a carton. 41 cartons, or a carton numbered 'TOTAL', is the failure this document is shaped to catch.",
+    "grossKg and netKg are decimal STRINGS matching ^\\d{1,8}(\\.\\d{1,3})?$ — '15.50' and '14.52'. A gross of 15.5 is tolerable; 15,50 or '15.50 kg' is not.",
+    "Every carton is 24 pcs. The qty must never be read off the carton NUMBER."
+  ]
+}

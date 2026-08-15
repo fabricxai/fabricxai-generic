@@ -1,0 +1,15 @@
+{
+  "_intakeKind": "machine_nameplate",
+  "_door": "/maintenance → Machines → the reader door",
+  "machineType": "flatlock 5-thread coverstitch",
+  "brand": "Suzuka Sewing Machine Co.",
+  "model": "SZ-988-FL",
+  "serial": "SZ26-204417",
+  "purchasedAt": "2026-03-01",
+  "_notes": [
+    "This one has NO text path worth using — a nameplate is a photograph or it is nothing. Attach the .jpg and paste nothing. The .paste.txt is here only so the two paths can be compared on the same plate.",
+    "The plate prints MFG. DATE as '03/2026'. purchasedAt is a full date, so 2026-03-01 is the reasonable read; absent is also defensible. What is NOT defensible is 2026-03-26 or 0003-01-20 — a month/year read as a day.",
+    "serial is 'SZ26-204417' exactly, letters and dash included. A serial transcribed as 26204417 cannot be matched against the plate later, which is the entire point of recording it.",
+    "machineType is what it DOES, not what is stamped: the plate says '5-THREAD FLATLOCK / COVERSTITCH' and the field wants that in words."
+  ]
+}

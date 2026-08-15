@@ -1,0 +1,26 @@
+{
+  "_intakeKind": "supplier_proforma",
+  "_door": "/procurement → New quote → 'read a proforma'",
+  "reference": "HL-PI-26-0914",
+  "quotedOn": "2026-09-14",
+  "validUntil": "2026-10-15",
+  "currency": "USD",
+  "priceTerm": "CFR Chattogram",
+  "lines": [
+    {
+      "itemCode": "FAB-FLC-280",
+      "itemName": "Brushed back fleece 280 g/m² ±5%, 80% cotton / 20% polyester, tubular 185 cm, reactive dyed, enzyme washed, brushed one side",
+      "qty": "25400",
+      "unit": "kg",
+      "unitPrice": "4.85",
+      "leadTimeDays": 35,
+      "moq": "5000",
+      "freight": "1850.00"
+    }
+  ],
+  "_notes": [
+    "leadTimeDays is stated in prose — '35 days from receipt of workable L/C'. The schema preprocesses a string to its digits, so 35 is right; '35 days' surviving as a string means the preprocess did not run.",
+    "dutyPct is NOT on this paper. It must come back absent — a 0 here is an invention, and imported fabric under bond is duty-free for a reason that has nothing to do with a rate the mill quoted.",
+    "freight is stated as included in CFR. 1850.00 is the stated figure; do not expect it added to the line total."
+  ]
+}

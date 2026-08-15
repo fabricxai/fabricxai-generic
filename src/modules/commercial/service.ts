@@ -503,6 +503,13 @@ export async function checkBtbHeadroomIn(
             free: headroom.free,
             currency: master.currency,
             limitPct: input.limitPct,
+            // Composed here because only `reason` crosses a server action's boundary — the
+            // catalogue copy for this key carried {limit}/{used}/{free} and reached the
+            // screen with the braces still in it. The figures are the whole refusal.
+            reason:
+              `The back-to-back credits under ${master.number} would pass their ceiling. ` +
+              `${input.limitPct}% of the master is ${headroom.limit} ${master.currency}, ` +
+              `${headroom.used} is already opened, and ${headroom.free} is free.`,
           },
         }
       : {

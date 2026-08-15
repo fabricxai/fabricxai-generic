@@ -26,6 +26,8 @@ import { withTenantRead, withTenantTx, type TenantDb } from '../core/tenancy'
 
 import { PROCUREMENT_EVENTS } from './events'
 import {
+  btbCurrencyRefusal,
+  btbFundingRefusal,
   compareQuotes,
   matchReceipt,
   ProcurementError,
@@ -576,11 +578,20 @@ export async function issuePo(
       if (btb.currency !== payload.currency) {
         // Netting an order against a credit in another currency needs a rate nobody has
         // stated. Same refusal the headroom check makes for a BTB against its master.
+        //
+        // The sentence is composed HERE, not in the copy catalogue: only `details.reason`
+        // survives a server action's boundary (see lib/action-failure.ts), so a catalogue
+        // string with {placeholders} in it reaches the screen with the braces still showing.
         throw new AppError('gate_blocked', 'gates.btb_headroom.po_currency_mismatch', {
           gate: GATES.btbHeadroom,
           btbNumber: btb.number,
           btbCurrency: btb.currency,
           poCurrency: payload.currency,
+          reason: btbCurrencyRefusal({
+            btbNumber: btb.number,
+            btbCurrency: btb.currency,
+            poCurrency: payload.currency,
+          }),
         })
       }
 
@@ -600,14 +611,22 @@ export async function issuePo(
       const wanted = sumMinor(committed, totalValue)
 
       if (wanted > credit) {
-        throw new AppError('gate_blocked', 'gates.btb_headroom.po_exceeds_btb', {
-          gate: GATES.btbHeadroom,
+        // Composed here for the same reason as above — and these figures are the entire
+        // point of the refusal. "It does not fit" sends somebody looking; "short by
+        // 88,690.00" tells them what to open, amend, or choose instead.
+        const facts = {
           btbNumber: btb.number,
           creditValue: btb.value,
+          currency: btb.currency,
           committed: fromMinor(committed),
           poValue: fromMinor(totalValue),
           shortfall: fromMinor(sumMinor(wanted, -credit)),
-          currency: btb.currency,
+        }
+
+        throw new AppError('gate_blocked', 'gates.btb_headroom.po_exceeds_btb', {
+          gate: GATES.btbHeadroom,
+          ...facts,
+          reason: btbFundingRefusal(facts),
         })
       }
     }

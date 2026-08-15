@@ -428,8 +428,11 @@ export const MESSAGES: Catalogue = {
     'gates.final_inspection.failed':
       'The final inspection failed. Commercial or an owner can waive it on the record if the buyer accepts the lot.',
     'gates.final_inspection.blocked': 'Final inspection has not cleared this shipment.',
+    // No {placeholders} in gate copy: only `reason` survives a server action's boundary
+    // (lib/action-failure.ts), so a brace here reaches the screen as a literal brace. The
+    // services compose the sentence with the figures in it; this is the fallback.
     'gates.btb_headroom.exceeded':
-      'This purchase order would take the back-to-back credits past their ceiling. Limit {limit} {currency}, already used {used}, free {free}.',
+      'This purchase order would take the back-to-back credits past their ceiling under the master credit.',
     'gates.btb_headroom.btb_not_found': 'That back-to-back credit no longer exists.',
     'gates.btb_headroom.master_not_found':
       'The master credit behind this back-to-back is missing, so its headroom cannot be checked.',
@@ -441,9 +444,9 @@ export const MESSAGES: Catalogue = {
     // different question — whether the credits fit under their master — and passed happily
     // while a PO four times the size of its credit was written against it.
     'gates.btb_headroom.po_exceeds_btb':
-      'This purchase order is larger than the credit funding it. {btbNumber} is {creditValue} {currency}, {committed} is already committed to it, and this order is {poValue} — short by {shortfall}.',
+      'This purchase order is larger than the back-to-back credit funding it, counting the orders already committed to that credit.',
     'gates.btb_headroom.po_currency_mismatch':
-      'This purchase order is in {poCurrency} and {btbNumber} is in {btbCurrency}. No rate has been stated to net one against the other.',
+      'This purchase order and the back-to-back credit funding it are in different currencies, and no rate has been stated to net them.',
     'gates.exp_number.missing':
       'No EXP number on this shipment. Bangladesh Bank requires one before documents can be presented, so the handoff is blocked rather than delayed.',
     'gates.lc_date.after_latest_shipment':
@@ -832,16 +835,16 @@ export const MESSAGES: Catalogue = {
     'gates.btb_headroom.no_btb':
       'কোনো ব্যাক-টু-ব্যাক ক্রেডিট যুক্ত নেই, আর সেটি ছাড়া ইমপোর্ট PO ইস্যু করা যায় না — তাহলে ফ্যাক্টরি সাপ্লায়ারের কাছে দায়বদ্ধ হবে অথচ টাকার উৎস থাকবে না।',
     'gates.btb_headroom.exceeded':
-      'এই পারচেজ অর্ডার ব্যাক-টু-ব্যাক ক্রেডিটকে সিলিং ছাড়িয়ে নিয়ে যাবে। লিমিট {limit} {currency}, ব্যবহৃত {used}, বাকি {free}।',
+      'এই পারচেজ অর্ডার মাস্টার ক্রেডিটের নিচে থাকা ব্যাক-টু-ব্যাক ক্রেডিটগুলোকে সিলিং ছাড়িয়ে নিয়ে যাবে।',
     'gates.btb_headroom.btb_not_found': 'এই ব্যাক-টু-ব্যাক ক্রেডিট আর নেই।',
     'gates.btb_headroom.master_not_found':
       'এই ব্যাক-টু-ব্যাকের পেছনের মাস্টার ক্রেডিট নেই, তাই এর হেডরুম মেলানো যাচ্ছে না।',
     'gates.btb_headroom.master_not_active':
       'মাস্টার ক্রেডিট সক্রিয় নয়, তাই এই ব্যাক-টু-ব্যাকের পেছনে কোনো টাকার উৎস নেই।',
     'gates.btb_headroom.po_exceeds_btb':
-      'এই পারচেজ অর্ডার তার ফান্ডিং ক্রেডিটের চেয়ে বড়। {btbNumber} হলো {creditValue} {currency}, তাতে ইতিমধ্যে {committed} প্রতিশ্রুত, আর এই অর্ডার {poValue} — {shortfall} কম পড়ছে।',
+      'ওই ক্রেডিটে আগে থেকে দেওয়া অর্ডারগুলো ধরলে, এই পারচেজ অর্ডার তার ফান্ডিং ব্যাক-টু-ব্যাক ক্রেডিটের চেয়ে বড়।',
     'gates.btb_headroom.po_currency_mismatch':
-      'এই পারচেজ অর্ডার {poCurrency}-তে আর {btbNumber} {btbCurrency}-তে। একটির সঙ্গে অন্যটি মেলানোর কোনো রেট বলা হয়নি।',
+      'এই পারচেজ অর্ডার আর তার ফান্ডিং ব্যাক-টু-ব্যাক ক্রেডিট আলাদা কারেন্সিতে, আর মেলানোর কোনো রেট বলা হয়নি।',
     'gates.btb_headroom.currency_mismatch':
       'ব্যাক-টু-ব্যাক আর তার মাস্টার ক্রেডিট আলাদা মুদ্রায় ({btbCurrency} বনাম {masterCurrency}), আর মেলানোর মতো কোনো রেট বলা হয়নি।',
     'gates.fabric_inspection.not_inspected':

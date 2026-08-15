@@ -1,0 +1,19 @@
+Nordkap Apparel AB
+MEASUREMENT CHART — POINTS OF MEASURE
+ST-2815 · NK-90455 · Rev 2
+All measurements in cm, garment measured flat.
+
+POM Point of measure                                   XS      S      M      L     XL    Tol +/-
+A  Chest width, 1 cm below armhole               51.0    53.5    56.0    58.5    61.0      1.5
+B  Body length from HPS                          62.0    64.0    66.0    68.0    70.0      1.0
+C  Across shoulder                               40.5    42.0    43.5    45.0    46.5      1.0
+D  Sleeve length from CB                         78.0    80.0    82.0    84.0    86.0      1.0
+E  Armhole straight                              22.5    23.5    24.5    25.5    26.5      0.8
+F  Cuff width relaxed                             8.5     8.5     9.0     9.0     9.5      0.5
+G  Bottom rib width relaxed                      38.0    40.5    43.0    45.5    48.0      1.5
+H  Hood height                                   35.0    35.5    36.0    36.5    37.0      0.8
+I  Hood width at base                            24.0    24.5    25.0    25.5    26.0      0.5
+J  Pocket opening                                15.5    16.0    16.5    17.0    17.5      0.5
+
+Tolerance is symmetric unless stated otherwise. A measurement outside tolerance on any
+graded point is a major defect at final inspection.

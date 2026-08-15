@@ -1,0 +1,54 @@
+Karnaphuli Mercantile Bank Ltd
+Gulshan Corporate Branch, Dhaka
+SWIFT KRMLBDDH
+
+ADVICE OF DOCUMENTARY CREDIT
+Received by SWIFT MT700 - our reference KRMLBDDH/ADV/2026/44127
+Advice date: 2026-09-16
+To the beneficiary: Test Textile Ltd, Plot 44–46, Sector 3, Karnaphuli EPZ Road, Ashulia, Savar, Dhaka 1341, Bangladesh
+
+:27: 1/1
+:40A: IRREVOCABLE
+:20: LC-7712
+:31C: 260915
+:40E: UCP LATEST VERSION
+:31D: 270225  BANGLADESH
+:50: Nordkap Apparel AB
+      Lindholmsallén 32
+      417 55 Göteborg, Sweden
+:59: Test Textile Ltd
+      Plot 44–46, Sector 3, Karnaphuli EPZ Road
+      Ashulia, Savar, Dhaka 1341, Bangladesh
+:32B: USD 375,900.00
+:39A: 5/5
+:41D: ANY BANK
+      BY NEGOTIATION
+:42C: 120 DAYS FROM BILL OF LADING DATE
+:42A: NDKMSESS
+:43P: ALLOWED
+:43T: ALLOWED
+:44E: CHATTOGRAM, BANGLADESH
+:44F: GOTHENBURG, SWEDEN
+:44C: 270210
+:45A: 42,000 PCS LADIES BRUSHED FLEECE FULL ZIP HOODIE
+STYLE ST-2815 / BUYER ARTICLE NK-90455
+AT USD 8.95 PER PIECE FOB CHATTOGRAM
+AS PER PROFORMA / PURCHASE ORDER NO NKA-PO-70318 DATED 2026-09-02
+SHIPMENT IN THREE LOTS PERMITTED
+:46A: DOCUMENTS REQUIRED
+      1. Signed commercial invoice in 3 fold
+      2. Full set 3/3 original clean on board ocean bills of lading made out to order and blank endorsed, marked freight collect, notify applicant
+      3. Packing list in 3 fold showing carton wise contents, gross and net weight
+      4. Certificate of origin GSP Form A issued by the Export Promotion Bureau, Bangladesh
+      5. Beneficiary's certificate that one set of non-negotiable documents has been sent to the applicant by courier within 3 days of shipment
+      6. Inspection certificate issued and signed by the applicant
+:47A: ADDITIONAL CONDITIONS
+      1. ALL DOCUMENTS MUST BEAR OUR CREDIT NUMBER AND DATE.
+      2. THIRD PARTY DOCUMENTS ACCEPTABLE EXCEPT INVOICE AND DRAFT.
+      3. SHIPMENT EFFECTED PRIOR TO RECEIPT OF ANY AMENDMENT IS NOT ACCEPTABLE.
+      4. A DISCREPANCY FEE OF USD 75.00 WILL BE DEDUCTED FROM THE PROCEEDS FOR EACH SET OF
+         DISCREPANT DOCUMENTS.
+:71B: ALL CHARGES OUTSIDE SWEDEN INCLUDING ADVISING AND NEGOTIATION ARE FOR BENEFICIARY ACCOUNT
+:48: WITHIN 21 DAYS AFTER THE DATE OF SHIPMENT BUT WITHIN THE VALIDITY OF THE CREDIT
+:49: WITHOUT
+:78: UPON RECEIPT OF DOCUMENTS IN COMPLIANCE WE SHALL REMIT AT MATURITY AS PER YOUR INSTRUCTIONS

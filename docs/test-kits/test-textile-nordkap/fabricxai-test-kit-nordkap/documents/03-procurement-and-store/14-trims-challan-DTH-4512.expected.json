@@ -1,0 +1,41 @@
+{
+  "_intakeKind": "delivery_challan",
+  "_door": "/store/receive → the drop zone",
+  "challanNo": "DTH-4512",
+  "receivedAt": "2026-11-18",
+  "supplierName": "Dhaka Trims House",
+  "lines": [
+    {
+      "itemCode": "TRM-ZIP-OE65",
+      "itemName": "YKK #5 open-end zipper 65 cm — assorted shades",
+      "qty": "42840",
+      "unit": "pcs",
+      "rolls": []
+    },
+    {
+      "itemCode": "TRM-CORD-8",
+      "itemName": "Flat drawcord 8 mm x 130 cm, tipped",
+      "qty": "43260",
+      "unit": "pcs",
+      "rolls": []
+    },
+    {
+      "itemCode": "TRM-EYELET-8",
+      "itemName": "Metal eyelet 8 mm antique silver",
+      "qty": "86520",
+      "unit": "pcs",
+      "rolls": []
+    },
+    {
+      "itemCode": "TRM-LBL-MAIN",
+      "itemName": "Woven main label, size-specific",
+      "qty": "42840",
+      "unit": "pcs",
+      "rolls": []
+    }
+  ],
+  "_notes": [
+    "Four lines, all in pcs, all general store — nothing here is bonded, so the receipt must NOT ask for a UD. If it does, the bonded test in the store has the wrong default.",
+    "86,520 (eyelets) is the largest number on the page and is two per garment plus wastage. A reading of 8,652 or 865,200 is the digit-slip this document exists to catch."
+  ]
+}

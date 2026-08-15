@@ -1,0 +1,29 @@
+{
+  "_intakeKind": "ud_scan",
+  "_door": "/marbim/intake → 'A customs Utilization Declaration'",
+  "number": "UD-2026-058",
+  "issueDate": "2026-09-28",
+  "validUntil": "2027-03-31",
+  "authorizedItems": [
+    {
+      "itemRef": "FAB-FLC-280",
+      "qty": "25400",
+      "unit": "kg"
+    },
+    {
+      "itemRef": "FAB-RIB-1X1",
+      "qty": "2050",
+      "unit": "kg"
+    },
+    {
+      "itemRef": "TRM-ZIP-OE65",
+      "qty": "42840",
+      "unit": "pcs"
+    }
+  ],
+  "_notes": [
+    "This one is a SCAN, not a clean PDF — the file path and the text path should score visibly differently. Run both. A scan that comes back at 1.000 on every field has not been read, it has been guessed.",
+    "Three authorised items with two different units. A reading that normalises the zipper's 42,840 pcs into kg is a finding.",
+    "25,400 kg is the number the store's bonded issues will be checked against for the rest of this order. It is the balance the overdraw block defends, so it must be exactly right before approving."
+  ]
+}

@@ -1,0 +1,18 @@
+Dhaka Trims House
+148/A Tejgaon Industrial Area, Dhaka 1208, Bangladesh
+
+DELIVERY CHALLAN / ডেলিভারি চালান
+
+Challan No.: DTH-4512
+Date: 2026-11-18
+Consignee: Test Textile Ltd, Plot 44–46, Sector 3, Karnaphuli EPZ Road
+Vehicle No.: DHAKA METRO-N-19-8802
+Order ref: ST-2815 / NKA-PO-70318
+
+Sl  Description of goods                                             Quantity    Unit
+1   TRM-ZIP-OE65  YKK #5 open-end zipper 65 cm - assorted shades     42,840      pcs
+2   TRM-CORD-8  Flat drawcord 8 mm x 130 cm, tipped                  43,260      pcs
+3   TRM-EYELET-8  Metal eyelet 8 mm antique silver                   86,520      pcs
+4   TRM-LBL-MAIN  Woven main label, size-specific                    42,840      pcs
+
+General (non-bonded) store. Against our quotation DTH-Q-2026-337. VAT challan follows.

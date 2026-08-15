@@ -1,0 +1,64 @@
+{
+  "_intakeKind": "hourly_sheet",
+  "_door": "/lines/hourly → the day-catchup door",
+  "lineCode": "L-3",
+  "producedOn": "2026-12-08",
+  "reference": "ST-2815",
+  "targetPerHour": 145,
+  "hours": [
+    {
+      "hourSlot": 8,
+      "target": 145,
+      "actual": 118,
+      "remark": "first hour — feeding, 6 operators short"
+    },
+    {
+      "hourSlot": 9,
+      "target": 145,
+      "actual": 141
+    },
+    {
+      "hourSlot": 10,
+      "target": 145,
+      "actual": 149
+    },
+    {
+      "hourSlot": 11,
+      "target": 145,
+      "actual": 152
+    },
+    {
+      "hourSlot": 12,
+      "target": 145,
+      "actual": 147
+    },
+    {
+      "hourSlot": 14,
+      "target": 145,
+      "actual": 138,
+      "remark": "needle change SN-3-014"
+    },
+    {
+      "hourSlot": 15,
+      "target": 145,
+      "actual": 151
+    },
+    {
+      "hourSlot": 16,
+      "target": 145,
+      "actual": 156
+    },
+    {
+      "hourSlot": 17,
+      "target": 145,
+      "actual": 143
+    }
+  ],
+  "_notes": [
+    "NINE hours, not ten. The 13:00–14:00 band is ruled through for lunch and must not become an hour with actual 0 — a zero hour drags the day's efficiency down by a tenth and the line gets a run-rate alert it did not earn.",
+    "hourSlot is the 24-hour START of the band. '14–15' is 14. The afternoon hours are the ones that get read as 2 and 3.",
+    "Two remarks only — hour 8 and hour 14. The rest must come back absent, not as empty strings.",
+    "The TOTAL row (1,295) is a total, not an hour. If a tenth entry appears with actual 1295, the model read the footer as data.",
+    "The downtime log at the bottom has times in it (09:40, 14:10, 16:35) and is NOT hours of output. Three more entries with actual 25 / 12 / 6 means the second table was swallowed into the first."
+  ]
+}

@@ -52,6 +52,49 @@ const mul = (a: bigint, b: bigint): bigint => (a * b) / SCALE_FACTOR
  */
 const sumMinor = (...values: readonly bigint[]): bigint => values.reduce((a, b) => a + b, 0n)
 
+/**
+ * The sentence a buyer reads when the credit will not cover the order.
+ *
+ * Pure, exported and tested here rather than composed inside the transaction, for two
+ * reasons. The figures ARE the refusal — "short by 88,690.00" is what tells somebody which
+ * credit to amend or choose — so getting the wording wrong is a defect about money, and a
+ * defect about money deserves a test. And only `details.reason` survives a server action's
+ * boundary in production (lib/action-failure.ts), which makes this string the entire message
+ * the person will see, not a decoration over a catalogue entry.
+ */
+export function btbFundingRefusal(facts: {
+  btbNumber: string
+  creditValue: string
+  currency: string
+  /** What other purchase orders already ride this credit. '0.00' when none do. */
+  committed: string
+  poValue: string
+  shortfall: string
+}): string {
+  const alreadyOn =
+    facts.committed === '0.00'
+      ? 'nothing else is committed to it'
+      : `${facts.committed} is already committed to it`
+
+  return (
+    `This purchase order is larger than the credit funding it. ${facts.btbNumber} is ` +
+    `${facts.creditValue} ${facts.currency}, ${alreadyOn}, and this order is ` +
+    `${facts.poValue} — short by ${facts.shortfall}.`
+  )
+}
+
+/** The same, for an order and a credit denominated differently. */
+export function btbCurrencyRefusal(facts: {
+  btbNumber: string
+  btbCurrency: string
+  poCurrency: string
+}): string {
+  return (
+    `This purchase order is in ${facts.poCurrency} and ${facts.btbNumber} is in ` +
+    `${facts.btbCurrency}. No rate has been stated to net one against the other.`
+  )
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Quote comparison
 // ─────────────────────────────────────────────────────────────────────────────

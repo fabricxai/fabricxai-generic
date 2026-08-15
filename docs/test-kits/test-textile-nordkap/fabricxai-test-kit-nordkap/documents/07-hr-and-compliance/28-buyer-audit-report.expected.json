@@ -1,0 +1,62 @@
+{
+  "_intakeKind": "audit_report",
+  "_door": "/marbim/intake → 'A compliance audit report' (compliance only)",
+  "_context": {
+    "auditId": "picked from the Audit dropdown. Create the audit FIRST — regime 'buyer', 2026-08-26, Vertas Assurance Ltd — then file this against it."
+  },
+  "findings": [
+    {
+      "severity": "critical",
+      "text": "Two of the four fire exits on the 3rd floor sewing area were obstructed by stacked carton pallets at the time of the walk; exit 3B was locked and the key was held in the security office.",
+      "sourcePage": 4,
+      "evidence": []
+    },
+    {
+      "severity": "major",
+      "text": "Overtime records for June and July 2026 show 68 operators exceeding the statutory 2 hours per day on 9 and 11 days respectively, without the written consent required by the Bangladesh Labour Rules 2015.",
+      "sourcePage": 5,
+      "evidence": []
+    },
+    {
+      "severity": "major",
+      "text": "Chemical store for spot-cleaning solvents has no secondary containment and no MSDS displayed in Bangla; three containers were unlabelled.",
+      "sourcePage": 5,
+      "evidence": []
+    },
+    {
+      "severity": "major",
+      "text": "No functioning anti-harassment committee could be evidenced; the last recorded meeting minute is dated 2025-11-04.",
+      "sourcePage": 6,
+      "evidence": []
+    },
+    {
+      "severity": "minor",
+      "text": "Drinking-water points on the ground floor were tested at 1 point per 84 workers against the required 1 per 50.",
+      "sourcePage": 6,
+      "evidence": []
+    },
+    {
+      "severity": "minor",
+      "text": "Personal protective equipment for the cutting section (metal mesh gloves) was available but not worn by 4 of 11 cutters observed.",
+      "sourcePage": 7,
+      "evidence": []
+    },
+    {
+      "severity": "minor",
+      "text": "Machine guards were missing on 2 of 14 button-attach machines inspected.",
+      "sourcePage": 7,
+      "evidence": []
+    },
+    {
+      "severity": "observation",
+      "text": "Childcare room is operating above its registered capacity on morning shifts; the factory has applied for an extension.",
+      "sourcePage": 8,
+      "evidence": []
+    }
+  ],
+  "_notes": [
+    "EIGHT findings: 1 critical, 3 major, 3 minor, 1 observation. The severity words on the page map onto the enum exactly — 'Critical (zero tolerance)' is still `critical`.",
+    "The corrective action plan at the end is NOT a finding list. Seven more findings that read like instructions ('Clear and unlock all fire exits') means the CAP table was swallowed.",
+    "The critical finding is the one with teeth: it should gate the order in the compliance screen, and the kit's walk checks that it does."
+  ]
+}

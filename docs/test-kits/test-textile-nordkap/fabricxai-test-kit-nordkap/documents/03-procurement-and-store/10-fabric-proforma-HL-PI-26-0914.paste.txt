@@ -1,0 +1,29 @@
+Zhejiang Hualing Knitting Co., Ltd
+No. 88 Binhai Industrial Road, Keqiao District
+Shaoxing, Zhejiang 312030, P.R. China
+
+PROFORMA INVOICE — HL-PI-26-0914 · 2026-09-14
+
+To (buyer): Test Textile Ltd, Plot 44–46, Sector 3, Karnaphuli EPZ Road, Ashulia, Savar, Dhaka 1341, Bangladesh
+Attn: Procurement · ref your enquiry TT-ENQ-2815-F
+PI number: HL-PI-26-0914
+PI date: 2026-09-14
+Valid until: 2026-10-15
+Price term: CFR Chattogram
+Currency: USD
+For end style: ST-2815 / NKA-PO-70318
+
+Article       Description                                                     Qty      Unit  Unit price  Amount
+FAB-FLC-280   Brushed back fleece 280 g/m2 +/-5%, 80% cotton / 20% polyester,
+              tubular 185 cm, reactive dyed, enzyme washed, brushed one side.
+              Shades: Charcoal Melange, Deep Navy, Off White.               25,400   kg      4.85   123,190.00
+Total CFR Chattogram                                                                                    123,190.00
+
+TERMS
+Payment: back-to-back L/C at 120 days from B/L date
+Lead time: 35 days from receipt of workable L/C
+Minimum order: 5,000 kg per shade
+Ocean freight: USD 1,850.00 - included in the CFR price
+Shipment: part shipment allowed, 3 lots by shade
+Tolerance: +/-3% on quantity and value
+Port of loading: Ningbo, China

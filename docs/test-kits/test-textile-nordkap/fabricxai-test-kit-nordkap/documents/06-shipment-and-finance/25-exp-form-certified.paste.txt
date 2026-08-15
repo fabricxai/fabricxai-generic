@@ -1,0 +1,21 @@
+BANGLADESH BANK — EXPORT FORM (EXP)
+
+EXP No.: EXP-2027-KMB-041182
+Date of issue: 2027-01-14
+Authorised dealer: Karnaphuli Mercantile Bank Ltd
+AD code: 010-2244-1188
+Exporter: Test Textile Ltd
+ERC / BIN: RC-119847 / 004471003-0201
+Consignee: Nordkap Apparel AB
+Country of destination: Sweden
+Port of shipment: Chattogram, Bangladesh
+L/C no. and date: LC-7712 / 2026-09-15
+Invoice no. and date: TT-INV-2815-1 / 2027-01-22
+Bill of lading: MAEU-CTG-771904 / 2027-01-22
+
+Commodity: ladies' brushed-fleece full-zip hoodie (style ST-2815)
+HS code: 6110.20.00
+Quantity: 12,000 pcs
+Unit value: USD 8.95
+Total value: USD 107,400.00
+Terms of sale: FOB Chattogram - proceeds realisable within 120 days of shipment

@@ -1,0 +1,20 @@
+Nordkap Apparel AB
+PURCHASE ORDER AMENDMENT — NKA-PO-70318 · AMD-01
+
+Original PO: NKA-PO-70318 dated 2026-09-02
+Amendment: AMD-01
+Amendment date: 2026-12-20
+Style: ST-2815
+
+Field                Was                  Now
+Ex-factory date      2027-01-28           2027-02-14
+Quantity             42,000 pcs           42,000 pcs - unchanged
+Unit price           USD 8.95             USD 8.95 - unchanged
+Colour / size grid   as PO                unchanged
+Shipment split       3 shipments          3 shipments - dates shift with ex-factory
+
+We are aware that the amended ex-factory date of 2027-02-14 sits after the latest
+shipment date of 2027-02-10 in credit LC-7712. Our bank has been instructed to
+amend 44C to 2027-02-28 and 31D to 2027-03-15. Do not present documents against the current
+credit for any shipment leaving after 2027-02-10 until the amendment reaches you through
+your advising bank.

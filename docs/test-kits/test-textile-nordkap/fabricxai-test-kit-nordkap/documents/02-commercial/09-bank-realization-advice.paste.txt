@@ -1,0 +1,34 @@
+Karnaphuli Mercantile Bank Ltd
+Gulshan Corporate Branch, Dhaka — SWIFT KRMLBDDH
+
+EXPORT PROCEEDS REALIZATION ADVICE
+Our reference: KMB/EXP/2027/09117
+Advice date: 2027-02-18
+Value date: 2027-02-18
+Under credit: LC-7712 of Nordbanken Kommers AB
+EXP number: EXP-2027-KMB-041182
+
+To: Test Textile Ltd
+A/C 0021-4471-9930 (USD ERQ) / 0021-4471-9901 (BDT current)
+
+We are pleased to advise that the export proceeds against the documents detailed below have
+been realized and credited to your account with value date 2027-02-18.
+
+DOCUMENTS PRESENTED
+Commercial invoice: TT-INV-2815-1 dated 2027-01-22
+Bill of lading: MAEU-CTG-771904 on board 2027-01-22
+Vessel / voyage: MAERSK KALMAR / 703W
+Shipment: 12,000 pcs, 500 cartons, Chattogram, Bangladesh to Gothenburg, Sweden
+Presentation date: 2027-01-27
+Discrepancies: none
+
+DEDUCTIONS                                   Amount (USD)
+Foreign bank charges                               92.50
+Courier charges                                    45.00
+Negotiation commission 0.25%                      268.50
+Total deductions                                  406.00
+
+SETTLEMENT                                   Amount (USD)
+Document value / gross proceeds               107,400.00
+Less total deductions                           (406.00)
+NET AMOUNT CREDITED                           106,994.00

@@ -17,6 +17,8 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  btbCurrencyRefusal,
+  btbFundingRefusal,
   compareQuotes,
   matchReceipt,
   ProcurementError,
@@ -194,6 +196,53 @@ describe('compareQuotes · landed cost, not unit price', () => {
 
     expect(result.ranked).toHaveLength(0)
     expect(result.infeasible).toHaveLength(2)
+  })
+})
+
+describe('btbFundingRefusal · the figures ARE the refusal', () => {
+  it('17 · names the credit, the order and the shortfall', () => {
+    // The live failure this gate was built from: 123,190 against a 34,500 credit.
+    const sentence = btbFundingRefusal({
+      btbNumber: 'BTB-4471-01',
+      creditValue: '34500.00',
+      currency: 'USD',
+      committed: '0.00',
+      poValue: '123190.00',
+      shortfall: '88690.00',
+    })
+
+    expect(sentence).toContain('BTB-4471-01')
+    expect(sentence).toContain('34500.00 USD')
+    expect(sentence).toContain('short by 88690.00')
+    // Nothing else on it, so say that rather than "0.00 is already committed to it".
+    expect(sentence).toContain('nothing else is committed to it')
+  })
+
+  it('18 · counts what already rides the credit when something does', () => {
+    const sentence = btbFundingRefusal({
+      btbNumber: 'BTB-7712-01',
+      creditValue: '20000.00',
+      currency: 'USD',
+      committed: '12900.00',
+      poValue: '12900.00',
+      shortfall: '5800.00',
+    })
+
+    expect(sentence).toContain('12900.00 is already committed to it')
+    expect(sentence).not.toContain('nothing else')
+  })
+
+  it('19 · a credit in another currency says which two, and stays a sentence', () => {
+    const sentence = btbCurrencyRefusal({
+      btbNumber: 'BTB-7712-01',
+      btbCurrency: 'USD',
+      poCurrency: 'BDT',
+    })
+
+    expect(sentence).toContain('BDT')
+    expect(sentence).toContain('USD')
+    // The bug this replaced: catalogue copy with {braces} that reached the screen raw.
+    expect(sentence).not.toMatch(/[{}]/)
   })
 })
 

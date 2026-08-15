@@ -1,0 +1,51 @@
+Test Textile Ltd
+PACK-OUT SHEET — PALLET 1
+ST-2815 · NKA-PO-70318 · shipment 1 of 3
+
+Buyer: Nordkap Apparel AB
+Colour: Charcoal Melange
+Pack: 24 pcs solid colour solid size
+Packed on: 2027-01-16
+
+Carton no   Colour             Size   Qty   Net kg   Gross kg
+NKA-0001    Charcoal Melange   XS     24    14.52    15.50
+NKA-0002    Charcoal Melange   XS     24    14.52    15.50
+NKA-0003    Charcoal Melange   XS     24    14.52    15.50
+NKA-0004    Charcoal Melange   XS     24    14.52    15.50
+NKA-0005    Charcoal Melange   XS     24    14.52    15.50
+NKA-0006    Charcoal Melange   XS     24    14.52    15.50
+NKA-0007    Charcoal Melange   XS     24    14.52    15.50
+NKA-0008    Charcoal Melange   XS     24    14.52    15.50
+NKA-0009    Charcoal Melange   XS     24    14.52    15.50
+NKA-0010    Charcoal Melange   XS     24    14.52    15.50
+NKA-0011    Charcoal Melange   XS     24    14.52    15.50
+NKA-0012    Charcoal Melange   XS     24    14.52    15.50
+NKA-0013    Charcoal Melange   XS     24    14.52    15.50
+NKA-0014    Charcoal Melange   XS     24    14.52    15.50
+NKA-0015    Charcoal Melange   XS     24    14.52    15.50
+NKA-0016    Charcoal Melange   XS     24    14.52    15.50
+NKA-0017    Charcoal Melange   XS     24    14.52    15.50
+NKA-0018    Charcoal Melange   XS     24    14.52    15.50
+NKA-0019    Charcoal Melange   XS     24    14.52    15.50
+NKA-0020    Charcoal Melange   XS     24    14.52    15.50
+NKA-0021    Charcoal Melange   XS     24    14.52    15.50
+NKA-0022    Charcoal Melange   XS     24    14.52    15.50
+NKA-0023    Charcoal Melange   XS     24    14.52    15.50
+NKA-0024    Charcoal Melange   XS     24    14.52    15.50
+NKA-0025    Charcoal Melange   XS     24    14.52    15.50
+NKA-0026    Charcoal Melange   XS     24    14.52    15.50
+NKA-0027    Charcoal Melange   XS     24    14.52    15.50
+NKA-0028    Charcoal Melange   XS     24    14.52    15.50
+NKA-0029    Charcoal Melange   XS     24    14.52    15.50
+NKA-0030    Charcoal Melange   XS     24    14.52    15.50
+NKA-0031    Charcoal Melange   XS     24    14.52    15.50
+NKA-0032    Charcoal Melange   XS     24    14.52    15.50
+NKA-0033    Charcoal Melange   XS     24    14.52    15.50
+NKA-0034    Charcoal Melange   XS     24    14.52    15.50
+NKA-0035    Charcoal Melange   XS     24    14.52    15.50
+NKA-0036    Charcoal Melange   XS     24    14.52    15.50
+NKA-0037    Charcoal Melange   XS     24    14.52    15.50
+NKA-0038    Charcoal Melange   XS     24    14.52    15.50
+NKA-0039    Charcoal Melange   XS     24    14.52    15.50
+NKA-0040    Charcoal Melange   XS     24    14.52    15.50
+TOTAL - pallet 1                      960   580.80   620.00

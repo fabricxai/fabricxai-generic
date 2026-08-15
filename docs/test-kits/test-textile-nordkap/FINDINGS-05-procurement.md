@@ -199,6 +199,35 @@ mill's identity. Worth a format hint or a soft warning when a code collides with
 A full stop followed by an em dash and a lower-case clause. The two halves are a message and
 an eyebrow that were never meant to be read as one sentence.
 
+## F18 · HIGH — gate copy interpolates values that never cross the boundary
+
+Found while verifying F1 on the live box. The gate refused correctly and the screen showed:
+
+> This purchase order is larger than the credit funding it. {btbNumber} is {creditValue}
+> {currency}, {committed} is already committed to it, and this order is {poValue} — short by
+> {shortfall}.
+
+Braces and all. `action-error.ts` documents exactly why: across a server action's boundary
+only `messageKey` and `reason` survive, so `details` — every figure — is gone by the time the
+copy is resolved. A catalogue string with `{placeholders}` therefore renders literally.
+
+Fixed for the three back-to-back keys in `70551a3`'s follow-up: the services compose the
+sentence where the figures exist and pass it as `reason`, the catalogue copy stands alone
+without braces as the fallback, and the composition is a pure tested helper because a wrong
+sentence about money is a defect about money.
+
+**Still open — the same flaw, other gates.** These keys all carry braces and are thrown the
+same way, so each will reach somebody as literal `{free}` or `{rolls}` the moment it fires:
+
+- `gates.ud_balance.*` — `{free} {unit}`, `{requested}` (the bonded overdraw, kit §6)
+- `gates.four_point.*` — `{rolls}`, `{pointsPer100SqYd}`, `{found} of {expected}`
+- `gates.lc_date.*` — `{plannedExFactoryDate}`, `{daysOver}`, `{latestShipmentDate}`,
+  `{expiryDate}`
+- `gates.btb_headroom.currency_mismatch` — `{btbCurrency}` against `{masterCurrency}`
+
+Each needs its service to compose a `reason` the way procurement now does. Worth doing before
+§6 is walked, since the UD overdraw is one of that section's headline refusals.
+
 ## F17 · Kit gap — §5 assumes items that no seed creates
 
 `pnpm seed:kit` seeds the older kit's six items (`YRN-30-1`, `FAB-PIQ-180`, `TRM-PLK` …).

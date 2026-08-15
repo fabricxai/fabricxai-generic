@@ -1,0 +1,20 @@
+Test Textile Ltd
+CUTTING SECTION — LAY REPORT (Form CUT-02)
+
+Lay No.: LAY-41
+Date: 2026-11-26
+Order / Style: NKA-PO-70318 / ST-2815
+Colour: Charcoal Melange
+Marker: ST-2815-A
+Plies: 96
+Table: C-2
+Rolls used: R-F-01 - R-F-21 (shade A)
+Fabric used (kg): 521.3
+
+CUT QUANTITY BY SIZE
+                     XS       S       M       L      XL    TOTAL
+Marker ratio          1       2       3       2       1    9
+Should cut           96     192     288     192      96    864
+ACTUAL CUT           96     192     286     192      96    862
+
+Remarks: 2 M panels short - fabric fault on R-F-09, panels rejected
