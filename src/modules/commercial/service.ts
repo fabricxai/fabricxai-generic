@@ -475,7 +475,13 @@ export async function checkBtbHeadroomIn(
       return {
         passed: false,
         reasonKey: 'gates.btb_headroom.currency_mismatch',
-        facts: { btbCurrency: btb.currency, masterCurrency: master.currency },
+        facts: {
+          btbCurrency: btb.currency,
+          masterCurrency: master.currency,
+          reason:
+            `${btb.number} is in ${btb.currency} and its master credit ${master.number} is ` +
+            `in ${master.currency}. No rate has been stated to net one against the other.`,
+        },
       }
     }
 

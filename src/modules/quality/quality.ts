@@ -517,3 +517,41 @@ function ratio(a: bigint, b: bigint): string {
   if (b === 0n) throw new QualityError('division by zero')
   return fromMinor((a * SCALE * 10n / b + 5n) / 10n)
 }
+
+/**
+ * What the 4-point gate says when it holds an issue back.
+ *
+ * Composed rather than filed as catalogue copy with `{rolls}` in it: only `reason` survives
+ * a server action's boundary (lib/action-failure.ts), so the placeholders were reaching the
+ * floor as literal braces. The roll numbers ARE the refusal — a storekeeper's next act is to
+ * pull those exact rolls off the issue and send the rest.
+ *
+ * Long lists are trimmed. Twenty roll numbers in a toast is a wall nobody reads at a
+ * delivery bay; the first few and a count is what someone can act on, and the full list is
+ * in the inspection screen.
+ */
+export function fabricInspectionRefusal(
+  kind: 'failed' | 'not_inspected',
+  facts: { rolls: readonly string[]; points?: string | null },
+): string {
+  const shown = facts.rolls.slice(0, 3).join(', ')
+  const rest = facts.rolls.length - 3
+  const list = rest > 0 ? `${shown} and ${rest} more` : shown
+  const one = facts.rolls.length === 1
+  const plural = one ? 'roll' : 'rolls'
+
+  if (kind === 'failed') {
+    const points = facts.points ? ` at ${facts.points} points per 100 yd²` : ''
+    return (
+      `${facts.rolls.length} ${plural} failed 4-point inspection${points}: ${list}. ` +
+      `Cloth this far out of grade becomes a buyer claim after it is cut.`
+    )
+  }
+
+  return (
+    `${facts.rolls.length} ${plural} ${one ? 'has' : 'have'} not been 4-point inspected ` +
+    `yet: ${list}. ` +
+    `Inspection comes before cutting, not after — a fault found on the table is fabric ` +
+    `already paid for.`
+  )
+}

@@ -131,6 +131,44 @@ describe('checkUdDraw · the gate', () => {
     expect(result.shortfall).toBe('0.01')
   })
 
+  it('7b · the refusal carries the balance, the ask and the shortfall in words', () => {
+    /*
+     * A bonded overdraw is the hardest block in the building, and until this it reached the
+     * storekeeper as a generic sentence with no numbers: none of the five UD reason keys had
+     * catalogue copy, and the copy written for this one sat under `gates.ud_balance.
+     * insufficient`, which nothing throws. Only `reason` survives a server action's boundary,
+     * so the sentence is composed here — and the figures are how somebody decides whether to
+     * split the issue or fetch an owner.
+     */
+    const result = draw({ qty: '12000.01' })
+    const reason = String(result.facts?.reason ?? '')
+
+    expect(reason).toContain('UD/DHK/2026/0417')
+    expect(reason).toContain('12000.00 M')      // free
+    expect(reason).toContain('12000.01')        // asked for
+    expect(reason).toContain('0.01')            // over by
+    expect(reason).toMatch(/owner can approve/i)
+    // The failure this replaces: braces reaching the floor.
+    expect(reason).not.toMatch(/[{}]/)
+  })
+
+  it('7c · every UD refusal says something, never just a key', () => {
+    const refusals = [
+      draw({ qty: '99999.00' }),
+      draw({ itemRef: 'FAB-NOT-ON-UD' }),
+      draw({ unit: 'KG' }),
+      draw({ ud: { ...UD, status: 'closed' } }),
+      draw({ ud: { ...UD, validUntil: '2020-01-01' } }),
+    ]
+
+    for (const refusal of refusals) {
+      expect(refusal.allowed).toBe(false)
+      const reason = String(refusal.facts?.reason ?? '')
+      expect(reason.length).toBeGreaterThan(20)
+      expect(reason).not.toMatch(/[{}]/)
+    }
+  })
+
   it('8 · blocks a draw against an item the UD never authorised', () => {
     // Unknown is not the same as unlimited. A bonded issue of something not on the UD is
     // exactly what customs looks for.

@@ -221,7 +221,11 @@ export function checkUdDraw(input: {
       ...base,
       allowed: false,
       reasonKey: 'commercial.ud.not_active',
-      facts: { udNumber: input.ud.number, status: input.ud.status },
+      facts: {
+        udNumber: input.ud.number,
+        status: input.ud.status,
+        reason: `${input.ud.number} is ${input.ud.status}, so nothing may be drawn against it.`,
+      },
     }
   }
 
@@ -232,7 +236,15 @@ export function checkUdDraw(input: {
       ...base,
       allowed: false,
       reasonKey: 'commercial.ud.expired',
-      facts: { udNumber: input.ud.number, validUntil: input.ud.validUntil, today: input.today },
+      facts: {
+        udNumber: input.ud.number,
+        validUntil: input.ud.validUntil,
+        today: input.today,
+        reason:
+          `${input.ud.number} was valid until ${input.ud.validUntil} and today is ` +
+          `${input.today}. Bonded material cannot leave the warehouse against an expired ` +
+          `declaration — customs needs a fresh one.`,
+      },
     }
   }
 
@@ -247,7 +259,13 @@ export function checkUdDraw(input: {
       ...base,
       allowed: false,
       reasonKey: 'commercial.ud.item_not_authorized',
-      facts: { udNumber: input.ud.number, itemRef: input.itemRef },
+      facts: {
+        udNumber: input.ud.number,
+        itemRef: input.itemRef,
+        reason:
+          `${input.ud.number} does not authorise "${input.itemRef}". A declaration covers ` +
+          `named materials only, and this is not one of them.`,
+      },
     }
   }
 
@@ -262,6 +280,10 @@ export function checkUdDraw(input: {
         itemRef: input.itemRef,
         authorizedUnit: item.unit,
         requestedUnit: input.unit,
+        reason:
+          `${input.ud.number} authorises "${input.itemRef}" in ${item.unit}, and this asks ` +
+          `for ${input.unit}. Converting one to the other is a customs question, not an ` +
+          `arithmetic one.`,
       },
     }
   }
@@ -288,6 +310,20 @@ export function checkUdDraw(input: {
         requested: input.qty,
         free: item.free,
         shortfall: toDecimal(requested - free),
+        /*
+         * The sentence the storekeeper actually reads, composed where the figures exist.
+         *
+         * Only `reason` survives a server action's boundary (lib/action-failure.ts), and
+         * these five refusals had no catalogue copy at all — the copy written for this one
+         * sits under `gates.ud_balance.insufficient`, which nothing throws. So a bonded
+         * overdraw, the hardest block in the building, reached the floor as a generic
+         * sentence with no numbers in it. An overdraw is legal exposure; the figures are
+         * how somebody decides whether to split the issue or fetch an owner.
+         */
+        reason:
+          `${input.ud.number} has ${item.free} ${item.unit} free for "${input.itemRef}" ` +
+          `and this asks for ${input.qty} — ${toDecimal(requested - free)} ${item.unit} ` +
+          `more than the declaration allows. An owner can approve a deliberate overdraw.`,
       },
     }
   }

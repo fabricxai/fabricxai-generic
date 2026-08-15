@@ -21,6 +21,7 @@ import { describe, expect, it } from 'vitest'
 import {
   aqlVerdict,
   dhu,
+  fabricInspectionRefusal,
   fourPointResult,
   measurementVariance,
   QualityError,
@@ -408,5 +409,39 @@ describe('repeatDefectRuns · the pattern alert', () => {
     )
 
     expect(runs[0]!.days).toBe(5)
+  })
+})
+
+describe('fabricInspectionRefusal · the roll numbers ARE the refusal', () => {
+  it('names the rolls a storekeeper must pull off the issue', () => {
+    // Composed rather than filed as copy with {rolls} in it: only `reason` survives a server
+    // action's boundary, so the placeholders were reaching the delivery bay as braces.
+    const sentence = fabricInspectionRefusal('failed', {
+      rolls: ['R-F-17', 'R-F-44', 'R-F-58'],
+      points: '24',
+    })
+
+    expect(sentence).toContain('R-F-17, R-F-44, R-F-58')
+    expect(sentence).toContain('24 points per 100 yd²')
+    expect(sentence).toContain('3 rolls')
+    expect(sentence).not.toMatch(/[{}]/)
+  })
+
+  it('trims a long list to what somebody can act on', () => {
+    // Twenty roll numbers in a toast at a delivery bay is a wall nobody reads.
+    const sentence = fabricInspectionRefusal('not_inspected', {
+      rolls: Array.from({ length: 12 }, (_, i) => `R-F-${String(i + 1).padStart(2, '0')}`),
+    })
+
+    expect(sentence).toContain('12 rolls')
+    expect(sentence).toContain('R-F-01, R-F-02, R-F-03 and 9 more')
+  })
+
+  it('says "roll", not "rolls", when there is one', () => {
+    const sentence = fabricInspectionRefusal('not_inspected', { rolls: ['R-F-07'] })
+    // "1 rolls have not been" is the kind of sentence that tells a storekeeper the
+    // system was written by somebody not paying attention.
+    expect(sentence).toContain('1 roll has not been')
+    expect(sentence).toContain('R-F-07')
   })
 })

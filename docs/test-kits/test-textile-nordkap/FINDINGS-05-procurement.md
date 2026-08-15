@@ -216,17 +216,21 @@ sentence where the figures exist and pass it as `reason`, the catalogue copy sta
 without braces as the fallback, and the composition is a pure tested helper because a wrong
 sentence about money is a defect about money.
 
-**Still open — the same flaw, other gates.** These keys all carry braces and are thrown the
-same way, so each will reach somebody as literal `{free}` or `{rolls}` the moment it fires:
+**The rest cleared before §6.** Every remaining gate now composes its own sentence where the
+figures exist — the UD balance (all five refusals), 4-point, both LC-date conflicts, the
+presentation window, and the back-to-back currency mismatch. The catalogue copy behind each
+stands alone with no braces in it.
 
-- `gates.ud_balance.*` — `{free} {unit}`, `{requested}` (the bonded overdraw, kit §6)
-- `gates.four_point.*` — `{rolls}`, `{pointsPer100SqYd}`, `{found} of {expected}`
-- `gates.lc_date.*` — `{plannedExFactoryDate}`, `{daysOver}`, `{latestShipmentDate}`,
-  `{expiryDate}`
-- `gates.btb_headroom.currency_mismatch` — `{btbCurrency}` against `{masterCurrency}`
+**And a worse thing found in the same sweep.** `decideUdDraw` returns five reason keys and
+**not one of them had any copy at all**. The sentence written for the bonded overdraw sits
+under `gates.ud_balance.insufficient`, which nothing throws — so the hardest block in the
+building was reaching a storekeeper as whatever generic fallback the calling screen passed,
+with no balance, no shortfall and no mention of the owner override. All five now have copy,
+and the composed reason names the free balance, the ask and the overdraw.
 
-Each needs its service to compose a `reason` the way procurement now does. Worth doing before
-§6 is walked, since the UD overdraw is one of that section's headline refusals.
+`refusal-copy.test.ts` now holds the whole class shut: every key in the `gates.` namespace and
+every key handed literally to `AppError` must have copy, in both languages, with no
+placeholder in it. It caught two Bangla strings I had already missed on the first pass.
 
 ## F19 · CRITICAL — the PO was issued at landed cost, in the wrong currency
 

@@ -116,6 +116,10 @@ export function detectLcConflicts(input: {
         facts: {
           latestShipmentDate: lc.latestShipmentDate,
           expiryDate: lc.expiryDate,
+          reason:
+            `This order has no ex-factory date, so it cannot be checked against ` +
+            `${lc.number} — whose latest shipment date is ` +
+            `${lc.latestShipmentDate ?? 'not stated'}. Unknown is not the same as safe.`,
         },
       })
       continue
@@ -148,6 +152,19 @@ export function detectLcConflicts(input: {
             plannedExFactoryDate: exFactory,
             latestShipmentDate: lc.latestShipmentDate,
             daysOver,
+            /*
+             * The dates, in the sentence itself.
+             *
+             * Only `reason` crosses a server action's boundary (lib/action-failure.ts), so
+             * the catalogue copy's {plannedExFactoryDate} was reaching a merchandiser as a
+             * literal brace. And this is the refusal that most needs its figures: "four days
+             * past" is a countdown somebody can still act on, where "the credit cannot accept
+             * this shipment" only says the truck is stuck.
+             */
+            reason:
+              `This shipment leaves on ${exFactory}, ${daysOver} day(s) after ` +
+              `${lc.number}'s latest shipment date of ${lc.latestShipmentDate}. The bank ` +
+              `will refuse the presentation unless the credit is amended.`,
           },
         })
         continue
@@ -169,6 +186,9 @@ export function detectLcConflicts(input: {
           plannedExFactoryDate: exFactory,
           expiryDate: lc.expiryDate,
           daysOver: daysOverExpiry,
+          reason:
+            `${lc.number} expired on ${lc.expiryDate}, ${daysOverExpiry} day(s) before this ` +
+            `shipment leaves on ${exFactory}. There is nothing left to present against.`,
         },
       })
       continue
@@ -188,6 +208,10 @@ export function detectLcConflicts(input: {
           expiryDate: lc.expiryDate,
           availableDays: available,
           requiredDays: presentationDays,
+          reason:
+            `Shipping on ${exFactory} leaves ${available} day(s) before ${lc.number} expires ` +
+            `on ${lc.expiryDate}, and the documents need ${presentationDays}. The date is ` +
+            `fine; the turnaround is not.`,
         },
       })
     }

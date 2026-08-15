@@ -95,13 +95,13 @@ export const MESSAGES: Catalogue = {
       'LC {lcNumber}: {daysLeft} day(s) to latest shipment ({date})',
     'commercial.notifications.lc_countdown_expiry.title':
       'LC {lcNumber}: {daysLeft} day(s) to expiry ({date})',
-    'commercial.lc.conflict.expiry': 'LC {lcNumber} expires before this order can ship',
+    'commercial.lc.conflict.expiry': 'The credit expires before this order can ship',
     'commercial.lc.conflict.latest_shipment':
-      'LC {lcNumber} latest shipment is before the planned ex-factory date',
+      'The credit\'s latest shipment date is before the planned ex-factory date',
     'commercial.lc.conflict.presentation_window':
-      'LC {lcNumber} leaves too few days to present documents after shipment',
+      'The credit leaves too few days to present documents after shipment',
     'commercial.lc.conflict.unknown_ex_factory':
-      'LC {lcNumber} is linked to an order with no ex-factory date',
+      'The credit is linked to an order with no ex-factory date',
 
     // ── 2.2 Bonded warehouse ──
     'commercial.notifications.ud_expiring.title':
@@ -113,11 +113,11 @@ export const MESSAGES: Catalogue = {
 
     // ── Gates (rule 8) — shown when a server-side gate refuses a write ──
     'gates.fabric_inspection.not_inspected':
-      'These rolls have not passed 4-point inspection yet: {rolls}',
+      'Some of these rolls have not passed 4-point inspection yet. Inspection comes before cutting, not after.',
     'gates.fabric_inspection.failed':
-      'These rolls failed 4-point inspection at {pointsPer100SqYd} points/100 yd²: {rolls}',
+      'Some of these rolls failed 4-point inspection. Cloth that far out of grade becomes a buyer claim after it is cut.',
     'gates.fabric_inspection.roll_not_found':
-      'One of these rolls could not be checked for inspection ({found} of {expected} found)',
+      'One of these rolls could not be checked for inspection, so the state of the rest is unknown.',
     'gates.fabric_inspection.no_provider':
       'Fabric inspection cannot be checked right now, so the issue is blocked',
 
@@ -400,7 +400,23 @@ export const MESSAGES: Catalogue = {
     // reached the storekeeper as the literal string `gate_blocked:
     // gates.ud_balance.insufficient` (audit BE-H3). These are the refusals people meet.
     'gates.ud_balance.insufficient':
-      'This issue would draw more than the UD allows. Free balance is {free} {unit}; this asks for {requested} {unit}. An owner can approve a deliberate overdraw through the approve inbox.',
+      'This issue would draw more than the UD allows. An owner can approve a deliberate overdraw through the approve inbox.',
+    /*
+     * The five refusals `decideUdDraw` actually returns, which had NO copy at all — the
+     * sentence above was filed under a key nothing throws, so every bonded refusal fell
+     * through to a caller's generic fallback. The services compose the real sentence with
+     * the balance in it; these stand behind them.
+     */
+    'commercial.ud.insufficient_balance':
+      'This issue would draw more than the UD allows. An owner can approve a deliberate overdraw through the approve inbox.',
+    'commercial.ud.not_active':
+      'That Utilization Declaration is not active, so nothing may be drawn against it.',
+    'commercial.ud.expired':
+      'That Utilization Declaration has expired. Bonded material cannot leave the warehouse against it — customs needs a fresh one.',
+    'commercial.ud.item_not_authorized':
+      'That material is not on this Utilization Declaration. A declaration covers named materials only.',
+    'commercial.ud.unit_mismatch':
+      'This asks in a different unit from the one the declaration authorises, and converting between them is a customs question.',
     'gates.pp_approval.not_approved':
       'The buyer has not approved the PP sample for this style, so cutting cannot start.',
     'gates.pp_approval.no_sample':
@@ -439,7 +455,7 @@ export const MESSAGES: Catalogue = {
     'gates.btb_headroom.master_not_active':
       'The master credit is not active, so nothing is funding this back-to-back.',
     'gates.btb_headroom.currency_mismatch':
-      'The back-to-back and its master credit are in different currencies ({btbCurrency} against {masterCurrency}), and no rate has been stated to net them.',
+      'The back-to-back and its master credit are in different currencies, and no rate has been stated to net them.',
     // The credit must FUND the order, not merely be attached to it. Headroom answers a
     // different question — whether the credits fit under their master — and passed happily
     // while a PO four times the size of its credit was written against it.
@@ -450,9 +466,9 @@ export const MESSAGES: Catalogue = {
     'gates.exp_number.missing':
       'No EXP number on this shipment. Bangladesh Bank requires one before documents can be presented, so the handoff is blocked rather than delayed.',
     'gates.lc_date.after_latest_shipment':
-      'This shipment left on {plannedExFactoryDate}, {daysOver} day(s) after the credit\'s latest shipment date of {latestShipmentDate}. The bank will refuse the presentation. Commercial can accept the breach on the record before the departure is confirmed.',
+      'This shipment leaves after the credit\'s latest shipment date, so the bank will refuse the presentation. Commercial can accept the breach on the record before the departure is confirmed.',
     'gates.lc_date.expired':
-      'The credit expired on {expiryDate}, {daysOver} day(s) before this shipment date. There is nothing left to present against. Commercial can accept the breach on the record before the departure is confirmed.',
+      'The credit expired before this shipment date, so there is nothing left to present against. Commercial can accept the breach on the record before the departure is confirmed.',
     'maintenance.errors.invalid': 'That does not fit what this maintenance record accepts.',
     'maintenance.errors.part_not_found': 'That spare part is not in the store.',
     'maintenance.errors.ticket_not_found': 'That ticket no longer exists.',
@@ -795,13 +811,13 @@ export const MESSAGES: Catalogue = {
       'এই ক্রেডিটের মেয়াদ তার শেষ শিপমেন্ট তারিখের আগেই শেষ হয়ে যাচ্ছে — অর্থাৎ পণ্য বেরোনোর আগেই ব্যাংকে কাগজ জমা দিতে হবে। মেয়াদ ও শেষ শিপমেন্ট — দুটি তারিখ দেখুন; একটিতে দিন আর মাস উল্টে গেছে।',
     'commercial.errors.lc_order_buyer_mismatch':
       'এই ক্রেডিট অন্য বায়ারের খোলা — যে পণ্যের জন্য ক্রেডিট খোলা হয়নি তার দাম এটি দিতে পারে না।',
-    'commercial.lc.conflict.expiry': 'LC {lcNumber}-এর মেয়াদ শিপমেন্টের আগেই শেষ হয়ে যাবে',
+    'commercial.lc.conflict.expiry': 'LC-র মেয়াদ শিপমেন্টের আগেই শেষ হয়ে যাবে',
     'commercial.lc.conflict.latest_shipment':
-      'LC {lcNumber}-এর শেষ শিপমেন্ট তারিখ পরিকল্পিত ex-factory তারিখের আগে',
+      'LC-র শেষ শিপমেন্ট তারিখ পরিকল্পিত ex-factory তারিখের আগে',
     'commercial.lc.conflict.presentation_window':
-      'LC {lcNumber}-এ শিপমেন্টের পর ডকুমেন্ট জমা দেওয়ার সময় খুব কম',
+      'LC-তে শিপমেন্টের পর ডকুমেন্ট জমা দেওয়ার সময় খুব কম',
     'commercial.lc.conflict.unknown_ex_factory':
-      'LC {lcNumber} এমন একটি অর্ডারের সাথে যুক্ত যার ex-factory তারিখ নেই',
+      'LC এমন একটি অর্ডারের সাথে যুক্ত যার ex-factory তারিখ নেই',
 
     // ── 2.2 ──
     'commercial.notifications.ud_expiring.title':
@@ -829,9 +845,9 @@ export const MESSAGES: Catalogue = {
     'gates.exp_number.missing':
       'এই শিপমেন্টে EXP নম্বর নেই। বাংলাদেশ ব্যাংক ডকুমেন্ট জমার আগে এটি চায়, তাই দেরি না করে হ্যান্ডঅফ আটকে দেওয়া হয়েছে।',
     'gates.lc_date.after_latest_shipment':
-      'এই শিপমেন্ট {plannedExFactoryDate} তারিখে গেছে — LC-র শেষ শিপমেন্ট তারিখ {latestShipmentDate}-এর {daysOver} দিন পরে। ব্যাংক প্রেজেন্টেশন নেবে না। ডিপার্চার কনফার্ম করার আগে কমার্শিয়াল রেকর্ডে এই ব্যত্যয় মেনে নিতে পারেন।',
+      'এই শিপমেন্ট LC-র শেষ শিপমেন্ট তারিখের পরে যাচ্ছে, তাই ব্যাংক প্রেজেন্টেশন নেবে না। ডিপার্চার কনফার্ম করার আগে কমার্শিয়াল রেকর্ডে এই ব্যত্যয় মেনে নিতে পারেন।',
     'gates.lc_date.expired':
-      'LC-র মেয়াদ {expiryDate} তারিখে শেষ হয়েছে, এই শিপমেন্ট তারিখের {daysOver} দিন আগে। জমা দেওয়ার মতো কিছু আর নেই। ডিপার্চার কনফার্ম করার আগে কমার্শিয়াল রেকর্ডে এই ব্যত্যয় মেনে নিতে পারেন।',
+      'এই শিপমেন্টের তারিখের আগেই LC-র মেয়াদ শেষ হয়েছে, জমা দেওয়ার মতো কিছু আর নেই। ডিপার্চার কনফার্ম করার আগে কমার্শিয়াল রেকর্ডে এই ব্যত্যয় মেনে নিতে পারেন।',
     'gates.btb_headroom.no_btb':
       'কোনো ব্যাক-টু-ব্যাক ক্রেডিট যুক্ত নেই, আর সেটি ছাড়া ইমপোর্ট PO ইস্যু করা যায় না — তাহলে ফ্যাক্টরি সাপ্লায়ারের কাছে দায়বদ্ধ হবে অথচ টাকার উৎস থাকবে না।',
     'gates.btb_headroom.exceeded':
@@ -846,20 +862,30 @@ export const MESSAGES: Catalogue = {
     'gates.btb_headroom.po_currency_mismatch':
       'এই পারচেজ অর্ডার আর তার ফান্ডিং ব্যাক-টু-ব্যাক ক্রেডিট আলাদা কারেন্সিতে, আর মেলানোর কোনো রেট বলা হয়নি।',
     'gates.btb_headroom.currency_mismatch':
-      'ব্যাক-টু-ব্যাক আর তার মাস্টার ক্রেডিট আলাদা মুদ্রায় ({btbCurrency} বনাম {masterCurrency}), আর মেলানোর মতো কোনো রেট বলা হয়নি।',
+      'ব্যাক-টু-ব্যাক আর তার মাস্টার ক্রেডিট আলাদা মুদ্রায়, আর মেলানোর মতো কোনো রেট বলা হয়নি।',
     'gates.fabric_inspection.not_inspected':
-      'এই রোলগুলোর ৪-পয়েন্ট ইন্সপেকশন এখনও হয়নি: {rolls}',
+      'এই রোলগুলোর কয়েকটির ৪-পয়েন্ট ইন্সপেকশন এখনও হয়নি। ইন্সপেকশন কাটিংয়ের আগে, পরে নয়।',
     'gates.fabric_inspection.failed':
-      'এই রোলগুলো ৪-পয়েন্ট ইন্সপেকশনে ফেল করেছে ({pointsPer100SqYd} পয়েন্ট/১০০ বর্গগজ): {rolls}',
+      'এই রোলগুলোর কয়েকটি ৪-পয়েন্ট ইন্সপেকশনে ফেল করেছে। এত খারাপ গ্রেডের কাপড় কাটার পরে বায়ার ক্লেইম হয়ে ফিরে আসে।',
     'gates.fabric_inspection.roll_not_found':
-      'একটি রোল যাচাই করা যায়নি ({expected} টির মধ্যে {found} টি পাওয়া গেছে)',
+      'একটি রোল যাচাই করা যায়নি, তাই বাকিগুলোর অবস্থাও নিশ্চিত নয়।',
     'gates.fabric_inspection.no_provider':
       'ফেব্রিক ইন্সপেকশন এখন যাচাই করা যাচ্ছে না, তাই ইস্যু আটকানো হয়েছে',
     // The floor meets these two: the storekeeper at the UD gate, the cutting master at the
     // PP gate. The desk-facing ones (BTB, final inspection) stay English on the same
     // boundary as the rest of the office namespaces.
     'gates.ud_balance.insufficient':
-      'এই ইস্যু UD-এর সীমার বেশি হয়ে যাবে। ফ্রি ব্যালেন্স {free} {unit}, চাওয়া হয়েছে {requested} {unit}। ইচ্ছাকৃত ওভারড্র হলে owner অ্যাপ্রুভ ইনবক্সে অনুমোদন দিতে পারেন।',
+      'এই ইস্যু UD-এর সীমার বেশি হয়ে যাবে। ইচ্ছাকৃত ওভারড্র হলে owner অ্যাপ্রুভ ইনবক্সে অনুমোদন দিতে পারেন।',
+    'commercial.ud.insufficient_balance':
+      'এই ইস্যু UD-এর সীমার বেশি হয়ে যাবে। ইচ্ছাকৃত ওভারড্র হলে owner অ্যাপ্রুভ ইনবক্সে অনুমোদন দিতে পারেন।',
+    'commercial.ud.not_active':
+      'এই UD সক্রিয় নয়, তাই এর বিপরীতে কিছু ইস্যু করা যাবে না।',
+    'commercial.ud.expired':
+      'এই UD-র মেয়াদ শেষ হয়ে গেছে। মেয়াদোত্তীর্ণ ঘোষণার বিপরীতে বন্ডেড মাল বের করা যায় না — কাস্টমস থেকে নতুন UD লাগবে।',
+    'commercial.ud.item_not_authorized':
+      'এই মালটি এই UD-তে নেই। UD শুধু নাম-উল্লেখ করা মালামাল কভার করে।',
+    'commercial.ud.unit_mismatch':
+      'UD যে এককে অনুমোদন দিয়েছে, চাওয়া হয়েছে অন্য এককে — এক থেকে অন্যটিতে রূপান্তর কাস্টমসের প্রশ্ন।',
     'gates.pp_approval.not_approved':
       'এই স্টাইলের PP স্যাম্পল বায়ার এখনও অ্যাপ্রুভ করেননি, তাই কাটিং শুরু করা যাবে না।',
     'gates.pp_approval.no_sample':

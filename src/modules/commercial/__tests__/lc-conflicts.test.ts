@@ -128,3 +128,65 @@ describe('detectLcConflicts', () => {
     expect(conflicts[0]).toMatchObject({ kind: 'unknown_ex_factory', severity: 'warning' })
   })
 })
+
+describe('the conflict says its dates, not its field names', () => {
+  /*
+   * Only `reason` survives a server action's boundary, and the shipment gate spreads these
+   * facts straight into the AppError it throws. The catalogue copy carried
+   * {plannedExFactoryDate} and reached a merchandiser as a literal brace.
+   *
+   * This is also the refusal that most needs its figures: "four days past" is a countdown
+   * somebody can still act on, where "the credit cannot accept this shipment" only says the
+   * truck is stuck.
+   */
+  const LC = {
+    id: 'lc-1',
+    number: 'LC-7712',
+    latestShipmentDate: '2027-02-10',
+    expiryDate: '2027-02-25',
+    status: 'active' as const,
+  }
+
+  const order = (over: Record<string, unknown> = {}) => ({
+    id: 'order-1',
+    poNumbers: ['NKA-PO-70318'],
+    plannedExFactoryDate: '2027-02-14',
+    status: 'in_production',
+    ...over,
+  })
+
+  it('names the credit, both dates and the days over, on a late shipment', () => {
+    const [conflict] = detectLcConflicts({ lc: LC, orders: [order()], presentationDays: 21 })
+    const reason = String(conflict?.facts?.reason ?? '')
+
+    expect(reason).toContain('LC-7712')
+    expect(reason).toContain('2027-02-14')   // when it leaves
+    expect(reason).toContain('2027-02-10')   // latest the credit allows
+    expect(reason).toContain('4 day(s)')     // the countdown that matters
+    expect(reason).not.toMatch(/[{}]/)
+  })
+
+  it('every conflict it can raise carries a sentence with no braces in it', () => {
+    const cases = [
+      detectLcConflicts({ lc: LC, orders: [order()], presentationDays: 21 }),
+      detectLcConflicts({ lc: LC, orders: [order({ plannedExFactoryDate: null })], presentationDays: 21 }),
+      detectLcConflicts({
+        lc: { ...LC, latestShipmentDate: null },
+        orders: [order({ plannedExFactoryDate: '2027-03-01' })],
+        presentationDays: 21,
+      }),
+      detectLcConflicts({
+        lc: { ...LC, latestShipmentDate: '2027-02-20' },
+        orders: [order({ plannedExFactoryDate: '2027-02-19' })],
+        presentationDays: 21,
+      }),
+    ].flat()
+
+    expect(cases.length).toBeGreaterThan(3)
+    for (const conflict of cases) {
+      const reason = String(conflict.facts?.reason ?? '')
+      expect(reason.length).toBeGreaterThan(20)
+      expect(reason).not.toMatch(/[{}]/)
+    }
+  })
+})

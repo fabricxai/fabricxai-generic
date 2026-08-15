@@ -39,6 +39,7 @@ import {
   type AqlTableRow,
   type DefectRun,
   type MeasurementPoint,
+  fabricInspectionRefusal,
 } from './quality'
 import {
   aqlTables,
@@ -1448,7 +1449,14 @@ export async function resolveFabricInspection(
     return {
       passed: false,
       reasonKey: 'gates.fabric_inspection.roll_not_found',
-      facts: { gate: GATES.fabricInspection, expected: input.rollIds.length, found: rollRows.length },
+      facts: {
+        gate: GATES.fabricInspection,
+        expected: input.rollIds.length,
+        found: rollRows.length,
+        reason:
+          `${rollRows.length} of ${input.rollIds.length} rolls could be found, so the ` +
+          `inspection state of the rest is unknown. The store can say which roll is missing.`,
+      },
     }
   }
 
@@ -1504,6 +1512,12 @@ export async function resolveFabricInspection(
         gate: GATES.fabricInspection,
         rolls: failed.map((f) => f.rollNo),
         pointsPer100SqYd: failed[0]!.points,
+        // Named rolls, because the storekeeper's next act is to pull those exact ones off
+        // the issue. Composed here since only `reason` crosses the action boundary.
+        reason: fabricInspectionRefusal('failed', {
+          rolls: failed.map((f) => f.rollNo),
+          points: failed[0]!.points,
+        }),
       },
     }
   }
@@ -1512,7 +1526,11 @@ export async function resolveFabricInspection(
     return {
       passed: false,
       reasonKey: 'gates.fabric_inspection.not_inspected',
-      facts: { gate: GATES.fabricInspection, rolls: uninspected },
+      facts: {
+        gate: GATES.fabricInspection,
+        rolls: uninspected,
+        reason: fabricInspectionRefusal('not_inspected', { rolls: uninspected }),
+      },
     }
   }
 
