@@ -13,6 +13,7 @@ import { moveAllocation, setAllocationStatus } from '@/modules/planning/actions'
 // client — and `postgres` — into the browser bundle; the build reports that as a missing
 // `fs`, several files away from the cause.
 import { allocationMachine, type AllocationStatus } from '@/modules/planning/capacity'
+import { unwrap } from '@/lib/action-failure'
 
 /** What the board row already holds. */
 export interface RunSummary {
@@ -102,13 +103,15 @@ export function RunActions({ run, canWrite }: { run: RunSummary; canWrite: boole
     setFailure(null)
     startTransition(async () => {
       try {
-        const result = await moveAllocation({
-          allocationId: run.id,
-          startDate,
-          endDate,
-          plannedDaily: respread(startDate, endDate),
-          preview: true,
-        })
+        const result = unwrap(
+          await moveAllocation({
+            allocationId: run.id,
+            startDate,
+            endDate,
+            plannedDaily: respread(startDate, endDate),
+            preview: true,
+          }),
+        )
         setFits(result.fits)
         setViolations(result.violations)
       } catch (error) {
@@ -123,13 +126,15 @@ export function RunActions({ run, canWrite }: { run: RunSummary; canWrite: boole
     setFailure(null)
     startTransition(async () => {
       try {
-        const result = await moveAllocation({
-          allocationId: run.id,
-          startDate,
-          endDate,
-          plannedDaily: respread(startDate, endDate),
-          acceptViolations,
-        })
+        const result = unwrap(
+          await moveAllocation({
+            allocationId: run.id,
+            startDate,
+            endDate,
+            plannedDaily: respread(startDate, endDate),
+            acceptViolations,
+          }),
+        )
 
         if (!result.allocationId) {
           // Nothing was written — the plan did not fit and the violations were not accepted.

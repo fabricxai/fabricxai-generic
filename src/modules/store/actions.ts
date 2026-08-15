@@ -91,23 +91,26 @@ export async function raiseMaterialRequisition(input: {
  * `propose` validates against the module's own zod at insert AND again at approve, and
  * refuses any target `store/register.ts` has not whitelisted (CLAUDE.md rule 3).
  */
-export async function draftStockAdjustment(input: unknown): Promise<{ id: string }> {
+export async function draftStockAdjustment(
+  input: unknown,
+): Promise<{ id: string } | ActionFailure> {
   const ctx = await requireRole(await headers(), 'store')
+  return surfaced(async () => {
+    const result = await propose(ctx, {
+      moduleId: 'store',
+      targetTable: 'stock_adjustments',
+      operation: 'insert',
+      zodSchemaKey: 'stock_adjustment_v1',
+      // A person typed this. No field confidence, because there is no extractor to have one —
+      // and a constant would sail past the check the whole pending flow is built around.
+      source: 'user_draft',
+      payload: input as Record<string, unknown>,
+    })
 
-  const result = await propose(ctx, {
-    moduleId: 'store',
-    targetTable: 'stock_adjustments',
-    operation: 'insert',
-    zodSchemaKey: 'stock_adjustment_v1',
-    // A person typed this. No field confidence, because there is no extractor to have one —
-    // and a constant would sail past the check the whole pending flow is built around.
-    source: 'user_draft',
-    payload: input as Record<string, unknown>,
+    // The count on screen has not changed — nothing is written until approval — but the
+    // draft's absence from the inbox would make somebody submit it twice.
+    revalidatePath('/approve')
+
+    return { id: result.id }
   })
-
-  // The count on screen has not changed — nothing is written until approval — but the
-  // draft's absence from the inbox would make somebody submit it twice.
-  revalidatePath('/approve')
-
-  return { id: result.id }
 }

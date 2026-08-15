@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { headers } from 'next/headers'
 
+import { surfaced, type ActionFailure } from '@/lib/action-failure'
 import { requireRole } from '@/modules/core/session'
 import { getPolicy } from '@/modules/settings/service'
 
@@ -32,19 +33,23 @@ import type { AqlPlan } from './quality'
  */
 export async function recordFabricInspection(
   input: unknown,
-): Promise<{ fabricInspectionId: string; pointsPer100SqYd: string; result: 'pass' | 'fail' }> {
+): Promise<
+  { fabricInspectionId: string; pointsPer100SqYd: string; result: 'pass' | 'fail' } | ActionFailure
+> {
   const ctx = await requireRole(await headers(), 'quality')
-  const policy = await getPolicy<QualityPolicy>(ctx, 'quality')
+  return surfaced(async () => {
+    const policy = await getPolicy<QualityPolicy>(ctx, 'quality')
 
-  const result = await inspectFabric(ctx, input, policy)
+    const result = await inspectFabric(ctx, input, policy)
 
-  revalidatePath('/quality/fabric')
-  // The store's issue screen reads the gate this result feeds, and its GRN list reads the
-  // status this write rolls up. Both are stale the moment a roll is graded.
-  revalidatePath('/store')
-  revalidatePath('/store/issue')
+    revalidatePath('/quality/fabric')
+    // The store's issue screen reads the gate this result feeds, and its GRN list reads the
+    // status this write rolls up. Both are stale the moment a roll is graded.
+    revalidatePath('/store')
+    revalidatePath('/store/issue')
 
-  return result
+    return result
+  })
 }
 
 /**
@@ -60,10 +65,12 @@ export async function previewAqlPlan(input: {
   inspectionLevel: string
   majorAql: string
   minorAql: string
-}): Promise<AqlPlan> {
+}): Promise<AqlPlan | ActionFailure> {
   const ctx = await requireRole(await headers(), 'quality', 'production')
-  const policy = await getPolicy<QualityPolicy>(ctx, 'quality')
-  return aqlPlanFor(ctx, input, policy)
+  return surfaced(async () => {
+    const policy = await getPolicy<QualityPolicy>(ctx, 'quality')
+    return aqlPlanFor(ctx, input, policy)
+  })
 }
 
 /**
@@ -81,22 +88,26 @@ export async function previewAqlPlan(input: {
  */
 export async function submitFinalInspection(
   input: unknown,
-): Promise<{ finalInspectionId: string; verdict: 'pass' | 'fail'; reasons: unknown[] }> {
+): Promise<
+  { finalInspectionId: string; verdict: 'pass' | 'fail'; reasons: unknown[] } | ActionFailure
+> {
   const ctx = await requireRole(await headers(), 'quality')
-  const policy = await getPolicy<QualityPolicy>(ctx, 'quality')
+  return surfaced(async () => {
+    const policy = await getPolicy<QualityPolicy>(ctx, 'quality')
 
-  const result = await runFinalInspection(ctx, input, policy)
+    const result = await runFinalInspection(ctx, input, policy)
 
-  revalidatePath('/quality')
-  revalidatePath('/quality/final')
-  // The shipment gate reads this verdict, and the order's TNA moves on a pass.
-  revalidatePath('/orders')
+    revalidatePath('/quality')
+    revalidatePath('/quality/final')
+    // The shipment gate reads this verdict, and the order's TNA moves on a pass.
+    revalidatePath('/orders')
 
-  return {
-    finalInspectionId: result.finalInspectionId,
-    verdict: result.outcome.verdict,
-    reasons: result.outcome.reasons,
-  }
+    return {
+      finalInspectionId: result.finalInspectionId,
+      verdict: result.outcome.verdict,
+      reasons: result.outcome.reasons,
+    }
+  })
 }
 
 /**
@@ -131,18 +142,21 @@ export async function recordMeasuredPieces(input: {
   pieces: Record<string, string>[]
   /** The device's key for this size, so a retried submit does not file it twice. */
   offlineKey?: string
-}): Promise<{ pieces: number; failed: number; outOfTolerance: number; incomplete: number }> {
+}): Promise<
+  { pieces: number; failed: number; outOfTolerance: number; incomplete: number } | ActionFailure
+> {
   const ctx = await requireRole(await headers(), 'quality')
+  return surfaced(async () => {
+    const { pieces } = await recordMeasuredSet(ctx, input)
 
-  const { pieces } = await recordMeasuredSet(ctx, input)
+    revalidatePath('/quality/measurements')
+    revalidatePath('/quality')
 
-  revalidatePath('/quality/measurements')
-  revalidatePath('/quality')
-
-  return {
-    pieces: pieces.length,
-    failed: pieces.filter((r) => r.result === 'fail').length,
-    outOfTolerance: pieces.filter((r) => r.outOfTolerance.length > 0).length,
-    incomplete: pieces.filter((r) => r.missing.length > 0).length,
-  }
+    return {
+      pieces: pieces.length,
+      failed: pieces.filter((r) => r.result === 'fail').length,
+      outOfTolerance: pieces.filter((r) => r.outOfTolerance.length > 0).length,
+      incomplete: pieces.filter((r) => r.missing.length > 0).length,
+    }
+  })
 }

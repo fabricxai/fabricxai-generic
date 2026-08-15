@@ -9,6 +9,7 @@ import { useLocale, useT } from '@/components/fx/locale'
 import { Button } from '@/components/fx/primitives'
 import { actionErrorMessage } from '@/lib/action-error'
 import { createSupplier } from '@/modules/procurement/actions'
+import { unwrap } from '@/lib/action-failure'
 
 const TYPES = ['yarn', 'fabric_mill', 'trims', 'embellishment', 'subcontract'] as const
 const ORIGINS = ['local', 'import'] as const
@@ -54,7 +55,8 @@ export function NewSupplierButton() {
 
     startTransition(async () => {
       try {
-        await createSupplier({
+        unwrap(
+          await createSupplier({
           code: code.trim(),
           name: name.trim(),
           type,
@@ -73,7 +75,8 @@ export function NewSupplierButton() {
                 ],
               }
             : {}),
-        })
+          }),
+        )
 
         setOpen(false)
         setCode('')

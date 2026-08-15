@@ -124,31 +124,33 @@ export async function allocate(input: {
   plannedDaily: Record<string, number>
   acceptViolations?: boolean
   productType?: string
-}): Promise<AllocateResult> {
+}): Promise<AllocateResult | ActionFailure> {
   const ctx = await requireRole(await headers(), ...WRITERS)
-  const policy = await getPolicy<PlanningPolicy>(ctx, 'planning')
+  return surfaced(async () => {
+    const policy = await getPolicy<PlanningPolicy>(ctx, 'planning')
 
-  const result = await allocateIn(
-    ctx,
-    {
-      orderId: input.orderId,
-      ...(input.orderStyleId === undefined ? {} : { orderStyleId: input.orderStyleId }),
-      lineId: input.lineId,
-      startDate: input.startDate,
-      endDate: input.endDate,
-      plannedDaily: input.plannedDaily,
-    },
-    {
-      policy,
-      ...(input.acceptViolations === undefined
-        ? {}
-        : { acceptViolations: input.acceptViolations }),
-      ...(input.productType === undefined ? {} : { productType: input.productType }),
-    },
-  )
+    const result = await allocateIn(
+      ctx,
+      {
+        orderId: input.orderId,
+        ...(input.orderStyleId === undefined ? {} : { orderStyleId: input.orderStyleId }),
+        lineId: input.lineId,
+        startDate: input.startDate,
+        endDate: input.endDate,
+        plannedDaily: input.plannedDaily,
+      },
+      {
+        policy,
+        ...(input.acceptViolations === undefined
+          ? {}
+          : { acceptViolations: input.acceptViolations }),
+        ...(input.productType === undefined ? {} : { productType: input.productType }),
+      },
+    )
 
-  if (result.allocationId) refresh()
-  return result
+    if (result.allocationId) refresh()
+    return result
+  })
 }
 
 /**
@@ -167,14 +169,16 @@ export async function moveAllocation(input: {
   preview?: boolean
   acceptViolations?: boolean
   productType?: string
-}): Promise<AllocateResult> {
+}): Promise<AllocateResult | ActionFailure> {
   const ctx = await requireRole(await headers(), ...WRITERS)
-  const policy = await getPolicy<PlanningPolicy>(ctx, 'planning')
+  return surfaced(async () => {
+    const policy = await getPolicy<PlanningPolicy>(ctx, 'planning')
 
-  const result = await moveAllocationIn(ctx, { ...input, policy })
+    const result = await moveAllocationIn(ctx, { ...input, policy })
 
-  if (!input.preview) refresh()
-  return result
+    if (!input.preview) refresh()
+    return result
+  })
 }
 
 /**
@@ -187,11 +191,13 @@ export async function moveAllocation(input: {
 export async function setAllocationStatus(input: {
   allocationId: string
   status: AllocationStatus
-}): Promise<void> {
+}): Promise<void | ActionFailure> {
   const ctx = await requireRole(await headers(), ...WRITERS)
-  await setAllocationStatusIn(ctx, input)
+  return surfaced(async () => {
+    await setAllocationStatusIn(ctx, input)
 
-  refresh()
+    refresh()
+  })
 }
 
 /**
@@ -206,12 +212,14 @@ export async function forkScenario(input: {
   lineIds?: string[]
   from?: string
   to?: string
-}): Promise<{ scenarioId: string; allocationCount: number }> {
+}): Promise<{ scenarioId: string; allocationCount: number } | ActionFailure> {
   const ctx = await requireRole(await headers(), ...WRITERS)
-  const result = await forkScenarioIn(ctx, input)
+  return surfaced(async () => {
+    const result = await forkScenarioIn(ctx, input)
 
-  refresh()
-  return result
+    refresh()
+    return result
+  })
 }
 
 /**
@@ -224,13 +232,15 @@ export async function forkScenario(input: {
  */
 export async function compareScenario(input: {
   scenarioId: string
-}): Promise<ScenarioComparison> {
+}): Promise<ScenarioComparison | ActionFailure> {
   const ctx = await requireRole(await headers(), ...WRITERS)
-  const policy = await getPolicy<PlanningPolicy>(ctx, 'planning')
+  return surfaced(async () => {
+    const policy = await getPolicy<PlanningPolicy>(ctx, 'planning')
 
-  return compareScenarioIn(ctx, {
-    scenarioId: input.scenarioId,
-    policy: completePolicy(policy),
+    return compareScenarioIn(ctx, {
+      scenarioId: input.scenarioId,
+      policy: completePolicy(policy),
+    })
   })
 }
 
@@ -245,18 +255,20 @@ export async function compareScenario(input: {
  */
 export async function proposeScenarioApply(input: {
   scenarioId: string
-}): Promise<{ pendingChangeId: string }> {
+}): Promise<{ pendingChangeId: string } | ActionFailure> {
   const ctx = await requireRole(await headers(), ...WRITERS)
-  const policy = await getPolicy<PlanningPolicy>(ctx, 'planning')
+  return surfaced(async () => {
+    const policy = await getPolicy<PlanningPolicy>(ctx, 'planning')
 
-  const result = await proposeScenarioApplyIn(ctx, {
-    scenarioId: input.scenarioId,
-    policy: completePolicy(policy),
+    const result = await proposeScenarioApplyIn(ctx, {
+      scenarioId: input.scenarioId,
+      policy: completePolicy(policy),
+    })
+
+    revalidatePath('/approve')
+    refresh()
+    return result
   })
-
-  revalidatePath('/approve')
-  refresh()
-  return result
 }
 
 /**
@@ -271,12 +283,14 @@ export async function recordSmv(input: {
   smv: string
   source: 'ie_study' | 'estimate'
   measuredAt?: string
-}): Promise<{ smvRecordId: string }> {
+}): Promise<{ smvRecordId: string } | ActionFailure> {
   const ctx = await requireRole(await headers(), ...WRITERS)
-  const result = await recordSmvIn(ctx, input)
+  return surfaced(async () => {
+    const result = await recordSmvIn(ctx, input)
 
-  refresh()
-  return result
+    refresh()
+    return result
+  })
 }
 
 /**

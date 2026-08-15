@@ -14,6 +14,7 @@ import { previewAqlPlan } from '@/modules/quality/actions'
 import { SyncPill } from '@/components/fx/floor'
 import { useOfflineQueue } from '@/lib/offline/use-offline-queue'
 import type { AqlPlan } from '@/modules/quality/quality'
+import { unwrap } from '@/lib/action-failure'
 
 interface DefectCode {
   category: string
@@ -178,12 +179,14 @@ export function FinalClient({
     startTransition(async () => {
       try {
         setPlan(
-          await previewAqlPlan({
+          unwrap(
+            await previewAqlPlan({
             lotQty: nextQty,
             inspectionLevel: nextLevel,
             majorAql,
             minorAql,
-          }),
+            }),
+          )
         )
       } catch (error) {
         setPlan(null)

@@ -29,16 +29,19 @@ import {
 export async function runPayroll(input: {
   period: string
   festival?: string | null
-}): Promise<{ runId: string; lines: number; totalNet: string; flagged: number }> {
+}): Promise<
+  { runId: string; lines: number; totalNet: string; flagged: number } | ActionFailure
+> {
   const ctx = await requireRole(await headers(), 'hr')
+  return surfaced(async () => {
+    const result = await computePayrollRun(ctx, {
+      period: input.period,
+      ...(input.festival ? { festival: input.festival } : {}),
+    })
 
-  const result = await computePayrollRun(ctx, {
-    period: input.period,
-    ...(input.festival ? { festival: input.festival } : {}),
+    revalidatePath('/workforce')
+    return result
   })
-
-  revalidatePath('/workforce')
-  return result
 }
 
 /**
@@ -51,12 +54,14 @@ export async function runPayroll(input: {
  */
 export async function approveRun(input: {
   runId: string
-}): Promise<{ from: string; to: string }> {
+}): Promise<{ from: string; to: string } | ActionFailure> {
   const ctx = await requireRole(await headers(), 'hr')
-  const result = await approvePayrollRun(ctx, input.runId)
+  return surfaced(async () => {
+    const result = await approvePayrollRun(ctx, input.runId)
 
-  revalidatePath('/workforce')
-  return { from: String(result.from), to: String(result.to) }
+    revalidatePath('/workforce')
+    return { from: String(result.from), to: String(result.to) }
+  })
 }
 
 /**

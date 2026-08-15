@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { headers } from 'next/headers'
 
+import { surfaced, type ActionFailure } from '@/lib/action-failure'
 import { requireRole } from '@/modules/core/session'
 import { getPolicy } from '@/modules/settings/service'
 
@@ -23,11 +24,13 @@ import type { CostSheetResult } from './cost-sheet'
  * a merchandiser can edit, and the gate that stops an order being quoted below
  * cost has to be the same one the approve path enforces (CLAUDE.md rule 8).
  */
-export async function previewSheet(sections: unknown): Promise<CostSheetResult> {
+export async function previewSheet(sections: unknown): Promise<CostSheetResult | ActionFailure> {
   const ctx = await requireRole(await headers(), 'merchandiser', 'commercial', 'finance')
-  const policy = await getPolicy<CostingPolicy>(ctx, 'costing')
+  return surfaced(async () => {
+    const policy = await getPolicy<CostingPolicy>(ctx, 'costing')
 
-  return previewCostSheet(ctx, { sections }, policy)
+    return previewCostSheet(ctx, { sections }, policy)
+  })
 }
 
 /**
@@ -45,14 +48,16 @@ export async function saveCostSheet(input: {
   styleCode: string
   bomId?: string
   sections: unknown
-}): Promise<{ sheetId: string; version: number; computed: CostSheetResult }> {
+}): Promise<{ sheetId: string; version: number; computed: CostSheetResult } | ActionFailure> {
   const ctx = await requireRole(await headers(), 'merchandiser', 'commercial', 'finance')
-  const policy = await getPolicy<CostingPolicy>(ctx, 'costing')
+  return surfaced(async () => {
+    const policy = await getPolicy<CostingPolicy>(ctx, 'costing')
 
-  const result = await createCostSheet(ctx, input, policy)
+    const result = await createCostSheet(ctx, input, policy)
 
-  revalidatePath('/costing')
-  return result
+    revalidatePath('/costing')
+    return result
+  })
 }
 
 /**

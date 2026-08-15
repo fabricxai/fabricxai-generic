@@ -8,6 +8,7 @@ import { DateInput, TextInput } from '@/components/fx/forms'
 import { Button } from '@/components/fx/primitives'
 import { actionErrorMessage } from '@/lib/action-error'
 import { createPurchaseRequisition } from '@/modules/procurement/actions'
+import { unwrap } from '@/lib/action-failure'
 
 interface Item {
   id: string
@@ -56,7 +57,8 @@ export function NewRequisitionButton({ items }: { items: readonly Item[] }) {
 
     startTransition(async () => {
       try {
-        const result = await createPurchaseRequisition({
+        const result = unwrap(
+          await createPurchaseRequisition({
           prNo: prNo.trim(),
           neededBy,
           lines: complete.map((line) => ({
@@ -66,7 +68,8 @@ export function NewRequisitionButton({ items }: { items: readonly Item[] }) {
             // is a transcription error, not an option to offer.
             unit: itemOf(line.itemId)?.uom ?? 'pcs',
           })),
-        })
+          }),
+        )
 
         setOpen(false)
         setPrNo('')

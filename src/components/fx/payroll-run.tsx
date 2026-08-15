@@ -7,6 +7,7 @@ import { InlineAlert } from '@/components/fx/feedback'
 import { Badge, Button } from '@/components/fx/primitives'
 import { approveRun, runPayroll } from '@/modules/workforce/actions'
 import { actionErrorMessage } from '@/lib/action-error'
+import { unwrap } from '@/lib/action-failure'
 
 /** The two festivals a Bangladeshi factory pays a bonus for. */
 const FESTIVALS = [
@@ -117,10 +118,12 @@ export function PayrollRunControl({
           disabled={pending || !period}
           onClick={() =>
             run(async () => {
-              const r = await runPayroll({
-                period,
-                ...(festival ? { festival } : {}),
-              })
+              const r = unwrap(
+                await runPayroll({
+                  period,
+                  ...(festival ? { festival } : {}),
+                }),
+              )
               return `${r.lines} workers computed · ${r.totalNet} net${
                 r.flagged > 0 ? ` · ${r.flagged} flagged for a look` : ''
               }.`
@@ -135,7 +138,7 @@ export function PayrollRunControl({
           disabled={pending || !approvable || !canApprove}
           onClick={() =>
             run(async () => {
-              const r = await approveRun({ runId: openRun!.id })
+              const r = unwrap(await approveRun({ runId: openRun!.id }))
               return `Run approved (${r.from} → ${r.to}). The figures are fixed from here.`
             })
           }

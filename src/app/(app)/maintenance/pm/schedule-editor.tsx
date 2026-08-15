@@ -7,6 +7,7 @@ import { InlineAlert } from '@/components/fx/feedback'
 import { actionErrorMessage } from '@/lib/action-error'
 import { Badge, Button } from '@/components/fx/primitives'
 import { savePmSchedule } from '@/modules/maintenance/actions'
+import { unwrap } from '@/lib/action-failure'
 
 type Cadence = 'daily' | 'weekly' | 'monthly'
 
@@ -73,7 +74,9 @@ export function ScheduleEditor({
 
     startTransition(async () => {
       try {
-        const result = await savePmSchedule({ machineType: machineType.trim(), cadence, checklist: parsed })
+        const result = unwrap(
+          await savePmSchedule({ machineType: machineType.trim(), cadence, checklist: parsed }),
+        )
         setNote(
           result.replaced
             ? `Replaced the ${cadence} checklist for ${machineType.trim()}. Services already recorded keep the steps that were checked on the day.`

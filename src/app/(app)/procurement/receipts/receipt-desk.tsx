@@ -8,6 +8,7 @@ import { Ident } from '@/components/fx/format'
 import { Badge, Button } from '@/components/fx/primitives'
 import { actionErrorMessage } from '@/lib/action-error'
 import { recordReceipt } from '@/modules/procurement/actions'
+import { unwrap } from '@/lib/action-failure'
 
 interface Line {
   lineId: string
@@ -80,7 +81,9 @@ export function ReceiptDesk({
 
     startTransition(async () => {
       try {
-        const result = await recordReceipt({ supplierPoLineId: line.lineId, qty: qty.trim() })
+        const result = unwrap(
+          await recordReceipt({ supplierPoLineId: line.lineId, qty: qty.trim() }),
+        )
 
         // The server's own answer, not a restatement of the request.
         const tail = result.closed

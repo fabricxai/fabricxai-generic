@@ -10,6 +10,7 @@ import { MarbimMark } from '@/components/fx/mark'
 import { Button } from '@/components/fx/primitives'
 import { approveSheet, previewSheet, saveCostSheet } from '@/modules/costing/actions'
 import type { CostSheetResult } from '@/modules/costing/cost-sheet'
+import { unwrap } from '@/lib/action-failure'
 
 /**
  * The live cost sheet.
@@ -100,7 +101,7 @@ export function CostingStudio({
     const timer = setTimeout(() => {
       startTransition(async () => {
         try {
-          setResult(await previewSheet(sections))
+          setResult(unwrap(await previewSheet(sections)))
           setError(null)
         } catch (e) {
           setError(actionErrorMessage(e, 'That sheet did not compute'))
@@ -281,13 +282,15 @@ export function CostingStudio({
                   onClick={() =>
                     startTransition(async () => {
                       try {
-                        const r = await saveCostSheet({
+                        const r = unwrap(
+                          await saveCostSheet({
                           styleCode: styleCode.trim(),
                           sections,
                           // The sheet pins the BOM it was costed against. Only when the
                           // studio was opened FROM one — a hand-built sheet pins nothing.
                           ...(seed ? { bomId: seed.bomId } : {}),
-                        })
+                          }),
+                        )
                         setSaved({ sheetId: r.sheetId, version: r.version })
                         setNoted(
                           `Saved as v${r.version} — FOB ${r.computed.fobPrice}, margin ${r.computed.achievedMarginPct}%.`,

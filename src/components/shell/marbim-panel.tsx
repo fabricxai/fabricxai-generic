@@ -6,6 +6,7 @@ import { type PointerEvent as ReactPointerEvent, useCallback, useEffect, useRef,
 import { MarbimSurface } from '@/app/(app)/marbim/surface-client'
 import { MarbimMark } from '@/components/fx/mark'
 import { useT } from '@/components/fx/locale'
+import { unwrap } from '@/lib/action-failure'
 import { listChatHistory } from '@/modules/marbim/actions'
 import { tierFromSurfaceLabel } from '@/modules/marbim/surface-label'
 
@@ -231,7 +232,9 @@ export function MarbimPanel({ entry, trust }: { entry: MarbimEntry; trust: Marbi
     // cascading render, and "show nothing while this loads" is a property of the gesture.
     void listChatHistory()
       .then((rows) => {
-        if (!cancelled) setHistory(rows)
+        // A refusal arrives as a value; `unwrap` throws it into the catch below, which
+        // already means "show an empty list rather than a broken panel".
+        if (!cancelled) setHistory(unwrap(rows))
       })
       .catch(() => {
         if (!cancelled) setHistory([])

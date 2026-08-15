@@ -8,6 +8,7 @@ import { actionErrorMessage } from '@/lib/action-error'
 import { Ident } from '@/components/fx/format'
 import { Badge, Button } from '@/components/fx/primitives'
 import { markPmDone } from '@/modules/maintenance/actions'
+import { unwrap } from '@/lib/action-failure'
 
 interface Row {
   scheduleId: string
@@ -68,7 +69,8 @@ export function PmChecklist({ rows, today }: { rows: readonly Row[]; today: stri
 
     startTransition(async () => {
       try {
-        const result = await markPmDone({
+        const result = unwrap(
+          await markPmDone({
           scheduleId: row.scheduleId,
           machineId: row.machineId,
           completedOn: today,
@@ -77,7 +79,8 @@ export function PmChecklist({ rows, today }: { rows: readonly Row[]; today: stri
             ok: ticks[i]?.ok === true,
             ...(ticks[i]?.note.trim() ? { note: ticks[i]!.note.trim() } : {}),
           })),
-        })
+          }),
+        )
 
         setDone(
           result.alreadyRecorded

@@ -123,16 +123,21 @@ export async function rejectDraft(input: z.input<typeof rejectInput>): Promise<v
  * `approve` uses to capture `before` for the audit log, so what a reviewer signs is what
  * the trail records.
  */
-export async function draftFields(input: { pendingChangeId: string }): Promise<DraftDetail | null> {
+export async function draftFields(
+  input: { pendingChangeId: string },
+): Promise<DraftDetail | null | ActionFailure> {
   const ctx = await requireRole(await headers(), ...APPROVER_ROLES)
-  const { pendingChangeId } = z.object({ pendingChangeId: z.string().uuid() }).parse(input)
 
-  const draft = await draftTarget(ctx, pendingChangeId)
-  if (!draft) return null
+  return surfaced(async () => {
+    const { pendingChangeId } = z.object({ pendingChangeId: z.string().uuid() }).parse(input)
 
-  const before = await currentRow(ctx, draft.targetTable, draft.targetId)
+    const draft = await draftTarget(ctx, pendingChangeId)
+    if (!draft) return null
 
-  return draftDetail(ctx, pendingChangeId, before)
+    const before = await currentRow(ctx, draft.targetTable, draft.targetId)
+
+    return draftDetail(ctx, pendingChangeId, before)
+  })
 }
 
 const trailInput = z.object({
@@ -149,11 +154,16 @@ const trailInput = z.object({
  * nothing new. Roles outside that set get the usual 403 and the screen simply shows no
  * trail — a viewer's drawer looks exactly as it did before this existed.
  */
-export async function committedTrail(input: z.input<typeof trailInput>): Promise<RecordTrail | null> {
+export async function committedTrail(
+  input: z.input<typeof trailInput>,
+): Promise<RecordTrail | null | ActionFailure> {
   const ctx = await requireRole(await headers(), ...APPROVER_ROLES)
-  const { targetTable, targetId } = trailInput.parse(input)
 
-  return recordTrail(ctx, { targetTable, targetId })
+  return surfaced(async () => {
+    const { targetTable, targetId } = trailInput.parse(input)
+
+    return recordTrail(ctx, { targetTable, targetId })
+  })
 }
 
 /**

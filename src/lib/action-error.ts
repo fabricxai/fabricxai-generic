@@ -45,7 +45,20 @@ export function actionErrorMessage(
    * said no, in words) and a failure (something broke) show in different tones.
    */
   const announce = (message: string): string => {
-    notifyOutcome(error instanceof ActionRefused ? 'refused' : 'failed', message)
+    /*
+     * Browser only — and this guard is the whole difference between a sentence and a dead
+     * screen.
+     *
+     * Server components call this too: `/procurement/[prId]` turns a failed quote comparison
+     * into copy it renders inline. But `notifyOutcome` lives in a `'use client'` module, so
+     * merely CALLING its reference during a server render throws "Attempted to call
+     * notifyOutcome() from the server" — which the error boundary then shows as React #441
+     * with a digest. The screen that was preparing an explanation died producing it, and the
+     * page took the whole route down with it.
+     */
+    if (typeof window !== 'undefined') {
+      notifyOutcome(error instanceof ActionRefused ? 'refused' : 'failed', message)
+    }
     return message
   }
 
@@ -60,6 +73,19 @@ export function actionErrorMessage(
     const copy = t(locale, error.failure.messageKey)
     if (copy !== error.failure.messageKey) return announce(copy)
     return announce(MESSAGES[DEFAULT_LOCALE][error.failure.messageKey] ?? fallback)
+  }
+
+  /*
+   * Production's mask for a thrown server error, kept off the screen.
+   *
+   * When an action throws, Next replaces the message with "Minified React error #441 …" —
+   * so the raw text this function would otherwise show is framework boilerplate with an
+   * error number in it, the least useful sentence available. The call site's own fallback
+   * at least names the act that failed. Actions that return refusals through `surfaced()`
+   * never reach this branch; it is the net under the ones that still throw.
+   */
+  if (/Minified React error #\d|Server Components render/.test(error.message)) {
+    return announce(fallback)
   }
 
   const key = KEYED.exec(error.message)?.[1]

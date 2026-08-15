@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { headers } from 'next/headers'
 
+import { surfaced, type ActionFailure } from '@/lib/action-failure'
 import { requireRole } from '@/modules/core/session'
 
 import {
@@ -36,19 +37,25 @@ export async function reportMachine(input: {
   lineId?: string
   priority: 'high' | 'normal'
   notes?: string
-}): Promise<{ ticketId: string }> {
+}): Promise<{ ticketId: string } | ActionFailure> {
   const ctx = await requireRole(await headers(), 'maintenance', 'production')
-  const result = await openTicket(ctx, input)
-  refresh()
-  return { ticketId: result.ticketId }
+  return surfaced(async () => {
+    const result = await openTicket(ctx, input)
+    refresh()
+    return { ticketId: result.ticketId }
+  })
 }
 
 /** A mechanic takes the ticket. One claimant, so two do not walk to the same machine. */
-export async function takeTicket(input: { ticketId: string }): Promise<{ status: string }> {
+export async function takeTicket(input: {
+  ticketId: string
+}): Promise<{ status: string } | ActionFailure> {
   const ctx = await requireRole(await headers(), 'maintenance')
-  const result = await claimTicket(ctx, input)
-  refresh()
-  return { status: String(result.status) }
+  return surfaced(async () => {
+    const result = await claimTicket(ctx, input)
+    refresh()
+    return { status: String(result.status) }
+  })
 }
 
 /**
@@ -65,22 +72,26 @@ export async function resolveMachineTicket(input: {
   ticketId: string
   partsUsed?: { partId: string; qty: number }[]
   notes?: string
-}): Promise<{ downMinutes: number | null }> {
+}): Promise<{ downMinutes: number | null } | ActionFailure> {
   const ctx = await requireRole(await headers(), 'maintenance')
-  const result = await resolveTicket(ctx, input)
-  refresh()
-  return { downMinutes: (result as { downMinutes?: number }).downMinutes ?? null }
+  return surfaced(async () => {
+    const result = await resolveTicket(ctx, input)
+    refresh()
+    return { downMinutes: (result as { downMinutes?: number }).downMinutes ?? null }
+  })
 }
 
 /** Cancel a ticket that should not have been raised. A reason is required. */
 export async function dropTicket(input: {
   ticketId: string
   reason: string
-}): Promise<{ status: string }> {
+}): Promise<{ status: string } | ActionFailure> {
   const ctx = await requireRole(await headers(), 'maintenance')
-  const result = await cancelTicket(ctx, input)
-  refresh()
-  return { status: String(result.status) }
+  return surfaced(async () => {
+    const result = await cancelTicket(ctx, input)
+    refresh()
+    return { status: String(result.status) }
+  })
 }
 
 /**
@@ -95,11 +106,13 @@ export async function markPmDone(input: {
   machineId: string
   completedOn: string
   checked: { step: string; ok: boolean; note?: string }[]
-}): Promise<{ alreadyRecorded: boolean }> {
+}): Promise<{ alreadyRecorded: boolean } | ActionFailure> {
   const ctx = await requireRole(await headers(), 'maintenance')
-  const result = await completePm(ctx, input)
-  refresh()
-  return { alreadyRecorded: result.alreadyRecorded }
+  return surfaced(async () => {
+    const result = await completePm(ctx, input)
+    refresh()
+    return { alreadyRecorded: result.alreadyRecorded }
+  })
 }
 
 /** Add a machine to the registry. */
@@ -109,11 +122,13 @@ export async function addMachine(input: {
   model?: string
   serial?: string
   lineId?: string
-}): Promise<{ machineId: string }> {
+}): Promise<{ machineId: string } | ActionFailure> {
   const ctx = await requireRole(await headers(), 'maintenance')
-  const result = await registerMachine(ctx, input)
-  refresh()
-  return result
+  return surfaced(async () => {
+    const result = await registerMachine(ctx, input)
+    refresh()
+    return result
+  })
 }
 
 /**
@@ -127,10 +142,12 @@ export async function moveMachine(input: {
   machineId: string
   lineId: string | null
   on: string
-}): Promise<void> {
+}): Promise<void | ActionFailure> {
   const ctx = await requireRole(await headers(), 'maintenance')
-  await assignMachineToLine(ctx, input)
-  refresh()
+  return surfaced(async () => {
+    await assignMachineToLine(ctx, input)
+    refresh()
+  })
 }
 
 /**
@@ -144,9 +161,11 @@ export async function savePmSchedule(input: {
   machineType: string
   cadence: 'daily' | 'weekly' | 'monthly'
   checklist: string[]
-}): Promise<{ replaced: boolean }> {
+}): Promise<{ replaced: boolean } | ActionFailure> {
   const ctx = await requireRole(await headers(), 'maintenance')
-  const result = await upsertPmSchedule(ctx, input)
-  refresh()
-  return { replaced: result.replaced }
+  return surfaced(async () => {
+    const result = await upsertPmSchedule(ctx, input)
+    refresh()
+    return { replaced: result.replaced }
+  })
 }

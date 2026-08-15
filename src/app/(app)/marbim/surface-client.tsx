@@ -12,6 +12,7 @@ import {
   type ToolStep,
 } from '@/components/fx/ai'
 import { EmptyState } from '@/components/fx/feedback'
+import { unwrap, type ActionFailure } from '@/lib/action-failure'
 import { MarbimMark, type MarkState } from '@/components/fx/mark'
 import { ask, loadChatTurns } from '@/modules/marbim/actions'
 import {
@@ -63,7 +64,7 @@ function receiptOf(model: string, toolCount: number, durationMs?: number): strin
 }
 
 function turnsFromStored(
-  rows: Awaited<ReturnType<typeof loadChatTurns>>,
+  rows: Exclude<Awaited<ReturnType<typeof loadChatTurns>>, ActionFailure>,
 ): Turn[] {
   return rows.map((row) => {
     const toolsRun = row.toolCalls.length
@@ -220,7 +221,8 @@ export function MarbimSurface({
     void loadChatTurns({ conversationId })
       .then((rows) => {
         if (cancelled) return
-        setTurns(turnsFromStored(rows))
+        // A refusal comes back as a value; `unwrap` re-throws it into the catch below.
+        setTurns(turnsFromStored(unwrap(rows)))
       })
       .catch(() => {
         if (!cancelled) setTurns([])
@@ -284,13 +286,17 @@ export function MarbimSurface({
 
     startTransition(async () => {
       try {
-        const result = await ask({
-          conversationId,
-          turnIndex,
-          question: text,
-          fromModule,
-          tier,
-        })
+        // A refusal comes back as a value (production masks thrown messages); `unwrap`
+        // re-throws it locally so the catch below marks the turn failed.
+        const result = unwrap(
+          await ask({
+            conversationId,
+            turnIndex,
+            question: text,
+            fromModule,
+            tier,
+          }),
+        )
         setTurns((t) =>
           t.map((turn) =>
             turn.id === localId

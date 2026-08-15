@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { headers } from 'next/headers'
 
+import { surfaced, type ActionFailure } from '@/lib/action-failure'
 import { requireRole } from '@/modules/core/session'
 import { getPolicy } from '@/modules/settings/service'
 
@@ -43,12 +44,14 @@ export async function createSupplier(input: {
   paymentTerms?: string
   defaultCurrency?: string
   contacts?: { name: string; role?: string; email?: string; phone?: string }[]
-}): Promise<{ supplierId: string }> {
+}): Promise<{ supplierId: string } | ActionFailure> {
   const ctx = await requireRole(await headers(), 'procurement')
-  const result = await createSupplierIn(ctx, input)
+  return surfaced(async () => {
+    const result = await createSupplierIn(ctx, input)
 
-  refresh()
-  return result
+    refresh()
+    return result
+  })
 }
 
 /**
@@ -64,12 +67,14 @@ export async function createPurchaseRequisition(input: {
   orderId?: string
   requisitionId?: string
   lines: { itemId: string; qty: string; unit: string }[]
-}): Promise<{ purchaseRequisitionId: string; lineCount: number }> {
+}): Promise<{ purchaseRequisitionId: string; lineCount: number } | ActionFailure> {
   const ctx = await requireRole(await headers(), 'procurement', 'merchandiser')
-  const result = await createPurchaseRequisitionIn(ctx, input)
+  return surfaced(async () => {
+    const result = await createPurchaseRequisitionIn(ctx, input)
 
-  refresh()
-  return result
+    refresh()
+    return result
+  })
 }
 
 /**
@@ -92,11 +97,13 @@ export async function recordQuote(input: {
     freight?: string
     dutyPct?: string
   }[]
-}): Promise<{ supplierQuoteId: string }> {
+}): Promise<{ supplierQuoteId: string } | ActionFailure> {
   const ctx = await requireRole(await headers(), 'procurement', 'commercial')
-  const result = await recordSupplierQuote(ctx, input)
-  refresh(input.purchaseRequisitionId)
-  return result
+  return surfaced(async () => {
+    const result = await recordSupplierQuote(ctx, input)
+    refresh(input.purchaseRequisitionId)
+    return result
+  })
 }
 
 /**
@@ -116,9 +123,9 @@ export async function compareQuotes(input: {
   baseCurrency?: string
   /** `{ BDT: '0.0083' }` — one unit of the quoted currency in the base currency. */
   rates?: Record<string, string>
-}): Promise<QuoteComparison> {
+}): Promise<QuoteComparison | ActionFailure> {
   const ctx = await requireRole(await headers(), 'procurement', 'commercial')
-  return compareQuotesForItem(ctx, input)
+  return surfaced(() => compareQuotesForItem(ctx, input))
 }
 
 /**
@@ -140,14 +147,16 @@ export async function issuePurchaseOrder(input: {
   btbLcId?: string
   expectedDeliveryDate?: string
   lines: { itemId: string; qty: string; unit: string; unitPrice: string }[]
-}): Promise<{ supplierPoId: string; totalValue: string; currency: string }> {
+}): Promise<{ supplierPoId: string; totalValue: string; currency: string } | ActionFailure> {
   const ctx = await requireRole(await headers(), 'procurement', 'commercial')
-  const policy = await getPolicy<ProcurementPolicy>(ctx, 'procurement')
+  return surfaced(async () => {
+    const policy = await getPolicy<ProcurementPolicy>(ctx, 'procurement')
 
-  const result = await issuePo(ctx, input, policy)
+    const result = await issuePo(ctx, input, policy)
 
-  refresh(input.purchaseRequisitionId)
-  return result
+    refresh(input.purchaseRequisitionId)
+    return result
+  })
 }
 
 /** Move a PO along its own states — acknowledged, in transit, closed. */
@@ -161,10 +170,12 @@ export async function updatePoStatus(input: {
     | 'received_partial'
     | 'received'
     | 'cancelled'
-}): Promise<void> {
+}): Promise<void | ActionFailure> {
   const ctx = await requireRole(await headers(), 'procurement', 'commercial')
-  await setPoStatus(ctx, input)
-  refresh()
+  return surfaced(async () => {
+    await setPoStatus(ctx, input)
+    refresh()
+  })
 }
 
 /**
@@ -184,15 +195,17 @@ export async function recordReceipt(input: {
   supplierPoLineId: string
   qty: string
   grnId?: string
-}): Promise<ReceiptResult> {
+}): Promise<ReceiptResult | ActionFailure> {
   const ctx = await requireRole(await headers(), 'procurement', 'store')
-  const policy = await getPolicy<ProcurementPolicy>(ctx, 'procurement')
+  return surfaced(async () => {
+    const policy = await getPolicy<ProcurementPolicy>(ctx, 'procurement')
 
-  const result = await applyReceipt(ctx, input, policy)
+    const result = await applyReceipt(ctx, input, policy)
 
-  refresh()
-  revalidatePath('/procurement/receipts')
-  revalidatePath('/procurement/scorecard')
+    refresh()
+    revalidatePath('/procurement/receipts')
+    revalidatePath('/procurement/scorecard')
 
-  return result
+    return result
+  })
 }

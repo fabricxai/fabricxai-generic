@@ -11,6 +11,7 @@ import { DateInput, TextInput } from '@/components/fx/forms'
 import { factoryToday } from '@/lib/dates'
 import { issuePurchaseOrder, recordQuote } from '@/modules/procurement/actions'
 import type { QuoteComparison } from '@/modules/procurement/procurement'
+import { unwrap } from '@/lib/action-failure'
 
 interface Supplier {
   id: string
@@ -96,7 +97,8 @@ export function RequisitionClient({
 
     startTransition(async () => {
       try {
-        await recordQuote({
+        unwrap(
+          await recordQuote({
           purchaseRequisitionId: prId,
           supplierId: quoteSupplierId,
           currency: supplierOf(quoteSupplierId)?.currency ?? 'USD',
@@ -108,7 +110,8 @@ export function RequisitionClient({
             ...(draft.freight.trim() ? { freight: draft.freight.trim() } : {}),
             ...(draft.dutyPct.trim() ? { dutyPct: draft.dutyPct.trim() } : {}),
           })),
-        })
+          }),
+        )
         setNoted(`Quote recorded for ${supplierOf(quoteSupplierId)?.name ?? 'the supplier'}.`)
         setQuoteLines({})
         setQuoteSupplierId('')
@@ -134,7 +137,8 @@ export function RequisitionClient({
 
     startTransition(async () => {
       try {
-        const result = await issuePurchaseOrder({
+        const result = unwrap(
+          await issuePurchaseOrder({
           supplierId: supplier.id,
           purchaseRequisitionId: prId,
           poNumber: poNumber.trim(),
@@ -153,7 +157,8 @@ export function RequisitionClient({
               unitPrice: ranked?.landedUnitCost ?? '0.00',
             }
           }),
-        })
+          }),
+        )
         setNoted(
           `PO ${poNumber.trim()} issued — ${result.totalValue} ${result.currency} to ${supplier.name}.`,
         )

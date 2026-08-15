@@ -109,7 +109,8 @@ export const ReadDocumentFlow = forwardRef<
     let cancelled = false
     void listIntakeKinds()
       .then((list) => {
-        if (!cancelled) setKinds(list)
+        // A refusal comes back as a value; `unwrap` re-throws it into the catch below.
+        if (!cancelled) setKinds(unwrap(list))
       })
       .catch(() => {
         // A viewer/member gets no chips rather than chips that 403 on submit.
@@ -140,7 +141,8 @@ export const ReadDocumentFlow = forwardRef<
         return
       }
       void extractionJobStatus({ jobId: phase.jobId })
-        .then((job) => {
+        .then((result) => {
+          const job = unwrap(result)
           if (job.status === 'succeeded') {
             setPhase({ step: 'done', kind: phase.kind, targetTable: job.targetTable })
           } else if (job.status === 'failed' || job.status === 'rejected') {
@@ -195,7 +197,7 @@ export const ReadDocumentFlow = forwardRef<
       return
     }
     try {
-      const fields = await intakeContext(kind.id)
+      const fields = unwrap(await intakeContext(kind.id))
       setPhase({ step: 'context', kind, fields })
     } catch (error) {
       setPhase({

@@ -88,67 +88,74 @@ const askInput = z.object({
   tier: z.enum(['fast', 'large']).default('fast'),
 })
 
-export async function ask(input: z.input<typeof askInput>): Promise<ChatResult> {
+export async function ask(
+  input: z.input<typeof askInput>,
+): Promise<ChatResult | ActionFailure> {
   const ctx = await requireRole(await headers(), ...ASK_ROLES)
-  const { conversationId, turnIndex, question, fromModule, tier } = askInput.parse(input)
 
-  // Only modules that actually registered a primer, and only ones this caller's
-  // roles can already read — MARBIM never widens what a person can see.
-  const registered = listModules()
-  const known = new Set(registered.map((m) => m.id))
-  const lead = fromModule && known.has(fromModule) ? fromModule : undefined
+  // Refusals return as values (rate limits, token ceilings, zod): production masks thrown
+  // messages, so before this wrap they reached the person asking as React #441.
+  return surfaced(async () => {
+    const { conversationId, turnIndex, question, fromModule, tier } = askInput.parse(input)
 
-  const inScope = lead ? registered.filter((m) => m.id === lead) : registered
+    // Only modules that actually registered a primer, and only ones this caller's
+    // roles can already read — MARBIM never widens what a person can see.
+    const registered = listModules()
+    const known = new Set(registered.map((m) => m.id))
+    const lead = fromModule && known.has(fromModule) ? fromModule : undefined
 
-  // The packs the modules in scope actually registered.
-  //
-  // This was hardcoded to `[]` with a note saying packs would be wired "as each module
-  // lands". Two modules had landed theirs and were still being ignored, so MARBIM answered
-  // every question with "no tools are available in this scope" — indistinguishable from a
-  // module that had never registered one. A module adding a pack now takes effect by the
-  // act of registering it, which is how the rest of the registry already works.
-  const packs = inScope
-    .map((m) => m.toolPack)
-    .filter((pack): pack is ToolPack => isToolPack(pack))
+    const inScope = lead ? registered.filter((m) => m.id === lead) : registered
 
-  /*
-   * Filtered by ROLE before the model ever sees the list (plan 6.5, audit AI-H6).
-   *
-   * The caption under the composer has always said "MARBIM reads what your role can already
-   * read", and until now it did not: every pack in scope went into the prompt whoever was
-   * asking, so a viewer's conversation advertised `workforce.payroll_run`. That was a
-   * disclosure of shape rather than data while nothing executed. Since the loop landed it
-   * would be the data.
-   *
-   * Read tools need `canSee` on the module, draft tools need `canWrite` — the nav's own
-   * answers, not a second list that could drift from the one the sidebar uses.
-   */
-  const profile = await companyProfile(ctx)
-  const factoryType = profile?.factoryType ?? 'woven'
-  const tools = toolsForRoles({ packs, roles: ctx.roles, factoryType })
+    // The packs the modules in scope actually registered.
+    //
+    // This was hardcoded to `[]` with a note saying packs would be wired "as each module
+    // lands". Two modules had landed theirs and were still being ignored, so MARBIM answered
+    // every question with "no tools are available in this scope" — indistinguishable from a
+    // module that had never registered one. A module adding a pack now takes effect by the
+    // act of registering it, which is how the rest of the registry already works.
+    const packs = inScope
+      .map((m) => m.toolPack)
+      .filter((pack): pack is ToolPack => isToolPack(pack))
 
-  const policy = await getPolicy<MarbimPolicy>(ctx, 'marbim')
+    /*
+     * Filtered by ROLE before the model ever sees the list (plan 6.5, audit AI-H6).
+     *
+     * The caption under the composer has always said "MARBIM reads what your role can already
+     * read", and until now it did not: every pack in scope went into the prompt whoever was
+     * asking, so a viewer's conversation advertised `workforce.payroll_run`. That was a
+     * disclosure of shape rather than data while nothing executed. Since the loop landed it
+     * would be the data.
+     *
+     * Read tools need `canSee` on the module, draft tools need `canWrite` — the nav's own
+     * answers, not a second list that could drift from the one the sidebar uses.
+     */
+    const profile = await companyProfile(ctx)
+    const factoryType = profile?.factoryType ?? 'woven'
+    const tools = toolsForRoles({ packs, roles: ctx.roles, factoryType })
 
-  // Product tiers stay Claude — fast is MARBIM_MODEL_REASON, large is the opus-class override.
-  const model =
-    tier === 'large' ? env.MARBIM_MODEL_REASON_LARGE : env.MARBIM_MODEL_REASON
+    const policy = await getPolicy<MarbimPolicy>(ctx, 'marbim')
 
-  return chat(ctx, {
-    conversationId,
-    turnIndex,
-    question,
-    model,
-    // Primers follow the same audience. A primer for a module whose tools this person cannot
-    // call is prompt they can only be frustrated by, and it is paid for on every request.
-    moduleIds: primerModulesForRoles(
-      inScope.map((m) => m.id),
-      ctx.roles,
-      factoryType,
-    ),
-    scope: lead ? { moduleId: lead } : {},
-    packs,
-    tools,
-    policy,
+    // Product tiers stay Claude — fast is MARBIM_MODEL_REASON, large is the opus-class override.
+    const model =
+      tier === 'large' ? env.MARBIM_MODEL_REASON_LARGE : env.MARBIM_MODEL_REASON
+
+    return chat(ctx, {
+      conversationId,
+      turnIndex,
+      question,
+      model,
+      // Primers follow the same audience. A primer for a module whose tools this person cannot
+      // call is prompt they can only be frustrated by, and it is paid for on every request.
+      moduleIds: primerModulesForRoles(
+        inScope.map((m) => m.id),
+        ctx.roles,
+        factoryType,
+      ),
+      scope: lead ? { moduleId: lead } : {},
+      packs,
+      tools,
+      policy,
+    })
   })
 }
 
@@ -204,22 +211,25 @@ async function contextOptions(ctx: AnyCtx, source: 'buyers' | 'audits'): Promise
 /** What the intake screen shows in a kind's pickers. Empty for kinds needing no context. */
 export async function intakeContext(
   kindId: string,
-): Promise<{ field: string; label: string; options: ContextOption[] }[]> {
+): Promise<{ field: string; label: string; options: ContextOption[] }[] | ActionFailure> {
   const ctx = await requireRole(await headers(), ...ASK_ROLES)
-  const kind = intakeKind(kindId)
-  if (!mayFileKind(kind, ctx.roles)) {
-    throw new AppError('forbidden', 'marbim.errors.kind_not_your_desk', { kindId })
-  }
 
-  const resolved = []
-  for (const field of kind.context ?? []) {
-    resolved.push({
-      field: field.field,
-      label: field.label,
-      options: await contextOptions(ctx, field.source),
-    })
-  }
-  return resolved
+  return surfaced(async () => {
+    const kind = intakeKind(kindId)
+    if (!mayFileKind(kind, ctx.roles)) {
+      throw new AppError('forbidden', 'marbim.errors.kind_not_your_desk', { kindId })
+    }
+
+    const resolved = []
+    for (const field of kind.context ?? []) {
+      resolved.push({
+        field: field.field,
+        label: field.label,
+        options: await contextOptions(ctx, field.source),
+      })
+    }
+    return resolved
+  })
 }
 
 /**
@@ -528,76 +538,93 @@ export async function readIntoForm(input: {
  * leads to — a viewer's drawer must not offer chips whose submit would 403.
  */
 export async function listIntakeKinds(): Promise<
-  { id: string; label: string; hint: string; targetTable: string; needsContext: boolean }[]
+  | { id: string; label: string; hint: string; targetTable: string; needsContext: boolean }[]
+  | ActionFailure
 > {
   const ctx = await requireRole(await headers(), ...INTAKE_ROLES)
-  // The caller's OWN kinds. Chips that 403 on submit are worse than no chips, and a wage
-  // gazette offered to a merchandiser invites them to file into payroll's inbox.
-  return intakeKindsFor(ctx.roles).map((kind) => ({
-    id: kind.id,
-    label: kind.label,
-    hint: kind.hint,
-    targetTable: kind.targetTable,
-    needsContext: (kind.context ?? []).length > 0,
-  }))
+
+  return surfaced(async () =>
+    // The caller's OWN kinds. Chips that 403 on submit are worse than no chips, and a wage
+    // gazette offered to a merchandiser invites them to file into payroll's inbox.
+    intakeKindsFor(ctx.roles).map((kind) => ({
+      id: kind.id,
+      label: kind.label,
+      hint: kind.hint,
+      targetTable: kind.targetTable,
+      needsContext: (kind.context ?? []).length > 0,
+    })),
+  )
 }
 
 /**
  * One extraction's fate, for the surface that queued it to follow. Read-only and
  * tenant-scoped; the poller stops the moment the status is terminal.
  */
-export async function extractionJobStatus(input: { jobId: string }): Promise<{
-  status: string
-  error: string | null
-  pendingChangeId: string | null
-  targetTable: string
-}> {
+export async function extractionJobStatus(input: { jobId: string }): Promise<
+  | {
+      status: string
+      error: string | null
+      pendingChangeId: string | null
+      targetTable: string
+    }
+  | ActionFailure
+> {
   const ctx = await requireRole(await headers(), ...INTAKE_ROLES)
-  const job = await extractionStatus(ctx, { jobId: input.jobId })
-  return {
-    status: job.status,
-    error: job.error,
-    pendingChangeId: job.pendingChangeId,
-    targetTable: job.targetTable,
-  }
+
+  return surfaced(async () => {
+    const job = await extractionStatus(ctx, { jobId: input.jobId })
+    return {
+      status: job.status,
+      error: job.error,
+      pendingChangeId: job.pendingChangeId,
+      targetTable: job.targetTable,
+    }
+  })
 }
 
 /** Recent threads for the history list in the panel. */
 export async function listChatHistory(): Promise<
-  { conversationId: string; preview: string; turnCount: number; lastAt: string }[]
+  { conversationId: string; preview: string; turnCount: number; lastAt: string }[] | ActionFailure
 > {
   const ctx = await requireRole(await headers(), ...ASK_ROLES)
-  const rows: ConversationSummary[] = await listConversations(ctx, { limit: 30 })
-  return rows.map((row) => ({
-    conversationId: row.conversationId,
-    preview: row.preview,
-    turnCount: row.turnCount,
-    lastAt: row.lastAt.toISOString(),
-  }))
+
+  return surfaced(async () => {
+    const rows: ConversationSummary[] = await listConversations(ctx, { limit: 30 })
+    return rows.map((row) => ({
+      conversationId: row.conversationId,
+      preview: row.preview,
+      turnCount: row.turnCount,
+      lastAt: row.lastAt.toISOString(),
+    }))
+  })
 }
 
 /** Turns for one of the caller's conversations — hydrates the surface on reopen / history pick. */
 export async function loadChatTurns(input: { conversationId: string }): Promise<
-  {
-    id: string
-    turnIndex: number
-    question: string
-    answer: string | null
-    toolCalls: { name: string; ok: boolean; ms?: number; error?: string }[]
-    model: string | null
-  }[]
+  | {
+      id: string
+      turnIndex: number
+      question: string
+      answer: string | null
+      toolCalls: { name: string; ok: boolean; ms?: number; error?: string }[]
+      model: string | null
+    }[]
+  | ActionFailure
 > {
   const ctx = await requireRole(await headers(), ...ASK_ROLES)
-  const { conversationId } = z.object({ conversationId: z.string().uuid() }).parse(input)
-  const turns = await conversation(ctx, conversationId)
-  return turns.map((turn) => ({
-    id: turn.id,
-    turnIndex: turn.turnIndex,
-    question: turn.question,
-    answer: turn.answer,
-    toolCalls: normalizeStoredToolCalls(turn.toolCalls),
-    model: turn.model,
-  }))
+
+  return surfaced(async () => {
+    const { conversationId } = z.object({ conversationId: z.string().uuid() }).parse(input)
+    const turns = await conversation(ctx, conversationId)
+    return turns.map((turn) => ({
+      id: turn.id,
+      turnIndex: turn.turnIndex,
+      question: turn.question,
+      answer: turn.answer,
+      toolCalls: normalizeStoredToolCalls(turn.toolCalls),
+      model: turn.model,
+    }))
+  })
 }
 
 function normalizeStoredToolCalls(

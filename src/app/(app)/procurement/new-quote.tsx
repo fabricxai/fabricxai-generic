@@ -10,6 +10,7 @@ import { ReadIntoForm, type ReadFields } from '@/components/shell/read-into-form
 import { actionErrorMessage } from '@/lib/action-error'
 import { matchItem } from '@/lib/match-item'
 import { recordQuote } from '@/modules/procurement/actions'
+import { unwrap } from '@/lib/action-failure'
 
 /**
  * What a supplier came back with (found by auditing every input dialog in the app).
@@ -162,7 +163,8 @@ export function NewQuoteButton({
 
     startTransition(async () => {
       try {
-        await recordQuote({
+        unwrap(
+          await recordQuote({
           purchaseRequisitionId: prId,
           supplierId,
           currency: currency.trim().toUpperCase(),
@@ -176,7 +178,8 @@ export function NewQuoteButton({
             ...(line.freight.trim() ? { freight: line.freight.trim() } : {}),
             ...(line.dutyPct.trim() ? { dutyPct: line.dutyPct.trim() } : {}),
           })),
-        })
+          }),
+        )
         setOpen(false)
         setReadNote(null)
         router.refresh()
