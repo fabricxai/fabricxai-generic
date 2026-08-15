@@ -12,6 +12,7 @@ import { getCtx } from '@/modules/core/session'
 import { companyProfile } from '@/modules/settings/service'
 import { NewRequisitionButton } from './new-requisition'
 import { NewQuoteButton } from './new-quote'
+import { PoStatusControl } from './po-status'
 import { NewSupplierButton } from './new-supplier'
 
 import {
@@ -216,8 +217,8 @@ export default async function ProcurementPage() {
               <div
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: '1.1fr 1.4fr .8fr 1fr 1fr 1fr .9fr',
-                  minWidth: 780,
+                  gridTemplateColumns: '1.1fr 1.4fr .8fr 1fr 1fr 1fr .9fr 1.3fr',
+                  minWidth: 960,
                   gap: 12,
                   padding: '10px 18px 10px 21px',
                   background: 'var(--fx-bg-sunken)',
@@ -234,10 +235,13 @@ export default async function ProcurementPage() {
                 <div>BTB</div>
                 <div>Expected</div>
                 <div style={{ textAlign: 'right' }}>Lines</div>
+                {/* Only a writer sees the column at all — an empty one would read as a
+                    feature that is broken rather than one that is not theirs. */}
+                {mayWrite ? <div style={{ textAlign: 'right' }}>Next step</div> : <div />}
               </div>
 
               {pos.map((po) => (
-                <PoRowView key={po.id} po={po} />
+                <PoRowView key={po.id} po={po} mayWrite={mayWrite} />
               ))}
             </div>
           )}
@@ -318,7 +322,7 @@ export default async function ProcurementPage() {
   )
 }
 
-function PoRowView({ po }: { po: PoRow }) {
+function PoRowView({ po, mayWrite }: { po: PoRow; mayWrite: boolean }) {
   const late = po.daysToDelivery !== null && po.daysToDelivery < 0
 
   return (
@@ -339,9 +343,9 @@ function PoRowView({ po }: { po: PoRow }) {
       <div
         style={{
           flex: 1,
-                    display: 'grid',
-          gridTemplateColumns: '1.1fr 1.4fr .8fr 1fr 1fr 1fr .9fr',
-          minWidth: 780,
+          display: 'grid',
+          gridTemplateColumns: '1.1fr 1.4fr .8fr 1fr 1fr 1fr .9fr 1.3fr',
+          minWidth: 960,
           gap: 12,
           padding: '13px 18px',
           alignItems: 'center',
@@ -420,6 +424,14 @@ function PoRowView({ po }: { po: PoRow }) {
             </span>
           ) : null}
         </div>
+
+        {/* Where a PO's life after issue actually happens. The control renders nothing at
+            all once only a receipt can move it, so a finished order stays quiet. */}
+        {mayWrite ? (
+          <PoStatusControl supplierPoId={po.id} poNumber={po.poNumber} status={po.status} />
+        ) : (
+          <div />
+        )}
       </div>
     </div>
   )

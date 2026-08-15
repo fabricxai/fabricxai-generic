@@ -275,6 +275,20 @@ procurement officer can do.
 **Fix:** a status control on the PO row, at minimum confirm and cancel, with the same
 role wall the action already declares.
 
+**Fixed.** `/procurement` now carries a per-row control offering only the moves that are a
+person's — confirm, on the loom, shipped, cancel — filtered by `manualPoTransitions`, a
+tested rule that never offers a transition the state machine would refuse. `received` and
+`received_partial` are deliberately absent: those are what the store books at the gate, and a
+status typed by hand would claim a delivery no receipt supports. Cancelling asks first, in
+the row and by name, because the machine makes it terminal. The column renders only for a
+role that may write.
+
+Worth recording how it was caught the second time: `action-reachability.test.ts` keeps a
+`NO_SCREEN_YET` list of actions the product cannot reach, `procurement/updatePoStatus` was on
+it with the note *"a PO cannot be moved through its own lifecycle"*, and the suite failed the
+moment the screen landed — telling me to delete the entry. The defect was known and tracked;
+what the walk added was someone hitting it.
+
 ## F17 · Kit gap — §5 assumes items that no seed creates
 
 `pnpm seed:kit` seeds the older kit's six items (`YRN-30-1`, `FAB-PIQ-180`, `TRM-PLK` …).

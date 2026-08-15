@@ -41,7 +41,6 @@ const NO_SCREEN_YET: Record<string, string> = {
   'compliance/saveCertificate': 'a certificate cannot be filed or renewed',
   'maintenance/reportMachine': 'a broken machine cannot be reported from the floor',
   'memory/findSimilarStyles': 'the similar-style lookup has no entry point on any screen',
-  'procurement/updatePoStatus': 'a PO cannot be moved through its own lifecycle',
 
   // Reachable services, unreachable actions: their screens moved to the offline queue in
   // plan 4.1, so these two are correct, gated, tested and unused HTTP surface.
@@ -54,6 +53,11 @@ const NO_SCREEN_YET: Record<string, string> = {
   // `orders/generateOrderTna` lived here from 5.1 until the live test: the TNA tab's
   // generate control (template picker + ship date) now calls it, so the entry is gone —
   // exactly the shrink this list exists to force.
+  //
+  // `procurement/updatePoStatus` left the same way, and this list is how it was found: the
+  // Nordkap §5 walk needed a wrongly-funded PO cancelled and there was no screen to do it
+  // from (finding F20). /procurement now carries a per-row control offering only the moves
+  // that are a person's — `received` stays derived from what the store books.
 }
 
 const MODULES_ROOT = 'src/modules'

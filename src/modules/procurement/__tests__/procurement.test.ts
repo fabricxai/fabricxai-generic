@@ -18,6 +18,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   btbCurrencyRefusal,
+  manualPoTransitions,
   btbFundingRefusal,
   compareQuotes,
   matchReceipt,
@@ -221,6 +222,42 @@ describe('compareQuotes · what is ranked and what is owed are different numbers
     // The landed figure is still there, still in the base currency, still for ranking.
     expect(ranked.currency).toBe('USD')
     expect(ranked.landedUnitCost).not.toBe('34.50')
+  })
+})
+
+describe('manualPoTransitions · the moves that belong to a person', () => {
+  it('16c · offers acknowledge and cancel on a fresh order, and nothing derived', () => {
+    expect(manualPoTransitions('issued')).toEqual(['confirmed', 'cancelled'])
+    // `received` and `received_partial` are what the store books at the gate. Offering
+    // either by hand would let somebody claim a delivery no receipt supports.
+    expect(manualPoTransitions('issued')).not.toContain('received')
+    expect(manualPoTransitions('confirmed')).not.toContain('received_partial')
+  })
+
+  it('16d · stops offering anything once only a receipt can move it', () => {
+    for (const terminal of ['shipped', 'received_partial', 'received', 'cancelled']) {
+      expect(manualPoTransitions(terminal)).toEqual([])
+    }
+  })
+
+  it('16e · every move it offers is one the state machine actually allows', () => {
+    // The screen and the wall are one rule. A button the server refuses is worse than no
+    // button — it teaches somebody the system is unreliable at the moment they act.
+    const machine: Record<string, readonly string[]> = {
+      issued: ['confirmed', 'cancelled'],
+      confirmed: ['in_production', 'shipped', 'received_partial', 'received', 'cancelled'],
+      in_production: ['shipped', 'received_partial', 'received', 'cancelled'],
+      shipped: ['received_partial', 'received'],
+      received_partial: ['received'],
+      received: [],
+      cancelled: [],
+    }
+
+    for (const [from, allowed] of Object.entries(machine)) {
+      for (const offered of manualPoTransitions(from)) {
+        expect(allowed).toContain(offered)
+      }
+    }
   })
 })
 

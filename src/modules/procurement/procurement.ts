@@ -53,6 +53,39 @@ const mul = (a: bigint, b: bigint): bigint => (a * b) / SCALE_FACTOR
 const sumMinor = (...values: readonly bigint[]): bigint => values.reduce((a, b) => a + b, 0n)
 
 /**
+ * The moves along a PO's life that belong to a PERSON, given where it is now.
+ *
+ * A subset of `supplierPoMachine`, and deliberately not the whole of it. The machine also
+ * allows `received_partial` and `received`, but those are answers to what turned up at the
+ * gate — `applyReceipt` derives them from the lines, and a status typed by hand would say
+ * goods arrived that nobody booked into stock. What is left is what only a person knows: the
+ * mill acknowledged the order, it went on the loom, it shipped, or it should never have been
+ * placed.
+ *
+ * `cancelled` disappears from the list once anything has been received, because the status
+ * itself has moved past the point where the machine allows it — a partly-settled account
+ * cannot be un-placed without orphaning a receipt.
+ *
+ * Exported and tested because the screen and the wall must be one rule: a button the server
+ * refuses is worse than no button, and a transition the server allows with nothing offering
+ * it is the reason a PO could be issued and never touched again.
+ */
+export function manualPoTransitions(status: string): readonly string[] {
+  switch (status) {
+    case 'issued':
+      return ['confirmed', 'cancelled']
+    case 'confirmed':
+      return ['in_production', 'shipped', 'cancelled']
+    case 'in_production':
+      return ['shipped', 'cancelled']
+    // shipped, received_partial, received, cancelled: what happens next is a receipt, or
+    // nothing at all.
+    default:
+      return []
+  }
+}
+
+/**
  * The sentence a buyer reads when the credit will not cover the order.
  *
  * Pure, exported and tested here rather than composed inside the transaction, for two
