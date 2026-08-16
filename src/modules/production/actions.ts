@@ -6,6 +6,7 @@ import { headers } from 'next/headers'
 import { surfaced, type ActionFailure } from '@/lib/action-failure'
 import { requireRole } from '@/modules/core/session'
 
+import { whatTheLineRan as readWhatTheLineRan } from './queries'
 import { planLineDay } from './service'
 
 /**
@@ -31,4 +32,20 @@ export async function planTheLine(input: {
     revalidatePath('/lines')
     return result
   })
+}
+
+/**
+ * What a line was running on a given day — asked by the catch-up dialog once it knows the
+ * date off the sheet, so it can say what the day will be booked against before it is saved.
+ *
+ * A read, so it does not go through the offline queue. If the network is down the dialog
+ * simply cannot say, and the write still resolves the order correctly on the server; this
+ * removes the silence, it is not what makes the attribution right (§9, F44).
+ */
+export async function whatTheLineRan(input: {
+  lineId: string
+  planDate: string
+}): Promise<{ orderId: string; label: string } | null | ActionFailure> {
+  const ctx = await requireRole(await headers(), 'planner', 'production', 'admin', 'owner')
+  return surfaced(() => readWhatTheLineRan(ctx, input))
 }

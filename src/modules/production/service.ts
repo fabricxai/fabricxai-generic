@@ -18,7 +18,7 @@
  * makes a supervisor's correction to the 14:00 count work by the same mechanism. The
  * `offline_keys` ledger still guards the batch as a whole; this guards each cell.
  */
-import { and, eq, isNull, sql } from 'drizzle-orm'
+import { and, eq, inArray, isNull, sql } from 'drizzle-orm'
 
 import { lines } from '@/modules/planning/schema'
 
@@ -128,6 +128,60 @@ export interface ProductionPolicy {
   behindTargetPct?: string
 }
 
+/** `lineId|producedOn` — a line's day, which is the grain a plan is kept at. */
+const lineDayKey = (e: { lineId: string; producedOn: string }): string =>
+  `${e.lineId}|${e.producedOn}`
+
+/**
+ * Which order each line was running on the day being written.
+ *
+ * **The day decides, not the clock.** `daily_line_plans` is the record of what a line ran on
+ * a given date, and it is the only thing that knows — so the write resolves the order from
+ * the plan for `producedOn` rather than trusting whatever the caller worked out. Three
+ * callers, and two of them were wrong without this:
+ *
+ *  - the day catch-up reads a sheet for a PAST day and took its order from TODAY's plan. On
+ *    Nordkap that booked 1,295 pieces against no order at all; had a different order been
+ *    planned today it would have attached the day to the wrong one, silently, and overstated
+ *    one order's sewn quantity while another ran short (§9, F44);
+ *  - the board's hour edit sent no order at all, orphaning every cell corrected from it.
+ *
+ * The caller's own `orderId` survives only as a fallback for a day with no plan — seeds and
+ * `/api/production/outputs` name it directly — so this narrows what is trusted rather than
+ * widening it.
+ */
+async function plannedOrderByLineDay(
+  ctx: AnyCtx,
+  tx: TenantDb,
+  entries: readonly { lineId: string; producedOn: string }[],
+): Promise<Map<string, string>> {
+  const lineIds = [...new Set(entries.map((e) => e.lineId))]
+  const dates = [...new Set(entries.map((e) => e.producedOn))]
+  if (lineIds.length === 0 || dates.length === 0) return new Map()
+
+  // One query for the whole batch, matching the file's rule that nothing here loops issuing
+  // queries. The line × date cross-product may fetch a few plans this batch does not need;
+  // they are keyed exactly on the way into the map, so they cost a row and change nothing.
+  const rows = await tx
+    .select({
+      lineId: dailyLinePlans.lineId,
+      planDate: dailyLinePlans.planDate,
+      orderId: dailyLinePlans.orderId,
+    })
+    .from(dailyLinePlans)
+    .where(
+      scoped(
+        dailyLinePlans,
+        ctx,
+        and(inArray(dailyLinePlans.lineId, lineIds), inArray(dailyLinePlans.planDate, dates)),
+      ),
+    )
+
+  return new Map(
+    rows.map((row) => [lineDayKey({ lineId: row.lineId, producedOn: row.planDate }), row.orderId]),
+  )
+}
+
 export async function recordHourlyOutputsIn(
   ctx: AnyCtx,
   tx: TenantDb,
@@ -135,6 +189,10 @@ export async function recordHourlyOutputsIn(
   offlineKey?: string,
 ): Promise<RecordOutputResult> {
   const payload = hourlyOutputBatch.parse(input)
+
+  // What each line was running on the day being written — see above. One query, before the
+  // insert, so the batch is still a single statement.
+  const planned = await plannedOrderByLineDay(ctx, tx, payload.entries)
 
   // One statement for the whole batch. Fifty round trips would be fifty network hops and
   // fifty index descents; this is one of each.
@@ -144,7 +202,7 @@ export async function recordHourlyOutputsIn(
       payload.entries.map((entry) => ({
         companyId: ctx.companyId,
         lineId: entry.lineId,
-        orderId: entry.orderId ?? null,
+        orderId: planned.get(lineDayKey(entry)) ?? entry.orderId ?? null,
         producedOn: entry.producedOn,
         hourSlot: entry.hourSlot,
         target: entry.target,

@@ -73,6 +73,7 @@ const MANPOWER = 40
 const DAY_PARTITION = 'hourly_outputs_2026_06'
 let lineId: string
 let orderId: string
+let buyerId: string
 
 beforeAll(async () => {
   await db.execute(sql`select app.ensure_hourly_output_partition(${DAY}::date)`)
@@ -87,6 +88,7 @@ beforeAll(async () => {
     .insert(buyers)
     .values({ companyId: COMPANY, code: 'HM', name: 'H&M' })
     .returning({ id: buyers.id })
+  buyerId = buyer!.id
   const [order] = await db
     .insert(orders)
     .values({ companyId: COMPANY, buyerId: buyer!.id, poNumbers: ['PO-9'], createdBy: USER })
@@ -258,6 +260,120 @@ describe('6.1 ⚡ · burst writes', () => {
     expect((await syncBatch(ctx, batch))[0]?.status).toBe('duplicate')
     expect(await countRows()).toBe(after)
     expect(after).toBe(before + 1)
+  })
+})
+
+describe('6.1 · which order a day belongs to (§9, F44)', () => {
+  /*
+   * A back-dated day is attached by the plan for THAT day, not by what the line is running
+   * now. The catch-up dialog used to send today's order for a sheet from last week, which
+   * booked a whole day against the wrong order — or, with nothing planned today, against no
+   * order at all, invisible to the order it was sewn for and to WIP.
+   */
+  const BACK_DAY = '2026-06-11'
+  let backOrderId: string
+
+  beforeAll(async () => {
+    await db.execute(sql`select app.ensure_hourly_output_partition(${BACK_DAY}::date)`)
+
+    const [order] = await db
+      .insert(orders)
+      .values({ companyId: COMPANY, buyerId, poNumbers: ['PO-BACK'], createdBy: USER })
+      .returning({ id: orders.id })
+    backOrderId = order!.id
+
+    // What the line ran that day — a DIFFERENT order from the one planned for DAY.
+    await db.insert(dailyLinePlans).values({
+      companyId: COMPANY,
+      lineId,
+      orderId: backOrderId,
+      planDate: BACK_DAY,
+      targetPerHour: 100,
+      manpowerPlanned: MANPOWER,
+      smv: '12.50',
+      createdBy: USER,
+    })
+  })
+
+  it('takes the order from the day being written, not from the caller', async () => {
+    // Exactly the old bug's payload: the day is BACK_DAY, the order named is the one running
+    // on DAY. The plan for BACK_DAY must win.
+    await recordHourlyOutputs(ctx, {
+      entries: [
+        { lineId, orderId, producedOn: BACK_DAY, hourSlot: 8, target: 100, actual: 91 },
+      ],
+    })
+
+    const [cell] = await db
+      .select()
+      .from(hourlyOutputs)
+      .where(
+        sql`${hourlyOutputs.lineId} = ${lineId} and ${hourlyOutputs.producedOn} = ${BACK_DAY} and ${hourlyOutputs.hourSlot} = 8`,
+      )
+
+    expect(cell?.orderId).toBe(backOrderId)
+    expect(cell?.orderId).not.toBe(orderId)
+  })
+
+  it('attaches a day the caller named no order for at all', async () => {
+    // The board's hour edit sends no order and orphaned every cell corrected through it.
+    await recordHourlyOutputs(ctx, {
+      entries: [{ lineId, producedOn: BACK_DAY, hourSlot: 9, target: 100, actual: 88 }],
+    })
+
+    const [cell] = await db
+      .select()
+      .from(hourlyOutputs)
+      .where(
+        sql`${hourlyOutputs.lineId} = ${lineId} and ${hourlyOutputs.producedOn} = ${BACK_DAY} and ${hourlyOutputs.hourSlot} = 9`,
+      )
+
+    expect(cell?.orderId).toBe(backOrderId)
+  })
+
+  it('re-saving repairs a day that was already booked against the wrong order', async () => {
+    // Rows written before the fix carry the wrong order. The upsert sets order_id from
+    // `excluded`, so entering the day again through the same screen corrects it — which is
+    // what makes the live tenant repairable without a migration.
+    await db
+      .update(hourlyOutputs)
+      .set({ orderId })
+      .where(
+        sql`${hourlyOutputs.lineId} = ${lineId} and ${hourlyOutputs.producedOn} = ${BACK_DAY} and ${hourlyOutputs.hourSlot} = 8`,
+      )
+
+    await recordHourlyOutputs(ctx, {
+      entries: [{ lineId, producedOn: BACK_DAY, hourSlot: 8, target: 100, actual: 91 }],
+    })
+
+    const [cell] = await db
+      .select()
+      .from(hourlyOutputs)
+      .where(
+        sql`${hourlyOutputs.lineId} = ${lineId} and ${hourlyOutputs.producedOn} = ${BACK_DAY} and ${hourlyOutputs.hourSlot} = 8`,
+      )
+
+    expect(cell?.orderId).toBe(backOrderId)
+  })
+
+  it('leaves the day unattached when nothing was planned, rather than guessing', async () => {
+    const UNPLANNED = '2026-06-12'
+    await db.execute(sql`select app.ensure_hourly_output_partition(${UNPLANNED}::date)`)
+
+    await recordHourlyOutputs(ctx, {
+      entries: [{ lineId, producedOn: UNPLANNED, hourSlot: 8, target: 100, actual: 70 }],
+    })
+
+    const [cell] = await db
+      .select()
+      .from(hourlyOutputs)
+      .where(
+        sql`${hourlyOutputs.lineId} = ${lineId} and ${hourlyOutputs.producedOn} = ${UNPLANNED}`,
+      )
+
+    // No plan, no order. The screen warns before saving; what must never happen is a day
+    // silently acquiring whichever order happened to be running on some other date.
+    expect(cell?.orderId).toBeNull()
   })
 })
 

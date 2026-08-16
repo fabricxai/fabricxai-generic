@@ -1,13 +1,14 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useState, useTransition } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 
 import { InlineAlert, Modal } from '@/components/fx/feedback'
 import { Button } from '@/components/fx/primitives'
 import { ReadIntoForm, type ReadFields } from '@/components/shell/read-into-form'
 import { actionErrorMessage } from '@/lib/action-error'
 import { useOfflineQueue } from '@/lib/offline/use-offline-queue'
+import { whatTheLineRan } from '@/modules/production/actions'
 
 /**
  * A whole day off the clipboard, at the end of the day.
@@ -37,8 +38,14 @@ import { useOfflineQueue } from '@/lib/offline/use-offline-queue'
 export interface CatchupLine {
   lineId: string
   code: string
-  orderId: string | null
 }
+
+/** What the day will be attached to, once the line and the date are both known. */
+type Attachment =
+  | { state: 'unknown' }
+  | { state: 'asking' }
+  | { state: 'planned'; label: string }
+  | { state: 'none' }
 
 interface ReadHour {
   hourSlot: number
@@ -59,8 +66,58 @@ export function DayCatchupButton({ lines }: { lines: readonly CatchupLine[] }) {
   const [producedOn, setProducedOn] = useState('')
   const [hours, setHours] = useState<ReadHour[]>([])
 
+  const [answer, setAnswer] = useState<{ key: string; value: Attachment } | null>(null)
+
   const line = lines.find((l) => l.lineId === lineId) ?? null
   const ready = line !== null && producedOn !== '' && hours.length > 0
+
+  /*
+   * Which order this day belongs to, asked for the DAY BEING ENTERED.
+   *
+   * The dialog used to send the order the line is running TODAY, which for a sheet from last
+   * Tuesday is either nothing or the wrong order (§9, F44). The write no longer takes the
+   * client's word for it — the service resolves the plan for `producedOn` itself — so this
+   * asks only in order to say so, before anything is saved.
+   *
+   * Keyed on the line-day it asked about, and derived rather than assigned: an answer for
+   * L3 can never be left on screen after the supervisor picks L4, and nothing sets state
+   * synchronously in the effect.
+   */
+  const askKey = lineId !== '' && producedOn !== '' ? `${lineId}|${producedOn}` : null
+
+  const attachment: Attachment =
+    askKey === null
+      ? { state: 'unknown' }
+      : answer?.key === askKey
+        ? answer.value
+        : { state: 'asking' }
+
+  useEffect(() => {
+    if (askKey === null) return
+
+    let live = true
+
+    void whatTheLineRan({ lineId, planDate: producedOn })
+      .then((result) => {
+        if (!live) return
+        // A refusal or a failure is not "nothing was planned" — stay quiet rather than claim
+        // the day is unattached when we simply could not find out.
+        const value: Attachment =
+          result === null
+            ? { state: 'none' }
+            : 'label' in result
+              ? { state: 'planned', label: result.label }
+              : { state: 'unknown' }
+        setAnswer({ key: askKey, value })
+      })
+      .catch(() => {
+        if (live) setAnswer({ key: askKey, value: { state: 'unknown' } })
+      })
+
+    return () => {
+      live = false
+    }
+  }, [askKey, lineId, producedOn])
 
   function fill(read: ReadFields) {
     const v = read.values
@@ -101,9 +158,10 @@ export function DayCatchupButton({ lines }: { lines: readonly CatchupLine[] }) {
       notes.push(`The sheet says line “${str(v.lineCode)}”, which is not one of yours — pick it below.`)
     }
     if (v.reference) {
-      // Said rather than used: which order an hour belongs to is settled by what the line is
-      // running, not by what somebody wrote at the top of a page.
-      notes.push(`The sheet names ${str(v.reference)}. Output is booked against whatever this line is running.`)
+      // Said rather than used: which order an hour belongs to is settled by the plan for the
+      // day, not by what somebody wrote at the top of a page. What it IS attached to is shown
+      // below, resolved for that date.
+      notes.push(`The sheet names ${str(v.reference)}.`)
     }
     setNote(notes.length > 0 ? notes.join(' ') : null)
   }
@@ -118,9 +176,12 @@ export function DayCatchupButton({ lines }: { lines: readonly CatchupLine[] }) {
           moduleId: 'production',
           operation: 'record_hourly_outputs',
           payload: {
+            // No orderId. This dialog enters a day that has already happened, and the only
+            // thing that knows which order that day belongs to is the plan for that date —
+            // which the service reads. Sending today's order here is what attached a whole
+            // day to the wrong one (§9, F44).
             entries: hours.map((hour) => ({
               lineId: line.lineId,
-              ...(line.orderId ? { orderId: line.orderId } : {}),
               producedOn,
               hourSlot: hour.hourSlot,
               target: hour.target ?? 0,
@@ -178,6 +239,25 @@ export function DayCatchupButton({ lines }: { lines: readonly CatchupLine[] }) {
               </span>
             </label>
           </div>
+
+          {/*
+            * What the day attaches to, for the date on the sheet. A day booked against
+            * nothing is invisible to the order it was sewn for and to WIP, and it used to
+            * happen without a word (§9, F44).
+            */}
+          {attachment.state === 'planned' ? (
+            <InlineAlert tone="info">
+              This day goes against <strong>{attachment.label}</strong> — what {line?.code ?? 'the line'} was
+              planned to run on {producedOn}.
+            </InlineAlert>
+          ) : null}
+          {attachment.state === 'none' ? (
+            <InlineAlert tone="warning">
+              Nothing was planned for {line?.code ?? 'this line'} on {producedOn}, so these hours
+              will be recorded against no order — the pieces will not count towards one. Plan
+              that day on the line board first if they should.
+            </InlineAlert>
+          ) : null}
 
           {hours.length > 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>

@@ -131,6 +131,15 @@ export default async function HourlyPage() {
   // six hours ahead, so `new Date().getHours()` pinned this screen to 8:00 every evening.
   // Outside shift hours it clamps to the last one rather than offering hour 23 — a
   // supervisor entering at 6pm is catching up, not time-travelling.
+  /*
+   * The catch-up gets lines and nothing else — deliberately no order.
+   *
+   * It enters a day that has already happened, and today's plan cannot say which order that
+   * day belonged to. Handing it one here is exactly what booked a whole day against the wrong
+   * order, silently (§9, F44); it resolves the plan for the day on the sheet instead.
+   */
+  const catchupLines = rows.map((row) => ({ lineId: row.lineId, code: row.code }))
+
   const nowHour = factoryHour()
   const currentHour = Math.min(
     Math.max(nowHour, SHIFT_START),
@@ -156,13 +165,7 @@ export default async function HourlyPage() {
         }
         ownsAmber
         actions={
-          <DayCatchupButton
-            lines={rows.map((row) => ({
-              lineId: row.lineId,
-              code: row.code,
-              orderId: planByLine.get(row.lineId)?.orderId ?? null,
-            }))}
-          />
+          <DayCatchupButton lines={catchupLines} />
         }
       />
       <HourlyClient

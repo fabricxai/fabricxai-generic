@@ -15,11 +15,13 @@ import type { AnyCtx } from '@/modules/core/ctx'
 import { scoped } from '@/modules/core/scoped'
 import { withTenantRead } from '@/modules/core/tenancy'
 // `lines` belongs to planning (rule 11: one writer module per shared table);
-// production reads it rather than owning it.
+// production reads it rather than owning it. Same for orders — read here only to name the
+// order a line's day belongs to, never written.
+import { orderStyles, orders } from '@/modules/orders/schema'
 import { lines } from '@/modules/planning/schema'
 
 import { forecastCompletion, type ForecastResult } from './metrics'
-import { downtimes, hourlyOutputs } from './schema'
+import { dailyLinePlans, downtimes, hourlyOutputs } from './schema'
 
 export interface HourCell {
   hourSlot: number
@@ -225,4 +227,51 @@ export async function activeLines(
       .where(scoped(lines, ctx, and(eq(lines.isActive, true))))
       .orderBy(asc(lines.code)),
   )
+}
+
+/**
+ * What a line was running on a given day, for the screen to say so before anything is saved.
+ *
+ * The catch-up dialog enters a day that has already happened, and the order that day belongs
+ * to is settled by the plan for THAT date — not by what the line is running now. The write
+ * resolves this itself (`plannedOrderByLineDay`); this is so the supervisor is told, because
+ * the alternative is a day saved against nothing with no indication that it happened
+ * (§9, F44).
+ *
+ * Returns null when nothing was planned, which is a real answer and the one worth showing.
+ */
+export async function whatTheLineRan(
+  ctx: AnyCtx,
+  input: { lineId: string; planDate: string },
+): Promise<{ orderId: string; label: string } | null> {
+  const rows = await withTenantRead(ctx, (tx) =>
+    tx
+      .select({
+        orderId: dailyLinePlans.orderId,
+        poNumbers: orders.poNumbers,
+        styleCode: orderStyles.styleCode,
+      })
+      .from(dailyLinePlans)
+      .innerJoin(orders, eq(orders.id, dailyLinePlans.orderId))
+      // A style is what a floor calls the work; the PO is what the office calls it. Left,
+      // because an order with no style row still has a plan and still has a name.
+      .leftJoin(orderStyles, eq(orderStyles.orderId, orders.id))
+      .where(
+        scoped(
+          dailyLinePlans,
+          ctx,
+          and(
+            eq(dailyLinePlans.lineId, input.lineId),
+            eq(dailyLinePlans.planDate, input.planDate),
+          ),
+        ),
+      )
+      .limit(1),
+  )
+
+  const row = rows[0]
+  if (!row) return null
+
+  const po = row.poNumbers[0] ?? row.orderId.slice(0, 8)
+  return { orderId: row.orderId, label: row.styleCode ? `${po} · ${row.styleCode}` : po }
 }
