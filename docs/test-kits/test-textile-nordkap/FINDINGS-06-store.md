@@ -63,6 +63,64 @@ was planted by a script, not received through the door.
 Both are needed. Part 2 alone would gate the factory's own cloth; part 1 alone leaves every
 historical receipt exempt.
 
+**Fixed in `63ca0fb`, both parts, verified against production data.**
+
+`/store/receive` now asks where a delivery came from — *a supplier sent them* or *our own
+production* — and, for a supplier delivery, which purchase order it is against. Bangla and
+English, on a Bangla-first screen. `grns.source` records the answer, and the exemption reads
+it: `knitsItsOwn && source === 'own_production'`. Absence is no longer evidence.
+
+The column defaults to `supplier`, the safe direction. History was backfilled on the one piece
+of positive evidence those rows carry — **bonded** material is imported under a customs
+declaration by definition, so a bonded receipt is a supplier delivery whatever its PO link
+says. On this tenant that classified every row correctly: the mill's fleece `supplier`, the
+factory's own dyeing `own_production`.
+
+Both directions checked on the live box after deploy:
+
+| Receipt | Source | Verdict |
+|---|---|---|
+| `DYE-2026-09` · the factory's own dyeing | `own_production` | passes ungraded — still issuable |
+| `ZJH-DC-8842` · the mill's fleece | `supplier` | **refused** · `not_inspected` |
+
+An issue of two uninspected fleece rolls through the real screen was refused and the rolls
+stayed `in_stock`. The regression is a test: a delivery that never said where it came from is
+gated — the exact shape of every receipt this screen recorded before today.
+
+## F30 · MEDIUM — the floor is told a count, not a reason · FIXED
+
+Floor writes go through the offline batch endpoint, and a refusal comes back to the tablet as
+**"1 write the server refused."** — no sentence, no roll numbers. The storekeeper at the rack
+learns that something was refused, not what to do about it.
+
+The detail lives on `/refused`, which showed the raw key —
+`gates.fabric_inspection.not_inspected` — to a supervisor deciding whether a day's counting
+could be re-entered.
+
+Fixed in `13a2ee6`: the sentence was already stored (gates compose it into `details.reason`,
+and `offline_keys.error` keeps the whole error); the screen simply never looked past
+`message` and `messageKey`. It now reads:
+
+> 2 rolls have not been 4-point inspected yet: R-F-30, R-F-31. Inspection comes before
+> cutting, not after — a fault found on the table is fabric already paid for.
+
+**Still open:** the tablet itself. The badge is a count, and the sentence is one screen away.
+A storekeeper standing at the rack should be told which rolls, where they stand.
+
+## F31 · MEDIUM — the refused-writes screen prints bare UUIDs
+
+Under "what it was", the refused payload renders as stored:
+
+```
+Item: 43003acf-7a6b-426b-931f-503f96f3383a
+Roll: d0056afe-284c-4e57-892e-dd752ae3f570
+ORDER  6c1ebafc-d742-46c6-8a65-7345046a318e
+```
+
+Against the product's own standard — no raw identifiers, no bare UUIDs — and useless for the
+job the screen exists for: a supervisor re-entering lost work needs the roll number and the
+order's PO number, both of which the system knows.
+
 ## F23 · HIGH — a trims delivery cannot be received at all
 
 `/store/receive` will not submit without at least one roll:
