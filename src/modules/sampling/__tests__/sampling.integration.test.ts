@@ -25,6 +25,10 @@ import { syncBatch } from '@/modules/core/offline-sync'
 import { withTenantRead } from '@/modules/core/tenancy'
 import { grnLines, grns, issueLines, issues, items, locations, rolls } from '@/modules/store/schema'
 import { createLay, createMarker } from '@/modules/cutting/service'
+import {
+  registerFabricInspectionProvider,
+  resetFabricInspectionProvider,
+} from '@/modules/store/gates'
 import '@/modules/cutting/register'
 import { orderBreakdowns, orders, orderStyles, tnaMilestones } from '@/modules/orders/schema'
 // Importing this module is what registers the PP provider — see the last describe block.
@@ -61,6 +65,14 @@ let markerId: string
 let rollIds: string[] = []
 
 beforeAll(async () => {
+  /*
+   * Cutting now checks 4-point over the rolls it is about to spread, and that seam fails
+   * CLOSED with no provider — correctly, since a gate nobody answers must not wave cloth
+   * through. This suite is about the PP gate, so it answers plainly and lets the fabric
+   * question be somebody else's test.
+   */
+  registerFabricInspectionProvider(async () => ({ passed: true }))
+
   await db.insert(companies).values([
     { id: COMPANY, name: 'Sample Co', slug: `smp-${COMPANY.slice(0, 8)}` },
     { id: OTHER, name: 'Other Co', slug: `oth-${OTHER.slice(0, 8)}` },
@@ -156,6 +168,7 @@ beforeAll(async () => {
 })
 
 afterAll(async () => {
+  resetFabricInspectionProvider()
   await db.execute(sql`delete from audit_log where company_id in (${COMPANY}, ${OTHER})`)
   await db.delete(companies).where(eq(companies.id, COMPANY))
   await db.delete(companies).where(eq(companies.id, OTHER))
