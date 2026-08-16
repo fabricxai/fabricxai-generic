@@ -32,7 +32,7 @@ import {
   recordHourlyOutputs,
   runRate,
 } from '@/modules/production/service'
-import { ensureOutputPartitions, runRunRateAlerts } from '@/modules/production/jobs'
+import { ensureOutputPartitions, runDayClose, runRunRateAlerts } from '@/modules/production/jobs'
 import {
   dailyLinePlans,
   downtimes,
@@ -687,6 +687,82 @@ describe('6.1 · endline and derived', () => {
     await closeDay(ctx, { forDate: DAY })
     const all = await db.select().from(efficiencyDaily).where(eq(efficiencyDaily.lineId, lineId))
     expect(all).toHaveLength(1)
+  })
+
+  it('says which lines it could not close, rather than skipping in silence (§9, F47)', async () => {
+    /*
+     * A line that sewed all day and got no efficiency figure is the thing a supervisor
+     * cannot see. Skipping is right — with no SMV and no manpower there is nothing to
+     * compute — but it happened without a word, so the output was entered and the line
+     * simply never appeared in the figures.
+     */
+    const UNPLANNED_DAY = '2026-06-14'
+    await db.execute(sql`select app.ensure_hourly_output_partition(${UNPLANNED_DAY}::date)`)
+
+    // Produced, with no plan behind it at all.
+    await recordHourlyOutputs(ctx, {
+      entries: [{ lineId, producedOn: UNPLANNED_DAY, hourSlot: 8, target: 0, actual: 96 }],
+    })
+
+    const result = await closeDay(ctx, { forDate: UNPLANNED_DAY })
+
+    expect(result.lines).toBe(0)
+    expect(result.skipped).toEqual([{ lineId, reason: 'no_plan' }])
+
+    // And nothing invented: no row is better than a fabricated percentage.
+    const rows = await db
+      .select()
+      .from(efficiencyDaily)
+      .where(sql`${efficiencyDaily.forDate} = ${UNPLANNED_DAY}`)
+    expect(rows).toHaveLength(0)
+  })
+
+  it('tells whoever plans the floor, once for the day', async () => {
+    // The skip is right; the silence was not. A planner is the one who can fix it, so a
+    // planner is the one told — and the day-close is rebuildable by design, so re-running
+    // it must not buzz them again.
+    const NOTIFY_DAY = '2026-06-08'
+    await db.execute(sql`select app.ensure_hourly_output_partition(${NOTIFY_DAY}::date)`)
+    await recordHourlyOutputs(ctx, {
+      entries: [{ lineId, producedOn: NOTIFY_DAY, hourSlot: 8, target: 0, actual: 88 }],
+    })
+
+    const system: SystemCtx = { companyId: COMPANY, userId: null, roles: ['owner'], system: true }
+    await runDayClose(system, { forDate: NOTIFY_DAY })
+    await runDayClose(system, { forDate: NOTIFY_DAY })
+
+    const rows = await db
+      .select()
+      .from(notifications)
+      .where(sql`${notifications.dedupeKey} = ${'dayclose-skipped:' + NOTIFY_DAY}`)
+
+    expect(rows).toHaveLength(1)
+    expect(rows[0]!.role).toBe('planner')
+    // The line is named, because "some lines" is not something anybody can act on.
+    expect(JSON.stringify(rows[0]!.params)).toContain('L-07')
+  })
+
+  it('tells a half-filled plan apart from no plan at all', async () => {
+    // A plan with no SMV is a form somebody started; no plan is nobody having planned. The
+    // planner needs to know which, because the fix is different.
+    const HALF_DAY = '2026-06-09'
+    await db.execute(sql`select app.ensure_hourly_output_partition(${HALF_DAY}::date)`)
+    await db.insert(dailyLinePlans).values({
+      companyId: COMPANY,
+      lineId,
+      orderId,
+      planDate: HALF_DAY,
+      targetPerHour: 120,
+      manpowerPlanned: MANPOWER,
+      smv: null,
+      createdBy: USER,
+    })
+    await recordHourlyOutputs(ctx, {
+      entries: [{ lineId, producedOn: HALF_DAY, hourSlot: 8, target: 120, actual: 101 }],
+    })
+
+    const result = await closeDay(ctx, { forDate: HALF_DAY })
+    expect(result.skipped).toEqual([{ lineId, reason: 'plan_missing_smv_or_manpower' }])
   })
 
   it('forecasts completion from the trailing rate', async () => {

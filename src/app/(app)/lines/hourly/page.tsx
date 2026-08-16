@@ -175,7 +175,8 @@ export default async function HourlyPage() {
           lineId: row.lineId,
           code: row.code,
           name: row.name,
-          target: planByLine.get(row.lineId)?.targetPerHour ?? 0,
+          // Null, not zero — nothing planned is not a target of none (§9, F47).
+          target: planByLine.get(row.lineId)?.targetPerHour ?? null,
           orderId: planByLine.get(row.lineId)?.orderId ?? null,
           alreadyEntered: row.hours.some((h) => h.hourSlot === currentHour),
         }))}

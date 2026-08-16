@@ -275,3 +275,34 @@ export function forecastCompletion(input: {
     confidence,
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Day-close preconditions
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Why a line that produced got no efficiency figure for the day (§9, F47). */
+export type SkipReason = 'no_plan' | 'plan_missing_smv_or_manpower'
+
+/**
+ * What a line's day can be measured with, or why it cannot be measured at all.
+ *
+ * Skipping is right — with no SMV and no manpower there is nothing to compute against, and
+ * inventing a number would put a fabricated one on a board. What was wrong is that it
+ * happened in SILENCE: the output was entered, the day closed, and the line simply never
+ * appeared in the figures.
+ *
+ * The two reasons are told apart because the fix is different. No plan at all means nobody
+ * planned the line; a plan missing its SMV or manpower is a form somebody half-filled. A
+ * planner told only "it was skipped" has to go and find out which.
+ */
+export function planForEfficiency(
+  plan: { smv: string | null; manpowerPlanned: number | null } | null | undefined,
+): { ok: true; smv: string; manpower: number } | { ok: false; reason: SkipReason } {
+  if (!plan) return { ok: false, reason: 'no_plan' }
+  if (!plan.smv || !plan.manpowerPlanned) {
+    return { ok: false, reason: 'plan_missing_smv_or_manpower' }
+  }
+  // Returns the two values rather than a bare verdict, so the caller cannot ask whether the
+  // day is measurable and then reach past the answer for fields that might be null.
+  return { ok: true, smv: plan.smv, manpower: plan.manpowerPlanned }
+}

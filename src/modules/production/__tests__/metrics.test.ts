@@ -17,6 +17,7 @@ import {
   computeDhu,
   computeEfficiency,
   forecastCompletion,
+  planForEfficiency,
   ProductionError,
   workedMinutes,
 } from '../metrics'
@@ -249,5 +250,43 @@ describe('forecastCompletion · run rate', () => {
     expect(() =>
       forecastCompletion({ remainingQty: 100, trailing: [], fromDate: '2026-06-12' }),
     ).toThrow(ProductionError)
+  })
+})
+
+describe('planForEfficiency', () => {
+  it('1 · hands back the two numbers efficiency is made of', () => {
+    expect(planForEfficiency({ smv: '18.60', manpowerPlanned: 68 })).toEqual({
+      ok: true,
+      smv: '18.60',
+      manpower: 68,
+    })
+  })
+
+  it('2 · no plan at all is its own reason', () => {
+    // Nobody planned the line. The fix is to plan it.
+    expect(planForEfficiency(null)).toEqual({ ok: false, reason: 'no_plan' })
+    expect(planForEfficiency(undefined)).toEqual({ ok: false, reason: 'no_plan' })
+  })
+
+  it('3 · a half-filled plan is told apart from no plan', () => {
+    // A form somebody started. The fix is to finish it — and a planner told only "skipped"
+    // would have to go and find out which of the two it was.
+    expect(planForEfficiency({ smv: null, manpowerPlanned: 68 })).toEqual({
+      ok: false,
+      reason: 'plan_missing_smv_or_manpower',
+    })
+    expect(planForEfficiency({ smv: '18.60', manpowerPlanned: null })).toEqual({
+      ok: false,
+      reason: 'plan_missing_smv_or_manpower',
+    })
+  })
+
+  it('4 · a line planned with nobody on it cannot be measured either', () => {
+    // Zero manpower divides by zero downstream; computeEfficiency refuses it, and this
+    // catches it before the day-close has to.
+    expect(planForEfficiency({ smv: '18.60', manpowerPlanned: 0 })).toEqual({
+      ok: false,
+      reason: 'plan_missing_smv_or_manpower',
+    })
   })
 })

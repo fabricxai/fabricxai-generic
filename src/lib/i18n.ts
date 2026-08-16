@@ -264,6 +264,10 @@ export const MESSAGES: Catalogue = {
     'store.notifications.grn_passed.title': 'Challan {challanNo} passed inspection.',
     'store.notifications.requisition_raised.title':
       'Material requested — {lines} line(s) waiting on the store.',
+    'production.notifications.dayclose_skipped.title':
+      'Some lines got no efficiency figure for {forDate}.',
+    'production.notifications.dayclose_skipped.body':
+      '{lines} produced that day but had no plan behind them — no SMV and no manpower means there is nothing to measure against, so they are missing from the day\u2019s figures. Plan the line before the shift and the number appears on its own.',
     'production.notifications.runrate_slip.title': 'Line {line} is falling behind the day plan.',
     'production.notifications.runrate_slip.body':
       '{made} made against {expected} planned so far — {behind} pieces behind, more than an hour of work.',
@@ -811,6 +815,10 @@ export const MESSAGES: Catalogue = {
     'store.notifications.grn_passed.title': 'চালান {challanNo} ইন্সপেকশনে পাস করেছে।',
     'store.notifications.requisition_raised.title':
       'মালামাল চাওয়া হয়েছে — {lines}টি লাইন স্টোরের অপেক্ষায়।',
+    'production.notifications.dayclose_skipped.title':
+      '{forDate} তারিখে কিছু লাইনের কোনো এফিসিয়েন্সি হিসাব হয়নি।',
+    'production.notifications.dayclose_skipped.body':
+      '{lines} ওই দিন প্রোডাকশন করেছে কিন্তু কোনো প্ল্যান ছিল না — SMV আর ম্যানপাওয়ার ছাড়া মাপার কিছু থাকে না, তাই দিনের হিসাবে এগুলো নেই। শিফট শুরুর আগে লাইনের প্ল্যান দিলে সংখ্যাটা নিজে থেকেই আসবে।',
     'production.notifications.runrate_slip.title': 'লাইন {line} দিনের পরিকল্পনা থেকে পিছিয়ে পড়ছে।',
     'production.notifications.runrate_slip.body':
       'এ পর্যন্ত পরিকল্পিত {expected}-এর বিপরীতে {made} হয়েছে — {behind} পিস পিছিয়ে, এক ঘণ্টার বেশি কাজ।',

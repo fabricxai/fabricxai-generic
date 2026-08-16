@@ -15,7 +15,15 @@ interface LineRow {
   lineId: string
   code: string
   name: string
-  target: number
+  /**
+   * The day plan's target, or NULL when nothing was planned for this line today.
+   *
+   * Not zero. A target of zero is a number, and the screen printed it as if the office had
+   * set it — while nothing measured against it: `achievedPct` needs a denominator, and the
+   * day-close skips a line with no plan entirely. A supervisor entered a day's output
+   * believing it was being counted and no figure was ever produced from it (§9, F47).
+   */
+  target: number | null
   orderId: string | null
   alreadyEntered: boolean
 }
@@ -114,7 +122,10 @@ export function HourlyClient({
           ...(line.orderId ? { orderId: line.orderId } : {}),
           producedOn,
           hourSlot: hour,
-          target: line.target,
+          // No plan means no target to record against; the zod default stores 0, which is
+          // what the column holds either way. What must not happen is the SCREEN calling
+          // that zero a plan.
+          target: line.target ?? 0,
           // eslint-disable-next-line fabricxai/no-float-money -- floor keypad piece count (integer), not money; NaN falls back to 0 and the server validates the payload
           actual: Number.parseInt(entries[line.lineId]!, 10) || 0,
         })),
@@ -261,7 +272,9 @@ export function HourlyClient({
                     color: 'var(--fx-text-tertiary)',
                   }}
                 >
-                  {t('ui.production.target_value', { target: line.target })}
+                  {line.target === null
+                    ? t('ui.production.no_plan_today')
+                    : t('ui.production.target_value', { target: line.target })}
                 </div>
               </div>
 

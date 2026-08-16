@@ -36,8 +36,10 @@ import {
   computeEfficiency,
   forecastCompletion,
   ProductionError,
+  planForEfficiency,
   workedMinutes,
   type ForecastResult,
+  type SkipReason,
 } from './metrics'
 import { trailingOutput } from './queries'
 import { lineDayKey, orderForEntry } from './attribution'
@@ -655,7 +657,7 @@ export async function recordEndlineCountIn(
 export async function closeDay(
   ctx: AnyCtx,
   input: { forDate: string; workingMinutes?: number },
-): Promise<{ lines: number }> {
+): Promise<{ lines: number; skipped: { lineId: string; reason: SkipReason }[] }> {
   return withTenantTx(ctx, async (tx) => {
     const rows = await tx
       .select({
@@ -670,6 +672,15 @@ export async function closeDay(
       .groupBy(hourlyOutputs.lineId)
 
     let written = 0
+    /*
+     * Lines that produced and got no efficiency, and why.
+     *
+     * Skipping is right — there is nothing to compute against — but it was SILENT, so a
+     * supervisor entered a day's output believing it was being measured and no number was
+     * ever produced from it. The floor's own screen now says a line has no plan before the
+     * hour is entered, and the day-close says which lines it could not close after (§9, F47).
+     */
+    const skipped: { lineId: string; reason: SkipReason }[] = []
 
     for (const row of rows) {
       const [plan] = await tx
@@ -681,19 +692,29 @@ export async function closeDay(
 
       // No plan means no SMV and no manpower — there is nothing to compute an efficiency
       // against, and inventing one would put a fabricated number on a board.
-      if (!plan?.smv || !plan.manpowerPlanned) continue
+      // The decision, and the reason it carries, are pure and live in `metrics.ts`.
+      const measurable = planForEfficiency(plan ?? null)
+      if (!measurable.ok) {
+        skipped.push({ lineId: row.lineId, reason: measurable.reason })
+        continue
+      }
 
       const output = Number(row.output)
       let efficiency
       try {
         efficiency = computeEfficiency({
-          smv: plan.smv,
+          smv: measurable.smv,
           output,
-          manpower: plan.manpowerPlanned,
+          manpower: measurable.manpower,
           workingMinutes: input.workingMinutes ?? workedMinutes(Number(row.hoursRecorded)),
         })
       } catch (error) {
-        if (error instanceof ProductionError) continue
+        if (error instanceof ProductionError) {
+          // A plan that passed the precondition and still would not compute — a zero-hour
+          // day, say. Reported as the half-filled case: something about the plan is wrong.
+          skipped.push({ lineId: row.lineId, reason: 'plan_missing_smv_or_manpower' })
+          continue
+        }
         throw error
       }
 
@@ -724,11 +745,11 @@ export async function closeDay(
 
     await emit(ctx, tx, {
       eventName: PRODUCTION_EVENTS.dayClosed,
-      payload: { forDate: input.forDate, lines: written },
+      payload: { forDate: input.forDate, lines: written, skipped: skipped.length },
       aggregateTable: 'efficiency_daily',
     })
 
-    return { lines: written }
+    return { lines: written, skipped }
   })
 }
 

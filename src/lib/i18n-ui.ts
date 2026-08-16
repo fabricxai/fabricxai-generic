@@ -1148,6 +1148,7 @@ export const UI_MESSAGES: Catalogue = {
     'ui.production.stoppage_title': '{line} has stopped',
     'ui.production.stopped_reason': 'stopped · {reason}',
     'ui.production.target_value': 'target {target}',
+    'ui.production.no_plan_today': 'no plan today — this hour will not be measured',
     'ui.production.too_many_defective':
       '{defective} defective out of {checked} checked. A count where more garments failed than were inspected cannot be filed.',
     'ui.production.uncounted_hour_note':
@@ -2485,6 +2486,7 @@ export const UI_MESSAGES: Catalogue = {
     'ui.production.stoppage_title': '{line} বন্ধ হয়ে গেছে',
     'ui.production.stopped_reason': 'বন্ধ · {reason}',
     'ui.production.target_value': 'টার্গেট {target}',
+    'ui.production.no_plan_today': 'আজ কোনো প্ল্যান নেই — এই ঘণ্টা হিসাবের মধ্যে আসবে না',
     'ui.production.too_many_defective':
       '{checked}টি চেক করে {defective}টি নষ্ট পাওয়া গেছে। যত চেক হয়েছে তার চেয়ে বেশি নষ্ট দেখালে সেই হিসাব জমা নেওয়া যাবে না।',
     'ui.production.uncounted_hour_note': 'কেউ না গুনলে ঘণ্টাটা খালিই থাকে — শূন্য ধরা হয় না',

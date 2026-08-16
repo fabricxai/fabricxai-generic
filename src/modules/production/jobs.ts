@@ -7,14 +7,16 @@
  * refused insert on a floor tablet is a lost hour of production — but they would stop
  * being pruned, and the board read would degrade quietly rather than break loudly.
  */
-import { sql } from 'drizzle-orm'
+import { inArray, sql } from 'drizzle-orm'
 
 import type { SystemCtx } from '../core/ctx'
 import { notify } from '../core/notifications'
 import { emit } from '../core/outbox'
+import { scoped } from '../core/scoped'
 import { withTenantRead, withTenantTx } from '../core/tenancy'
 // `orders` and `tna_milestones` belong to 1.3 (rule 11) — production forecasts against
 // them through the order module's own read model rather than joining their tables here.
+import { lines } from '@/modules/planning/schema'
 import { ordersInProduction } from '../orders/queries'
 
 import { PRODUCTION_EVENTS } from './events'
@@ -73,13 +75,52 @@ export async function ensureOutputPartitions(
 export async function runDayClose(
   ctx: SystemCtx,
   input: { forDate?: string } = {},
-): Promise<{ lines: number; forDate: string }> {
+): Promise<{ lines: number; forDate: string; skipped: number }> {
   const forDate =
     input.forDate ??
     new Date(Date.now() - 86_400_000).toISOString().slice(0, 10)
 
   const result = await closeDay(ctx, { forDate })
-  return { ...result, forDate }
+
+  /*
+   * A line that sewed all day and got no efficiency figure is worth saying out loud.
+   *
+   * The skip itself is right — with no SMV and no manpower there is nothing to compute, and
+   * inventing a number would put a fabricated one on a board. What was wrong is that it
+   * happened in silence: the output was entered, the day closed, and the line simply never
+   * appeared in the figures. Whoever plans the floor is the one who can fix it, so they are
+   * the one told, once per day (§9, F47).
+   */
+  if (result.skipped.length > 0) {
+    const codes = await withTenantRead(ctx, (tx) =>
+      tx
+        .select({ code: lines.code })
+        .from(lines)
+        .where(scoped(lines, ctx, inArray(lines.id, result.skipped.map((s) => s.lineId))))
+        .orderBy(lines.code),
+    )
+
+    await notify(ctx, {
+      role: 'planner',
+      kind: 'production.dayclose.skipped',
+      severity: 'warning',
+      titleKey: 'production.notifications.dayclose_skipped.title',
+      bodyKey: 'production.notifications.dayclose_skipped.body',
+      params: {
+        forDate,
+        count: result.skipped.length,
+        lines: codes.map((c) => c.code).join(', '),
+      },
+      moduleId: 'production',
+      entityTable: 'efficiency_daily',
+      href: '/lines',
+      // Once per day, however many times the close is re-run — it is rebuildable by design.
+      dedupeKey: `dayclose-skipped:${forDate}`,
+      channels: ['in_app'],
+    })
+  }
+
+  return { lines: result.lines, forDate, skipped: result.skipped.length }
 }
 
 /** Hourly WIP snapshot per order — cut / sewn / finished (brief §Jobs). */
