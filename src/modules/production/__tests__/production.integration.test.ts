@@ -68,6 +68,8 @@ const otherCtx: RequestCtx = { companyId: OTHER, userId: USER, roles: ['producti
  * job that is responsible for it, in the '6.1 · partition roll-forward' block below.
  */
 const DAY = '2026-06-15'
+/** The fixture line's planned manpower — the efficiency denominator's other half. */
+const MANPOWER = 40
 const DAY_PARTITION = 'hourly_outputs_2026_06'
 let lineId: string
 let orderId: string
@@ -103,7 +105,7 @@ beforeAll(async () => {
     orderId,
     planDate: DAY,
     targetPerHour: 120,
-    manpowerPlanned: 40,
+    manpowerPlanned: MANPOWER,
     smv: '12.50',
     createdBy: USER,
   })
@@ -345,6 +347,20 @@ describe('6.1 · endline and derived', () => {
     const [row] = await db.select().from(efficiencyDaily).where(eq(efficiencyDaily.lineId, lineId))
     expect(row?.efficiencyPct).toBeTruthy()
     expect(Number(row!.outputTotal)).toBeGreaterThan(0)
+
+    /*
+     * The day is as long as the hours the line recorded — not a nominal 480 minutes (§9,
+     * F42). Derived from the row count rather than written as a literal because this
+     * fixture's hours are shared with the tests above; what must hold is the RELATIONSHIP,
+     * whatever the count happens to be.
+     */
+    const cells = await db
+      .select()
+      .from(hourlyOutputs)
+      .where(sql`${hourlyOutputs.lineId} = ${lineId} and ${hourlyOutputs.producedOn} = ${DAY}`)
+
+    expect(Number(row!.availableMinutes)).toBe(cells.length * 60 * MANPOWER)
+    expect(Number(row!.outputTotal)).toBe(cells.reduce((n, c) => n + c.actual, 0))
 
     // Re-running the day-close must not create a second row — derived tables are
     // rebuildable from source at any time (architecture §4).

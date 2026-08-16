@@ -36,6 +36,7 @@ import {
   computeEfficiency,
   forecastCompletion,
   ProductionError,
+  workedMinutes,
   type ForecastResult,
 } from './metrics'
 import { trailingOutput } from './queries'
@@ -498,18 +499,28 @@ export async function recordEndlineCountIn(
 /**
  * Day-close efficiency for every line that ran. Idempotent — safe to re-run, and safe to
  * rebuild from `hourly_outputs` at any time (architecture §4, derived tables).
+ *
+ * **The day is as long as the hours the line recorded**, not a nominal 480 minutes. The same
+ * rows this sums for output also say how long the line was manned, and dividing a nine-hour
+ * day by eight reported Nordkap's L-3 at 73.80% where the floor did 65.60% — an error that
+ * grew with every hour of overtime and always in the flattering direction (§9, F42).
+ * `workedMinutes` carries the reasoning.
+ *
+ * `workingMinutes` stays as an explicit override for a factory that states its own shift
+ * length, but nothing passes one by default any more.
  */
 export async function closeDay(
   ctx: AnyCtx,
   input: { forDate: string; workingMinutes?: number },
 ): Promise<{ lines: number }> {
-  const workingMinutes = input.workingMinutes ?? 480
-
   return withTenantTx(ctx, async (tx) => {
     const rows = await tx
       .select({
         lineId: hourlyOutputs.lineId,
         output: sql<string>`sum(${hourlyOutputs.actual})::text`,
+        // One row per hour — the unique index on (line, date, hour) makes this the count of
+        // hours the line was manned, not a count of writes.
+        hoursRecorded: sql<string>`count(*)::text`,
       })
       .from(hourlyOutputs)
       .where(scoped(hourlyOutputs, ctx, eq(hourlyOutputs.producedOn, input.forDate)))
@@ -536,7 +547,7 @@ export async function closeDay(
           smv: plan.smv,
           output,
           manpower: plan.manpowerPlanned,
-          workingMinutes,
+          workingMinutes: input.workingMinutes ?? workedMinutes(Number(row.hoursRecorded)),
         })
       } catch (error) {
         if (error instanceof ProductionError) continue

@@ -69,6 +69,46 @@ export interface EfficiencyResult {
   efficiencyPct: string
 }
 
+const MINUTES_PER_HOUR = 60
+
+/**
+ * How long the day actually was, from the hours the line recorded.
+ *
+ * The denominator of every efficiency figure in the product used to be the constant 480 —
+ * a nominal eight-hour shift — in both the day-close and the floor board. Almost no day is
+ * eight hours. A Bangladeshi line runs eight plus two of overtime, breaks for lunch, and
+ * stops when the fabric runs out, and the error ran in both directions at once:
+ *
+ *  - **the day-close flattered.** Nordkap's L-3 sewed 1,295 pieces across NINE hours and
+ *    was reported at 73.80% because it was divided by eight. The floor did 65.60%. Overtime
+ *    was credited as if it were free, and the more overtime a line ran the better it looked
+ *    (live test §9, F42).
+ *  - **the wall board starved.** It is read mid-shift. At ten in the morning a line with two
+ *    hours on the clipboard was divided by a whole shift and shown at a quarter of its real
+ *    efficiency, climbing all day towards the truth and only arriving at knocking-off time.
+ *
+ * An hour is in this count because somebody recorded it, which means the line was manned for
+ * it — including an hour it made nothing, which is a real efficiency loss and belongs in the
+ * denominator. The lunch hour is absent because nobody records it, which is exactly why the
+ * hourly sheet reading refuses to invent a zero for the band ruled through (`hourlySheetDraft`).
+ *
+ * A factory that wants to state its own shift length still can: both callers take an explicit
+ * override, and planning's working-week calendar keeps its own `shiftMinutes` for FORECASTING
+ * capacity. This is the other thing — measuring a day that has already happened.
+ */
+export function workedMinutes(hoursRecorded: number): number {
+  if (!Number.isInteger(hoursRecorded) || hoursRecorded <= 0) {
+    // A day nobody recorded an hour for has no length. Falling back to a nominal shift here
+    // would put a 0% against a line that never ran — the same fabricated number the rest of
+    // this file refuses.
+    throw new ProductionError(
+      `a day with no hours recorded has no length, got ${hoursRecorded}`,
+    )
+  }
+
+  return hoursRecorded * MINUTES_PER_HOUR
+}
+
 /**
  * earned ÷ available, as a percentage.
  *

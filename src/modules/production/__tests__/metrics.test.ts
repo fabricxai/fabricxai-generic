@@ -18,6 +18,7 @@ import {
   computeEfficiency,
   forecastCompletion,
   ProductionError,
+  workedMinutes,
 } from '../metrics'
 
 describe('computeEfficiency', () => {
@@ -59,6 +60,57 @@ describe('computeEfficiency', () => {
   it('5 · is exact — SMV is quoted to two decimals and must not drift', () => {
     const result = computeEfficiency({ smv: '0.33', output: 3, manpower: 1, workingMinutes: 1 })
     expect(result.earnedMinutes).toBe('0.99')
+  })
+})
+
+describe('workedMinutes', () => {
+  it('1 · the day is as long as the hours the line recorded', () => {
+    expect(workedMinutes(8)).toBe(480)
+    expect(workedMinutes(9)).toBe(540)
+    expect(workedMinutes(10)).toBe(600)
+  })
+
+  it('2 · Nordkap L-3: nine hours reads 65.60%, eight would have read 73.80%', () => {
+    // The live-test day (§9, F42). 1,295 pieces at 18.60 SMV, 68 operators, and NINE hours
+    // on the sheet — the 13:00 band is ruled through for lunch and is not one of them.
+    const day = { smv: '18.60', output: 1295, manpower: 68 }
+
+    const truth = computeEfficiency({ ...day, workingMinutes: workedMinutes(9) })
+    expect(truth.earnedMinutes).toBe('24087.00')
+    expect(truth.availableMinutes).toBe('36720.00')
+    expect(truth.efficiencyPct).toBe('65.60')
+
+    // What the fixed 480-minute denominator reported instead. Two hours of overtime credited
+    // as if they were free, and the error flatters — the direction nobody questions.
+    const flattered = computeEfficiency({ ...day, workingMinutes: 480 })
+    expect(flattered.efficiencyPct).toBe('73.80')
+  })
+
+  it('3 · mid-shift on the wall board, the denominator grows with the day', () => {
+    // The same line two hours in. Against a whole shift this read 14.76% at ten in the
+    // morning; against the hours actually worked it reads what the line is doing.
+    const twoHoursIn = computeEfficiency({
+      smv: '18.60',
+      output: 259,
+      manpower: 68,
+      workingMinutes: workedMinutes(2),
+    })
+    expect(twoHoursIn.efficiencyPct).toBe('59.04')
+
+    const againstAWholeShift = computeEfficiency({
+      smv: '18.60',
+      output: 259,
+      manpower: 68,
+      workingMinutes: 480,
+    })
+    expect(againstAWholeShift.efficiencyPct).toBe('14.76')
+  })
+
+  it('4 · a day with no hours recorded has no length, rather than a nominal one', () => {
+    // Falling back to 480 here would put a 0% against a line that never ran.
+    expect(() => workedMinutes(0)).toThrow(ProductionError)
+    expect(() => workedMinutes(-1)).toThrow(ProductionError)
+    expect(() => workedMinutes(2.5)).toThrow(ProductionError)
   })
 })
 

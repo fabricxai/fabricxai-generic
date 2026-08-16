@@ -4,7 +4,7 @@ import { eq } from 'drizzle-orm'
 
 import { getCtx } from '@/modules/core/session'
 import { withTenantRead } from '@/modules/core/tenancy'
-import { computeEfficiency } from '@/modules/production/metrics'
+import { computeEfficiency, workedMinutes } from '@/modules/production/metrics'
 import { board } from '@/modules/production/queries'
 import { dailyLinePlans } from '@/modules/production/schema'
 
@@ -27,8 +27,6 @@ export const dynamic = 'force-dynamic'
 
 /** A normal Bangladeshi sewing shift: 8 hours plus two of overtime. */
 const SHIFT_HOURS = 10
-/** The efficiency denominator — the shift's eight regular hours, in minutes. */
-const WORKING_MINUTES = 480
 
 export default async function BoardPage() {
   const ctx = await getCtx(await headers())
@@ -60,11 +58,18 @@ export default async function BoardPage() {
   for (const row of rows) {
     const plan = planByLine.get(row.lineId)
     if (!plan?.smv || plan.manpower <= 0) continue
+    // A line with nothing entered yet is not running at 0% — it has no efficiency, and the
+    // board leaves it out of the floor figure rather than dragging everyone down with it.
+    if (row.hours.length === 0) continue
     const result = computeEfficiency({
       smv: plan.smv,
       output: row.actual,
       manpower: plan.manpower,
-      workingMinutes: WORKING_MINUTES,
+      // The hours entered so far, NOT a whole shift. This board is read at ten in the
+      // morning: dividing two hours of work by eight showed a line running perfectly at a
+      // quarter of its efficiency, and the number climbed all day towards the truth without
+      // ever being it (§9, F42).
+      workingMinutes: workedMinutes(row.hours.length),
     })
     earned += Number(result.earnedMinutes)
     available += Number(result.availableMinutes)
