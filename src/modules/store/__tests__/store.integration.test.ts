@@ -12,13 +12,14 @@
  */
 import { randomUUID } from 'node:crypto'
 
-import { eq, sql } from 'drizzle-orm'
+import { and, eq, inArray, sql } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { createDirectClient, createDirectDb } from '@/db/direct'
 import { companies, users } from '@/db/schema/core'
 import { buyers } from '@/modules/buyers/schema'
 import { udConsumptions, uds } from '@/modules/commercial/schema'
+import { getUdBalance } from '@/modules/commercial/service'
 import type { RequestCtx } from '@/modules/core/ctx'
 import { AppError } from '@/modules/core/errors'
 import { syncBatch } from '@/modules/core/offline-sync'
@@ -36,6 +37,7 @@ import {
   createRequisition,
   getStock,
   issueStock,
+  returnRolls,
   receiveGrn,
 } from '@/modules/store/service'
 
@@ -271,6 +273,132 @@ describe('3.1 · goods out draws the UD in the same transaction', () => {
     expect(draws).toHaveLength(2)
   })
 
+  it('brings a roll back and gives the declaration its balance back', async () => {
+    /*
+     * The gap this closes: `rollMachine` has allowed `issued → returned` since it was
+     * written and nothing could make the move. Cloth comes back for ordinary reasons, and
+     * for the one that found it — rolls that failed 4-point were issued before the gate
+     * could see them, and there was no way to fetch them home.
+     *
+     * The bonded half is the part that matters. A returned roll whose UD draw still stands
+     * leaves the declaration permanently short of material sitting in the bond, and the
+     * drift surfaces at a customs reconciliation months later.
+     */
+    await receiveGrn(ctx, {
+      challanNo: `RET-${randomUUID().slice(0, 6)}`,
+      receivedAt: '2026-07-02',
+      bonded: true,
+      udId,
+      lines: [
+        {
+          itemId: fabricId,
+          qty: '60.00',
+          unit: 'M',
+          rolls: [{ rollNo: 'R-RET', qty: '60.00', locationId: bondedLocationId, shadeGroup: 'A' }],
+        },
+      ],
+    })
+    const [roll] = await db.select().from(rolls).where(eq(rolls.rollNo, 'R-RET'))
+
+    const before = await getUdBalance(ctx, udId)
+    await issueStock(ctx, {
+      orderId,
+      lines: [{ itemId: fabricId, rollId: roll!.id, qty: '60.00', unit: 'M' }],
+    })
+    const afterIssue = await getUdBalance(ctx, udId)
+    expect(afterIssue.items[0]!.free).not.toBe(before.items[0]!.free)
+
+    const result = await returnRolls(ctx, {
+      rollIds: [roll!.id],
+      reason: 'failed 4-point at the mill — returned for claim',
+    })
+
+    expect(result.rolls).toBe(1)
+    expect(result.udReversals).toBe(1)
+
+    const [back] = await db.select().from(rolls).where(eq(rolls.id, roll!.id))
+    expect(back!.status).toBe('returned')
+
+    // The balance is whole again, and the draw is still on the ledger with its reason —
+    // not deleted, not negated. A customs ledger that can be written downwards is not one.
+    const afterReturn = await getUdBalance(ctx, udId)
+    expect(afterReturn.items[0]!.free).toBe(before.items[0]!.free)
+
+    const [draw] = await db
+      .select()
+      .from(udConsumptions)
+      .where(and(eq(udConsumptions.udId, udId), eq(udConsumptions.qty, '60.00')))
+    expect(draw!.reversedAt).not.toBeNull()
+    expect(draw!.reversedReason).toContain('failed 4-point')
+  })
+
+  it('reverses the draw for the roll returned, not the one that weighs the same', async () => {
+    /*
+     * The hazard the line link exists for. Two rolls of identical weight go out on one
+     * issue; one comes back. Matching draws by quantity would reverse whichever row the
+     * database happened to return, and a customs ledger corrected by coincidence is worse
+     * than one left alone — the balance would look right while naming the wrong material.
+     */
+    await receiveGrn(ctx, {
+      challanNo: `TWIN-${randomUUID().slice(0, 6)}`,
+      receivedAt: '2026-07-03',
+      bonded: true,
+      udId,
+      lines: [
+        {
+          itemId: fabricId,
+          qty: '50.00',
+          unit: 'M',
+          rolls: [
+            { rollNo: 'R-TWIN-A', qty: '25.00', locationId: bondedLocationId, shadeGroup: 'A' },
+            { rollNo: 'R-TWIN-B', qty: '25.00', locationId: bondedLocationId, shadeGroup: 'A' },
+          ],
+        },
+      ],
+    })
+    const twins = await db.select().from(rolls).where(inArray(rolls.rollNo, ['R-TWIN-A', 'R-TWIN-B']))
+    const a = twins.find((r) => r.rollNo === 'R-TWIN-A')!
+    const b = twins.find((r) => r.rollNo === 'R-TWIN-B')!
+
+    await issueStock(ctx, {
+      orderId,
+      lines: [
+        { itemId: fabricId, rollId: a.id, qty: '25.00', unit: 'M' },
+        { itemId: fabricId, rollId: b.id, qty: '25.00', unit: 'M' },
+      ],
+    })
+
+    const result = await returnRolls(ctx, { rollIds: [a.id], reason: 'wrong shade for the lay' })
+    expect(result.udReversals).toBe(1)
+
+    // The returned roll's line is reversed; its twin's draw still stands.
+    const [lineA] = await db.select().from(issueLines).where(eq(issueLines.rollId, a.id))
+    const [lineB] = await db.select().from(issueLines).where(eq(issueLines.rollId, b.id))
+    const [drawA] = await db
+      .select()
+      .from(udConsumptions)
+      .where(eq(udConsumptions.storeIssueLineId, lineA!.id))
+    const [drawB] = await db
+      .select()
+      .from(udConsumptions)
+      .where(eq(udConsumptions.storeIssueLineId, lineB!.id))
+
+    expect(drawA!.reversedAt).not.toBeNull()
+    expect(drawB!.reversedAt).toBeNull()
+  })
+
+  it('refuses a return with no reason, and one for a roll still in stock', async () => {
+    const [roll] = await db.select().from(rolls).where(eq(rolls.rollNo, 'R-RET'))
+
+    await expect(returnRolls(ctx, { rollIds: [roll!.id], reason: '  ' })).rejects.toMatchObject({
+      messageKey: 'store.errors.return_needs_reason',
+    })
+    // Already returned — the machine says so rather than silently doing nothing twice.
+    await expect(
+      returnRolls(ctx, { rollIds: [roll!.id], reason: 'again' }),
+    ).rejects.toMatchObject({ code: 'illegal_transition' })
+  })
+
   it('refuses to issue a roll that has already gone out', async () => {
     const [roll] = await db.select().from(rolls).where(eq(rolls.rollNo, 'R-001'))
 
@@ -360,9 +488,14 @@ describe('3.1 · offline replay is a no-op', () => {
     const lines = await db.select().from(issueLines).where(eq(issueLines.issueId, issueId))
     expect(lines).toHaveLength(1)
 
-    const draws = await db.select().from(udConsumptions).where(eq(udConsumptions.udId, udId))
-    // The earlier 200, the GRN-resolved 100, and this 150 — recorded once each, never twice.
-    expect(draws).toHaveLength(3)
+    // Scoped to THIS issue, which is what the test is about: a replayed batch must not draw
+    // its own line twice. Counting every draw on the declaration made the assertion hostage
+    // to any other test that issues bonded material.
+    const draws = await db
+      .select()
+      .from(udConsumptions)
+      .where(eq(udConsumptions.storeIssueId, issueId))
+    expect(draws).toHaveLength(1)
   })
 
   it('a rejected row stays rejected on replay rather than retrying forever', async () => {

@@ -10,7 +10,7 @@
  * the gate." Two storekeepers issuing the last of a bonded roll at the same moment must
  * not both succeed, and a check that reads the balance outside a lock would let them.
  */
-import { and, desc, eq, sql } from 'drizzle-orm'
+import { and, desc, eq, isNull, sql } from 'drizzle-orm'
 
 import { factoryToday } from '@/lib/dates'
 import { compareDecimalStrings } from '@/lib/quantity'
@@ -94,10 +94,18 @@ async function loadUd(
     })
   }
 
+  // Reversed draws are still on the ledger and still readable; they simply do not weigh on
+  // the balance any more, because the material came back into the bond.
   const ledger = await tx
     .select({ itemRef: udConsumptions.itemRef, qty: udConsumptions.qty, unit: udConsumptions.unit })
     .from(udConsumptions)
-    .where(scoped(udConsumptions, ctx, eq(udConsumptions.udId, udId)))
+    .where(
+      scoped(
+        udConsumptions,
+        ctx,
+        and(eq(udConsumptions.udId, udId), isNull(udConsumptions.reversedAt)),
+      ),
+    )
 
   return {
     ud: {
@@ -169,6 +177,8 @@ export interface UdDrawInput {
   unit: string
   /** The issue this draw belongs to. Set by module 3.1. */
   storeIssueId?: string
+  /** The issue line that drew it. Quantity is not an identity — see the column's note. */
+  storeIssueLineId?: string
   today?: string
   /**
    * Set ONLY by the approve path, when an owner has approved a deliberate overdraw
@@ -231,6 +241,7 @@ export async function drawUd(
       companyId: ctx.companyId,
       udId: input.udId,
       storeIssueId: input.storeIssueId ?? null,
+      storeIssueLineId: input.storeIssueLineId ?? null,
       // The RESOLVED ref — the declaration's own word for the material, never the
       // store's, or computeUdBalance refuses the whole ledger as inconsistent.
       itemRef,

@@ -222,10 +222,37 @@ export const udConsumptions = pgTable(
      */
     storeIssueId: uuid('store_issue_id'),
 
+    /**
+     * The issue LINE the draw belongs to, not merely the issue.
+     *
+     * A draw is made per line, and two lines of one issue routinely carry the same quantity
+     * — this factory has two fleece rolls weighing 25.40 kg. Matching a draw back to its
+     * material by amount would reverse whichever row the database returned first, which is
+     * a customs ledger corrected by coincidence. The line id is the identity.
+     *
+     * Null on draws recorded before this column; `returnRolls` refuses rather than guesses
+     * when it cannot tell those apart.
+     */
+    storeIssueLineId: uuid('store_issue_line_id'),
+
     itemRef: text('item_ref').notNull(),
     /** numeric(12,2) per the brief; metres, kilograms or pieces. Never a float. */
     qty: numeric('qty', { precision: 12, scale: 2 }).notNull(),
     unit: text('unit').notNull(),
+
+    /**
+     * When the draw was given back, and why.
+     *
+     * A consumption is never deleted and never negated — the check constraint below forbids a
+     * negative quantity, and rightly: a customs ledger that can be written downwards is not a
+     * ledger. Material that comes back to the bonded store is recorded as a reversal of the
+     * draw that took it out, so the paper trail reads "drawn on the 12th, returned on the
+     * 16th, because the cloth failed inspection" — which is exactly what an auditor asks.
+     *
+     * The balance ignores a reversed row. Everything else still sees it.
+     */
+    reversedAt: timestamp('reversed_at', { withTimezone: true }),
+    reversedReason: text('reversed_reason'),
 
     /** Set when an owner approved a deliberate overdraw through pending_changes. */
     overrideOf: uuid('override_of').references(() => uds.id, { onDelete: 'set null' }),

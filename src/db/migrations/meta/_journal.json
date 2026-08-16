@@ -617,6 +617,20 @@
       "when": 1786841704727,
       "tag": "0087_furry_bloodscream",
       "breakpoints": true
+    },
+    {
+      "idx": 88,
+      "version": "7",
+      "when": 1786843832529,
+      "tag": "0088_spotty_changeling",
+      "breakpoints": true
+    },
+    {
+      "idx": 89,
+      "version": "7",
+      "when": 1786844390202,
+      "tag": "0089_steady_mandrill",
+      "breakpoints": true
     }
   ]
 }

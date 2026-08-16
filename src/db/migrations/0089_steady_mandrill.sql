@@ -1,0 +1,1 @@
+ALTER TABLE "ud_consumptions" ADD COLUMN "store_issue_line_id" uuid;

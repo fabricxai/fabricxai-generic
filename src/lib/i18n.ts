@@ -399,6 +399,9 @@ export const MESSAGES: Catalogue = {
     // Twenty-one gate reasons were thrown with no copy behind them, so a UD overdraw
     // reached the storekeeper as the literal string `gate_blocked:
     // gates.ud_balance.insufficient` (audit BE-H3). These are the refusals people meet.
+    'store.errors.nothing_to_return': 'No rolls were chosen to return.',
+    'store.errors.return_needs_reason':
+      'A return needs a reason. It moves material back into the store and gives back what the declaration had drawn, and the reason is what the record is for.',
     'gates.ud_balance.insufficient':
       'This issue would draw more than the UD allows. An owner can approve a deliberate overdraw through the approve inbox.',
     /*
@@ -1132,6 +1135,9 @@ export const MESSAGES: Catalogue = {
     'store.errors.bonded_requires_ud':
       'বন্ডেড মাল UD ছাড়া ইস্যু করা যাবে না। UD ছাড়া ইস্যু করলে সেটা কাগজের ছোট ভুল নয়, কাস্টমসের ঝুঁকি।',
     'store.errors.exceeds_requisition': 'রিকুইজিশনে যা চাওয়া হয়েছে তার চেয়ে এটি বেশি।',
+    'store.errors.nothing_to_return': 'ফেরত দেওয়ার জন্য কোনো রোল বাছা হয়নি।',
+    'store.errors.return_needs_reason':
+      'ফেরতের কারণ লিখতে হবে। এতে মাল স্টোরে ফিরে আসে আর UD থেকে যা টানা হয়েছিল তা ফেরত যায় — কারণটাই রেকর্ডের মূল কথা।',
     'store.errors.item_uom_locked':
       'এই আইটেমের স্টক আগের এককেই রাখা আছে। এখন একক বদলালে আগে লেখা প্রতিটি পরিমাণের মানে চুপচাপ বদলে যাবে।',
     'store.errors.location_kind_locked':

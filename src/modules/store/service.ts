@@ -14,7 +14,9 @@
  * Blocking would get people working around the system by not recording the shade, which
  * is strictly worse than a warning nobody reads.
  */
-import { and, count, eq, inArray, sql } from 'drizzle-orm'
+import { randomUUID } from 'node:crypto'
+
+import { and, count, eq, inArray, isNull, sql } from 'drizzle-orm'
 
 import { fromMinor, toMinor } from '@/lib/quantity'
 
@@ -759,6 +761,11 @@ export async function issueStockIn(
     // let those lines skip the customs gate entirely — bonded material leaving with no
     // draw recorded against it. A roll's declaration is resolved through its GRN when the
     // caller did not name one.
+    // The line's id up front, because the draw is written before the line row and the two
+    // have to name each other. Matching them later by quantity is what this avoids: two
+    // lines of one issue routinely weigh the same.
+    const issueLineId = randomUUID()
+
     const udId = line.udId ?? (roll ? udByGrnLine.get(roll.grnLineId) : undefined)
     if (udId) {
       const [item] = await tx.select().from(items).where(scoped(items, ctx, eq(items.id, line.itemId)))
@@ -773,12 +780,14 @@ export async function issueStockIn(
         qty: line.qty,
         unit: line.unit,
         storeIssueId: issue.id,
+        storeIssueLineId: issueLineId,
       })
 
       udDraws.push({ udId, itemRef: draw.decision.itemRef ?? itemRef, qty: line.qty })
     }
 
     await tx.insert(issueLines).values({
+      id: issueLineId,
       companyId: ctx.companyId,
       issueId: issue.id,
       itemId: line.itemId,
@@ -830,6 +839,122 @@ export async function issueStockIn(
 
 export async function issueStock(ctx: RequestCtx, input: unknown): Promise<IssueResult> {
   return withTenantTx(ctx, (tx) => issueStockIn(ctx, tx, input))
+}
+
+export interface ReturnResult {
+  rolls: number
+  /** Bonded draws given back, so the declaration's balance recovers what came home. */
+  udReversals: number
+}
+
+/**
+ * Material coming back from the floor to the store ⚖.
+ *
+ * `rollMachine` has allowed `issued → returned` since it was written and nothing could make
+ * the move — the third such gap this walk has turned up, after a purchase order that could
+ * not be cancelled and a status nobody could advance. Cloth comes back for ordinary reasons
+ * (a lay finished short, a shade was wrong) and for the reason that found this one: rolls
+ * that failed 4-point were issued before the inspection gate could see them, and there was
+ * no way to fetch them back.
+ *
+ * **The bonded draw is given back with them.** A returned roll that leaves its UD consumption
+ * standing is a declaration permanently short of material that is sitting in the bond — the
+ * balance drifts away from the rack, and a customs reconciliation months later is where it
+ * surfaces. The consumption is not deleted and not negated: a ledger that can be written
+ * downwards is not a ledger, and the check constraint says so. It is marked reversed, with
+ * the reason, and the balance stops counting it.
+ */
+export async function returnRolls(
+  ctx: RequestCtx,
+  input: { rollIds: readonly string[]; reason: string },
+): Promise<ReturnResult> {
+  if (input.rollIds.length === 0) {
+    throw new AppError('validation_failed', 'store.errors.nothing_to_return', {})
+  }
+  if (input.reason.trim() === '') {
+    // A return moves ⚖ material and reverses a customs draw. "Why" is the whole record.
+    throw new AppError('validation_failed', 'store.errors.return_needs_reason', {})
+  }
+
+  return withTenantTx(ctx, async (tx) => {
+    const rollRows = await tx
+      .select()
+      .from(rolls)
+      .where(scoped(rolls, ctx, inArray(rolls.id, [...input.rollIds])))
+      .for('update')
+
+    if (rollRows.length !== input.rollIds.length) {
+      throw notFound('store.errors.roll_not_found', {
+        expected: input.rollIds.length,
+        found: rollRows.length,
+      })
+    }
+
+    for (const roll of rollRows) {
+      // The machine decides, not this function: a roll already returned or adjusted out is
+      // not a roll to fetch back, and saying so by name beats a silent no-op.
+      rollMachine.assert(roll.status as 'issued', 'returned')
+    }
+
+    await tx
+      .update(rolls)
+      .set({ status: 'returned', updatedAt: new Date() })
+      .where(scoped(rolls, ctx, inArray(rolls.id, [...input.rollIds])))
+
+    for (const roll of rollRows) {
+      await recordChange(ctx, tx, {
+        action: 'update',
+        targetTable: 'rolls',
+        targetId: roll.id,
+        before: { status: roll.status },
+        after: { status: 'returned', reason: input.reason },
+      })
+    }
+
+    /*
+     * The bonded half, matched on the issue LINE each roll went out on.
+     *
+     * Not on quantity: two lines of one issue routinely carry the same weight — this
+     * factory has two fleece rolls at 25.40 kg — and reversing whichever row came back
+     * first would correct a customs ledger by coincidence.
+     */
+    const { udConsumptions } = await import('../commercial/schema')
+    const lines = await tx
+      .select({ id: issueLines.id })
+      .from(issueLines)
+      .where(scoped(issueLines, ctx, inArray(issueLines.rollId, [...input.rollIds])))
+
+    let udReversals = 0
+
+    if (lines.length > 0) {
+      const reversed = await tx
+        .update(udConsumptions)
+        .set({ reversedAt: new Date(), reversedReason: input.reason })
+        .where(
+          scoped(
+            udConsumptions,
+            ctx,
+            and(
+              inArray(
+                udConsumptions.storeIssueLineId,
+                lines.map((line) => line.id),
+              ),
+              isNull(udConsumptions.reversedAt),
+            ),
+          ),
+        )
+        .returning({ id: udConsumptions.id })
+
+      udReversals = reversed.length
+    }
+
+    await emit(ctx, tx, {
+      eventName: STORE_EVENTS.stockReturned,
+      payload: { rollIds: [...input.rollIds], reason: input.reason, udReversals },
+    })
+
+    return { rolls: rollRows.length, udReversals }
+  })
 }
 
 /** open → partial → fulfilled, derived from what has actually been issued. */
