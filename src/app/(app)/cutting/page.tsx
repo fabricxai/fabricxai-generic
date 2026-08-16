@@ -18,6 +18,8 @@ import { cuttableOrders, recentLays } from '@/modules/cutting/queries'
 
 import { RaisedDrafts } from '@/components/shell/raised-drafts'
 
+import { ReleaseMarkerButton } from './release-marker'
+
 /**
  * 5.1 Cutting.
  *
@@ -36,6 +38,10 @@ export default async function CuttingPage() {
   const locale = await requestLocale()
 
   const [lays, orders] = await Promise.all([recentLays(ctx), cuttableOrders(ctx)])
+
+  // The styles the floor could be asked to cut, so the marker form can offer them rather
+  // than making somebody retype a code a lay will later match on exactly.
+  const styles = [...new Set(orders.map((o) => o.styleCode).filter(Boolean))].sort()
 
   // `lay_status` is open | cut | cancelled — there is no "closed", so the old
   // `!== 'closed'` test excluded nothing and counted every cut and cancelled lay as still
@@ -59,6 +65,10 @@ export default async function CuttingPage() {
           unreported > 0 ? tui(locale, 'ui.cutting.unreported_meta', { count: unreported }) : undefined
         }
         ownsAmber
+        /* The door 5.1 never had. It sits here rather than only on the lay screen because
+           a marker is released once per style, ahead of the spread — the moment somebody
+           has the CAD plan in front of them, not the moment the table is waiting. */
+        actions={<ReleaseMarkerButton styles={styles} />}
       />
 
       <RaisedDrafts />
