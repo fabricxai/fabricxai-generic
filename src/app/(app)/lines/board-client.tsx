@@ -1,5 +1,6 @@
 'use client'
 
+import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
 import { Card } from '@/components/fx/data'
@@ -57,6 +58,7 @@ export function LineBoard({
 }) {
   const t = useT()
   const { online, queued, refused, syncing, capture, sync, clear } = useOfflineQueue()
+  const router = useRouter()
   const [entry, setEntry] = useState<{ line: LineRow; hour: number } | null>(null)
 
   const hourSlots = Array.from({ length: shiftHours }, (_, i) => i + 8)
@@ -285,6 +287,24 @@ export function LineBoard({
             },
           })
           setEntry(null)
+          /*
+           * Drain, then re-read — the same rule the hourly keypad already follows.
+           *
+           * `capture()` writes to the device and kicks the queue without waiting, so this
+           * box used to close onto a board still showing the hour as never counted. The
+           * write had landed; nothing on screen said so, and the only reasonable conclusion
+           * is that it did not work — so the supervisor types it again. Now doubly true: a
+           * remark typed here and then invisible is the discard this feature exists to end,
+           * wearing a different hat (§9, F48).
+           *
+           * Offline, deliberately neither: the queue holds the write and `router.refresh()`
+           * would re-fetch a page the network cannot serve, tearing down the screen the
+           * person just saved on. The later sync is what refreshes the server's view.
+           */
+          if (online) {
+            await sync()
+            router.refresh()
+          }
         }}
       />
     </FloorScreen>
