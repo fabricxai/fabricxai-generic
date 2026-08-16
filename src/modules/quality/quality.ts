@@ -555,3 +555,24 @@ export function fabricInspectionRefusal(
     `already paid for.`
   )
 }
+
+/**
+ * The style code out of whatever a chart's header line says.
+ *
+ * A buyer's chart heads itself with everything at once — `ST-2815 · NK-90455 · Rev 2` is the
+ * style, the buyer's own article number and the revision, on one line — and an extractor
+ * reading that line whole files the chart under a string nobody will ever search for.
+ * `measurementSpecs` is looked up by exact style code, so a chart with fifty correct points
+ * approved by an owner became invisible to the style it describes: the measurement screen
+ * read `points: []` for a style that had a chart on file (Nordkap §7b).
+ *
+ * Splitting is deliberately narrow. It cuts on the marks that mean *another field follows* —
+ * a middot, a pipe, a comma, a spaced dash — and on a trailing revision marker, which is the
+ * one suffix charts write without a separator. It does NOT cut on a plain space: "ST 2815"
+ * is a style code some factories really use, and mangling it would trade one filing error
+ * for another.
+ */
+export function styleCodeFrom(raw: string): string {
+  const firstField = raw.split(/\s*[·•|,;]\s*|\s+[—–]\s+/)[0] ?? raw
+  return firstField.replace(/\s+rev\.?\s*\d+(\.\d+)?$/i, '').trim()
+}

@@ -34,6 +34,7 @@ import {
   finalInspections,
   inlineChecks,
   measurementChecks,
+  measurementSpecs,
 } from '@/modules/quality/schema'
 import {
   captureInlineCheck,
@@ -50,6 +51,7 @@ import {
   scheduleThirdPartyInspection,
   setFinalInspectionStatus,
   upsertDefectCode,
+  commitMeasurementSpec,
 } from '@/modules/quality/service'
 import { supplierPos, suppliers } from '@/modules/procurement/schema'
 import { grnLines, grns, items, locations, rolls } from '@/modules/store/schema'
@@ -1064,5 +1066,47 @@ describe('7.1 · the 4-point gate in a knit composite house', () => {
     )
     expect(verdict.passed).toBe(false)
     expect(verdict.reasonKey).toBe('gates.fabric_inspection.not_inspected')
+  })
+})
+
+describe('a measurement chart is filed under the style, not the header line', () => {
+  /*
+   * The Nordkap §7b failure. A buyer's chart heads itself `ST-2815 · NK-90455 · Rev 2`, the
+   * extractor read the whole line as the code, and the spec — fifty correct points, approved
+   * by an owner — became invisible: `measurementSpecs` is found by exact style code, so the
+   * measurement screen read `points: []` for a style that had a chart on file.
+   */
+  const chart = (styleCode: string) => ({
+    styleCode,
+    unit: 'cm',
+    points: [{ name: 'A Chest width — size M', spec: '56.0', tolPlus: '1.5', tolMinus: '1.5' }],
+  })
+
+  it('files a header line under the style code alone', async () => {
+    const result = await withTenantTx(ctx, (tx) =>
+      commitMeasurementSpec(ctx, tx, { payload: chart('ST-HDR · NK-90455 · Rev 2') }),
+    )
+
+    const [row] = await withTenantRead(ctx, (tx) =>
+      tx.select().from(measurementSpecs).where(eq(measurementSpecs.id, result.rowId)),
+    )
+    expect(row!.styleCode).toBe('ST-HDR')
+  })
+
+  it('versions against the cleaned code, not beside it', async () => {
+    // Without normalising before the lookup, a corrected chart opens a second version 1
+    // next to the polluted one and the screen picks whichever sorts first.
+    await withTenantTx(ctx, (tx) =>
+      commitMeasurementSpec(ctx, tx, { payload: chart('ST-VER') }),
+    )
+    const second = await withTenantTx(ctx, (tx) =>
+      commitMeasurementSpec(ctx, tx, { payload: chart('ST-VER · NK-90455 · Rev 7') }),
+    )
+
+    const [row] = await withTenantRead(ctx, (tx) =>
+      tx.select().from(measurementSpecs).where(eq(measurementSpecs.id, second.rowId)),
+    )
+    expect(row!.styleCode).toBe('ST-VER')
+    expect(row!.version).toBe(2)
   })
 })

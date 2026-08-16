@@ -28,6 +28,7 @@ import { withTenantRead, withTenantTx, type TenantDb } from '../core/tenancy'
 import { QUALITY_EVENTS } from './events'
 import {
   aqlVerdict,
+  styleCodeFrom,
   dhu as computeDhu,
   fourPointResult,
   measurementVariance,
@@ -1600,10 +1601,21 @@ export async function commitMeasurementSpec(
 ): Promise<{ rowId: string; after: Record<string, unknown> }> {
   const payload = measurementSpecPayload.parse(input.payload)
 
+  /*
+   * The code, not the header line it was printed on.
+   *
+   * The read schema now asks the model for the style code alone, but a model is not a
+   * guarantee — the same extractor filed `ST-2815` correctly one day and
+   * `ST-2815 · NK-90455 · Rev 2` the next. This is the row that gets looked up by exact
+   * code, so this is where the guarantee belongs. Normalised before the version lookup too,
+   * or a corrected chart would open a second version-1 line beside the polluted one.
+   */
+  const styleCode = styleCodeFrom(payload.styleCode)
+
   const [latest] = await tx
     .select({ version: measurementSpecs.version })
     .from(measurementSpecs)
-    .where(scoped(measurementSpecs, ctx, eq(measurementSpecs.styleCode, payload.styleCode)))
+    .where(scoped(measurementSpecs, ctx, eq(measurementSpecs.styleCode, styleCode)))
     .orderBy(desc(measurementSpecs.version))
     .limit(1)
 
@@ -1613,7 +1625,7 @@ export async function commitMeasurementSpec(
     .insert(measurementSpecs)
     .values({
       companyId: ctx.companyId,
-      styleCode: payload.styleCode,
+      styleCode,
       version,
       points: payload.points,
       unit: payload.unit,

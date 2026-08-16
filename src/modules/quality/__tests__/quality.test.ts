@@ -20,6 +20,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   aqlVerdict,
+  styleCodeFrom,
   dhu,
   fabricInspectionRefusal,
   fourPointResult,
@@ -443,5 +444,33 @@ describe('fabricInspectionRefusal · the roll numbers ARE the refusal', () => {
     // system was written by somebody not paying attention.
     expect(sentence).toContain('1 roll has not been')
     expect(sentence).toContain('R-F-07')
+  })
+})
+
+describe('styleCodeFrom · a header line is not a style code', () => {
+  it('takes the style out of everything a chart prints beside it', () => {
+    // The live failure: fifty correct points filed under a string no lookup matches, because
+    // `measurementSpecs` is found by exact code and the order's style is ST-2815.
+    expect(styleCodeFrom('ST-2815 · NK-90455 · Rev 2')).toBe('ST-2815')
+    expect(styleCodeFrom('ST-2815 | NK-90455')).toBe('ST-2815')
+    expect(styleCodeFrom('ST-2815, NK-90455, Rev 2')).toBe('ST-2815')
+    expect(styleCodeFrom('ST-2815 — Rev 3')).toBe('ST-2815')
+  })
+
+  it('strips a revision written without a separator', () => {
+    expect(styleCodeFrom('ST-2815 Rev 2')).toBe('ST-2815')
+    expect(styleCodeFrom('ST-2815 rev.4')).toBe('ST-2815')
+  })
+
+  it('leaves a code that is already a code exactly alone', () => {
+    expect(styleCodeFrom('ST-2815')).toBe('ST-2815')
+    expect(styleCodeFrom('  ST-2815  ')).toBe('ST-2815')
+  })
+
+  it('does not cut on a plain space', () => {
+    // "ST 2815" is a style code some factories really use. Splitting there would trade one
+    // filing error for another, and this one would be silent in the other direction.
+    expect(styleCodeFrom('ST 2815')).toBe('ST 2815')
+    expect(styleCodeFrom('POLO SHIRT 2244')).toBe('POLO SHIRT 2244')
   })
 })

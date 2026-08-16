@@ -68,7 +68,20 @@ const chartDecimal = (max = 12) =>
   }, decimal(max))
 
 export const measurementSpecPayload = z.object({
-  styleCode: z.string().min(1),
+  /*
+   * Described, because this schema IS the instruction: it becomes the JSON Schema the
+   * extract model is handed, and an undescribed field gets whatever the line says. A chart
+   * heads itself `ST-2815 · NK-90455 · Rev 2`, and the model filed all three as the code —
+   * which put fifty correct points under a string no lookup will ever match.
+   */
+  styleCode: z
+    .string()
+    .min(1)
+    .describe(
+      'The factory\'s own style code ALONE, like "ST-2815". A chart header often prints the ' +
+        'style, the buyer\'s article number and a revision on one line — take only the ' +
+        'style code, and never the buyer article or the revision.',
+    ),
   unit: z.string().min(1).max(10).default('cm'),
   points: z
     .array(
