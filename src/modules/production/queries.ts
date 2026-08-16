@@ -27,6 +27,8 @@ export interface HourCell {
   hourSlot: number
   target: number
   actual: number
+  /** Why the hour went the way it did, when somebody said — usually nothing (§9, F43). */
+  remark: string | null
 }
 
 export interface LineRow {
@@ -62,6 +64,7 @@ export async function board(
           hourSlot: hourlyOutputs.hourSlot,
           target: hourlyOutputs.target,
           actual: hourlyOutputs.actual,
+          remark: hourlyOutputs.remark,
         })
         .from(hourlyOutputs)
         .where(scoped(hourlyOutputs, ctx, eq(hourlyOutputs.producedOn, input.producedOn)))

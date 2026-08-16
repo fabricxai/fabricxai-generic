@@ -1,0 +1,1 @@
+ALTER TABLE "hourly_outputs" ADD COLUMN "remark" text;

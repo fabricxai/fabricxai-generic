@@ -1083,6 +1083,10 @@ export const UI_MESSAGES: Catalogue = {
     'ui.production.field_defects': 'Defects found',
     'ui.production.field_rework': 'Sent to rework',
     'ui.production.field_target_hour': 'Target this hour',
+    'ui.production.field_hour_remark': 'Anything to note',
+    'ui.production.field_hour_remark_placeholder': 'needle change SN-3-014',
+    'ui.production.field_hour_remark_hint':
+      'Why the hour went the way it did, if there is a reason. Leave it empty when there is not.',
     'ui.production.field_what_happened': 'What happened',
     'ui.production.field_why': 'Why',
     'ui.production.field_which_machine': 'Which machine',
@@ -2416,6 +2420,10 @@ export const UI_MESSAGES: Catalogue = {
     'ui.production.field_defects': 'কত ত্রুটি পাওয়া গেছে',
     'ui.production.field_rework': 'রিওয়ার্কে পাঠানো হয়েছে',
     'ui.production.field_target_hour': 'এই ঘণ্টার টার্গেট',
+    'ui.production.field_hour_remark': 'কিছু বলার আছে',
+    'ui.production.field_hour_remark_placeholder': 'নিডল পরিবর্তন SN-3-014',
+    'ui.production.field_hour_remark_hint':
+      'ঘণ্টাটা এমন হলো কেন, কারণ থাকলে লিখুন। না থাকলে খালি রাখুন।',
     'ui.production.field_what_happened': 'কী হয়েছিল',
     'ui.production.field_why': 'কারণ',
     'ui.production.field_which_machine': 'কোন মেশিন',

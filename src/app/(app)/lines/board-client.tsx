@@ -137,6 +137,13 @@ export function LineBoard({
                         <button
                           key={h}
                           onClick={() => setEntry({ line: row, hour: h })}
+                          // The dot is decorative; the reason belongs in the button's name,
+                          // or a screen-reader user has no way to know an hour was explained.
+                          aria-label={
+                            cell
+                              ? `${row.code} ${h}:00 — ${cell.actual} of ${cell.target}${cell.remark ? `. ${cell.remark}` : ''}`
+                              : `${row.code} ${h}:00 — not counted`
+                          }
                           style={{
                             minHeight: 48,
                             borderRadius: 'var(--fx-radius-sm)',
@@ -173,6 +180,23 @@ export function LineBoard({
                               >
                                 /{cell.target}
                               </span>
+                              {/*
+                                * An hour with something said about it is marked, so a
+                                * supervisor can see there is a reason to open rather than
+                                * tapping twelve cells to find out. The remark itself is in
+                                * the box — a cell is 48px and a sentence does not fit.
+                                */}
+                              {cell.remark ? (
+                                <span
+                                  aria-hidden
+                                  style={{
+                                    width: 4,
+                                    height: 4,
+                                    borderRadius: '50%',
+                                    background: 'var(--fx-text-tertiary)',
+                                  }}
+                                />
+                              ) : null}
                             </>
                           ) : (
                             /* Empty, not zero: nobody has said what happened
@@ -240,7 +264,7 @@ export function LineBoard({
         producedOn={producedOn}
         plannedTarget={entry ? (plannedTargetByLine[entry.line.lineId] ?? null) : null}
         onClose={() => setEntry(null)}
-        onSave={async (target, actual) => {
+        onSave={async (target, actual, remark) => {
           if (!entry) return
           await capture({
             moduleId: 'production',
@@ -253,6 +277,9 @@ export function LineBoard({
                   hourSlot: entry.hour,
                   target: Number(target),
                   actual: Number(actual),
+                  // Always sent from this box, empty string included: it is the one that
+                  // asks, so silence here is a deliberate clear rather than no opinion.
+                  remark,
                 },
               ],
             },
@@ -276,7 +303,7 @@ function HourEntry({
   /** The day plan's target for this line, when one exists — the box opens holding it. */
   plannedTarget: number | null
   onClose: () => void
-  onSave: (target: string, actual: string) => Promise<void>
+  onSave: (target: string, actual: string, remark: string) => Promise<void>
 }) {
   const t = useT()
   const existing = entry?.line.hours.find((c) => c.hourSlot === entry.hour)
@@ -286,6 +313,12 @@ function HourEntry({
     existing ? String(existing.target) : plannedTarget !== null ? String(plannedTarget) : '',
   )
   const [actual, setActual] = useState(existing ? String(existing.actual) : '')
+  /*
+   * Why the hour went the way it did. Opens holding what is already on the row — the sheet
+   * reading puts one here, and this is where it is read and corrected. Emptying the box
+   * clears it, which is the one write that says so deliberately (§9, F43).
+   */
+  const [remark, setRemark] = useState(existing?.remark ?? '')
   const [busy, setBusy] = useState(false)
 
   if (!entry) return null
@@ -310,7 +343,7 @@ function HourEntry({
             onClick={async () => {
               setBusy(true)
               try {
-                await onSave(target.trim(), actual.trim())
+                await onSave(target.trim(), actual.trim(), remark.trim())
               } finally {
                 setBusy(false)
               }
@@ -336,6 +369,29 @@ function HourEntry({
           onChange={setActual}
           unit={t('ui.production.unit_pcs')}
         />
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <span style={{ font: "500 13px/1.3 var(--fx-font-sans)" }}>
+            {t('ui.production.field_hour_remark')}
+          </span>
+          <input
+            value={remark}
+            onChange={(e) => setRemark(e.target.value)}
+            maxLength={200}
+            placeholder={t('ui.production.field_hour_remark_placeholder')}
+            style={{
+              minHeight: 'var(--fx-tap-min)',
+              padding: '10px 12px',
+              border: '1px solid var(--fx-border-default)',
+              borderRadius: 'var(--fx-radius-md)',
+              background: 'var(--fx-bg-surface)',
+              color: 'var(--fx-text-primary)',
+              font: "400 14px/1.4 var(--fx-font-sans)",
+            }}
+          />
+          <span style={{ font: "400 12px/1.5 var(--fx-font-sans)", color: 'var(--fx-text-tertiary)' }}>
+            {t('ui.production.field_hour_remark_hint')}
+          </span>
+        </label>
         <span style={{ font: "400 13px/1.5 var(--fx-font-sans)", color: 'var(--fx-text-tertiary)' }}>
           {t('ui.production.saved_on_tablet_note')}
         </span>

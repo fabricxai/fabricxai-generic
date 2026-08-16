@@ -107,6 +107,20 @@ export const hourlyOutputs = pgTable(
     target: integer('target').notNull().default(0),
     actual: integer('actual').notNull().default(0),
 
+    /**
+     * Why the hour went the way it did — "needle change SN-3-014", "6 operators short".
+     *
+     * Every paper hourly sheet in Bangladesh has this column, and the reading has always
+     * pulled it off the photograph; it was shown to the supervisor to check and then thrown
+     * away at the save button, because there was nowhere to put it (§9, F43). An hour of 118
+     * against a target of 145 then sat there as an unexplained miss, and the one line that
+     * would have told maintenance a needle broke lived only on the paper.
+     *
+     * Nullable, and stays null for the ordinary hour: most hours have nothing to say, and a
+     * column of empty strings is worse than a column of blanks.
+     */
+    remark: text('remark'),
+
     /** Device idempotency key, kept on the row for reconciliation against a tablet. */
     offlineKey: text('offline_key'),
     enteredBy: text('entered_by').references(() => users.id, { onDelete: 'set null' }),

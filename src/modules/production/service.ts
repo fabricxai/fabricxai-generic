@@ -207,6 +207,7 @@ export async function recordHourlyOutputsIn(
         hourSlot: entry.hourSlot,
         target: entry.target,
         actual: entry.actual,
+        remark: entry.remark ?? null,
         offlineKey: offlineKey ?? null,
         enteredBy: ctx.userId,
       })),
@@ -217,6 +218,20 @@ export async function recordHourlyOutputsIn(
         actual: sql`excluded.actual`,
         target: sql`excluded.target`,
         orderId: sql`excluded.order_id`,
+        /*
+         * A write that says nothing about the remark leaves it alone.
+         *
+         * The hourly keypad enters one number per line and has no remark field, so a plain
+         * `excluded.remark` would blank the explanation somebody typed off the sheet every
+         * time the hour was corrected — the same silent discard this column exists to end
+         * (§9, F43). Absent means no opinion; an empty string is how the box that DOES ask
+         * says "clear it".
+         */
+        remark: sql`case
+          when excluded.remark is null then ${hourlyOutputs.remark}
+          when excluded.remark = '' then null
+          else excluded.remark
+        end`,
         updatedAt: new Date(),
       },
     })

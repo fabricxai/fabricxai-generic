@@ -27,6 +27,18 @@ export const hourlyOutputEntry = z.object({
   hourSlot: z.number().int().min(0).max(23),
   target: z.number().int().min(0).default(0),
   actual: z.number().int().min(0),
+  /**
+   * Why the hour went the way it did, when there is something to say (§9, F43).
+   *
+   * Three states, because the batch upsert has to tell them apart:
+   *
+   *  - **absent** — this write has no opinion. The quick keypad across every line does not
+   *    ask for a remark, and re-entering an hour through it must not wipe the explanation
+   *    somebody typed off the sheet;
+   *  - **empty string** — clear it, said deliberately;
+   *  - **text** — set it.
+   */
+  remark: z.string().max(200).optional(),
 })
 
 /**

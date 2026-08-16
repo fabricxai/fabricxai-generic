@@ -39,6 +39,7 @@ import {
   efficiencyDaily,
   hourlyOutputs,
 } from '@/modules/production/schema'
+import { board } from '@/modules/production/queries'
 import { lines } from '@/modules/planning/schema'
 
 const client = createDirectClient()
@@ -260,6 +261,108 @@ describe('6.1 ⚡ · burst writes', () => {
     expect((await syncBatch(ctx, batch))[0]?.status).toBe('duplicate')
     expect(await countRows()).toBe(after)
     expect(after).toBe(before + 1)
+  })
+})
+
+describe('6.1 · why the hour went that way (§9, F43)', () => {
+  /*
+   * The sheet's remark reached the confirm list and died at the save button. Now it is a
+   * column — and the rule that matters is what a write with NO opinion does, because the
+   * hourly keypad enters one number per line and has no remark field at all.
+   */
+  const REMARK_DAY = '2026-06-13'
+
+  beforeAll(async () => {
+    await db.execute(sql`select app.ensure_hourly_output_partition(${REMARK_DAY}::date)`)
+  })
+
+  it('keeps what the sheet said about the hour', async () => {
+    await recordHourlyOutputs(ctx, {
+      entries: [
+        {
+          lineId,
+          producedOn: REMARK_DAY,
+          hourSlot: 8,
+          target: 145,
+          actual: 118,
+          remark: 'first hour — feeding, 6 operators short',
+        },
+        { lineId, producedOn: REMARK_DAY, hourSlot: 9, target: 145, actual: 141 },
+      ],
+    })
+
+    const cells = await db
+      .select()
+      .from(hourlyOutputs)
+      .where(
+        sql`${hourlyOutputs.lineId} = ${lineId} and ${hourlyOutputs.producedOn} = ${REMARK_DAY}`,
+      )
+
+    expect(cells.find((c) => c.hourSlot === 8)?.remark).toBe(
+      'first hour — feeding, 6 operators short',
+    )
+    // An ordinary hour has nothing to say, and says it as a blank rather than an empty string.
+    expect(cells.find((c) => c.hourSlot === 9)?.remark).toBeNull()
+  })
+
+  it('a correction that says nothing leaves the explanation alone', async () => {
+    // The hourly keypad, re-entering the same hour. This is the whole reason the upsert does
+    // not simply take `excluded.remark`: it would blank the sheet's own words on every
+    // correction, which is the discard this column exists to end.
+    await recordHourlyOutputs(ctx, {
+      entries: [{ lineId, producedOn: REMARK_DAY, hourSlot: 8, target: 145, actual: 120 }],
+    })
+
+    const [cell] = await db
+      .select()
+      .from(hourlyOutputs)
+      .where(
+        sql`${hourlyOutputs.lineId} = ${lineId} and ${hourlyOutputs.producedOn} = ${REMARK_DAY} and ${hourlyOutputs.hourSlot} = 8`,
+      )
+
+    expect(cell?.actual).toBe(120)
+    expect(cell?.remark).toBe('first hour — feeding, 6 operators short')
+  })
+
+  it('an empty remark from the box that asks is a deliberate clear', async () => {
+    await recordHourlyOutputs(ctx, {
+      entries: [
+        { lineId, producedOn: REMARK_DAY, hourSlot: 8, target: 145, actual: 120, remark: '' },
+      ],
+    })
+
+    const [cell] = await db
+      .select()
+      .from(hourlyOutputs)
+      .where(
+        sql`${hourlyOutputs.lineId} = ${lineId} and ${hourlyOutputs.producedOn} = ${REMARK_DAY} and ${hourlyOutputs.hourSlot} = 8`,
+      )
+
+    expect(cell?.remark).toBeNull()
+  })
+
+  it('reaches the board the supervisor reads', async () => {
+    await recordHourlyOutputs(ctx, {
+      entries: [
+        {
+          lineId,
+          producedOn: REMARK_DAY,
+          hourSlot: 14,
+          target: 145,
+          actual: 138,
+          remark: 'needle change SN-3-014',
+        },
+      ],
+    })
+
+    // The screen's read model, not the raw rows — the point is that it survives the trip
+    // to the board a supervisor actually looks at.
+    const rows = await board(ctx, { producedOn: REMARK_DAY, shiftHours: 10 })
+    const cell = rows
+      .find((r) => r.lineId === lineId)
+      ?.hours.find((h) => h.hourSlot === 14)
+
+    expect(cell?.remark).toBe('needle change SN-3-014')
   })
 })
 

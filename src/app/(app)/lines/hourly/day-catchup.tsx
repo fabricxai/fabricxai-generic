@@ -186,6 +186,11 @@ export function DayCatchupButton({ lines }: { lines: readonly CatchupLine[] }) {
               hourSlot: hour.hourSlot,
               target: hour.target ?? 0,
               actual: hour.actual,
+              // The one the supervisor was shown and asked to check. It used to stop here:
+              // read off the sheet, listed for confirmation, then dropped on the way to the
+              // payload, so an hour of 118 against 145 was stored as an unexplained miss and
+              // "needle change SN-3-014" lived only on the paper (§9, F43).
+              ...(hour.remark ? { remark: hour.remark } : {}),
             })),
           },
         })
