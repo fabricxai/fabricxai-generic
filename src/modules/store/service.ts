@@ -919,10 +919,11 @@ export async function returnRolls(
      * first would correct a customs ledger by coincidence.
      */
     const { udConsumptions } = await import('../commercial/schema')
-    const lines = await tx
-      .select({ id: issueLines.id })
+    const lineIssues = await tx
+      .select({ id: issueLines.id, issueId: issueLines.issueId })
       .from(issueLines)
       .where(scoped(issueLines, ctx, inArray(issueLines.rollId, [...input.rollIds])))
+    const lines = lineIssues
 
     let udReversals = 0
 
@@ -946,6 +947,53 @@ export async function returnRolls(
         .returning({ id: udConsumptions.id })
 
       udReversals = reversed.length
+
+      /*
+       * Draws written before the line link existed carry no line id, so the exact match
+       * above finds nothing and the declaration would silently stay short of material that
+       * is back on the rack. Those rows are matched on what they DO carry — the same issue,
+       * the same quantity, still unreversed — one row per roll, taken one at a time.
+       *
+       * The attribution that quantity-matching would falsify does not exist on these rows:
+       * none of them names a line. The amount and the material are right, which is what the
+       * balance is made of, and the reversal reason records that it was matched this way.
+       */
+      const legacyRolls = rollRows.filter((roll) => roll.status === 'issued')
+      for (const roll of legacyRolls) {
+        if (udReversals >= rollRows.length) break
+
+        const [legacy] = await tx
+          .select({ id: udConsumptions.id })
+          .from(udConsumptions)
+          .where(
+            scoped(
+              udConsumptions,
+              ctx,
+              and(
+                inArray(
+                  udConsumptions.storeIssueId,
+                  lineIssues.map((line) => line.issueId),
+                ),
+                isNull(udConsumptions.storeIssueLineId),
+                isNull(udConsumptions.reversedAt),
+                eq(udConsumptions.qty, roll.qty),
+              ),
+            ),
+          )
+          .limit(1)
+
+        if (!legacy) continue
+
+        await tx
+          .update(udConsumptions)
+          .set({
+            reversedAt: new Date(),
+            reversedReason: `${input.reason} (draw matched by quantity — recorded before issue lines were linked)`,
+          })
+          .where(scoped(udConsumptions, ctx, eq(udConsumptions.id, legacy.id)))
+
+        udReversals += 1
+      }
     }
 
     await emit(ctx, tx, {

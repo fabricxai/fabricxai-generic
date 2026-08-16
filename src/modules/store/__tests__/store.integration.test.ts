@@ -387,6 +387,54 @@ describe('3.1 · goods out draws the UD in the same transaction', () => {
     expect(drawB!.reversedAt).toBeNull()
   })
 
+  it('gives back a draw recorded before issue lines were linked', async () => {
+    /*
+     * The rows that already existed. Draws written before `store_issue_line_id` carry no
+     * line, so an exact match finds nothing and the declaration would quietly stay short of
+     * material sitting back on the rack. They are matched on what they do carry — same
+     * issue, same quantity, still unreversed — and the reason says so.
+     */
+    await receiveGrn(ctx, {
+      challanNo: `OLD-${randomUUID().slice(0, 6)}`,
+      receivedAt: '2026-07-04',
+      bonded: true,
+      udId,
+      lines: [
+        {
+          itemId: fabricId,
+          qty: '40.00',
+          unit: 'M',
+          rolls: [{ rollNo: 'R-OLD', qty: '40.00', locationId: bondedLocationId, shadeGroup: 'A' }],
+        },
+      ],
+    })
+    const [roll] = await db.select().from(rolls).where(eq(rolls.rollNo, 'R-OLD'))
+    await issueStock(ctx, {
+      orderId,
+      lines: [{ itemId: fabricId, rollId: roll!.id, qty: '40.00', unit: 'M' }],
+    })
+
+    // Age the draw: strip the link, exactly as every row written before the column had it.
+    const [line] = await db.select().from(issueLines).where(eq(issueLines.rollId, roll!.id))
+    await db
+      .update(udConsumptions)
+      .set({ storeIssueLineId: null })
+      .where(eq(udConsumptions.storeIssueLineId, line!.id))
+
+    const before = await getUdBalance(ctx, udId)
+    const result = await returnRolls(ctx, { rollIds: [roll!.id], reason: 'issued in error' })
+    expect(result.udReversals).toBe(1)
+
+    const after = await getUdBalance(ctx, udId)
+    expect(Number(after.items[0]!.free)).toBeGreaterThan(Number(before.items[0]!.free))
+
+    const [draw] = await db
+      .select()
+      .from(udConsumptions)
+      .where(and(eq(udConsumptions.qty, '40.00'), eq(udConsumptions.udId, udId)))
+    expect(draw!.reversedReason).toContain('matched by quantity')
+  })
+
   it('refuses a return with no reason, and one for a roll still in stock', async () => {
     const [roll] = await db.select().from(rolls).where(eq(rolls.rollNo, 'R-RET'))
 
