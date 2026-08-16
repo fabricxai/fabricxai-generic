@@ -16,7 +16,6 @@ import { requestLocale } from '@/lib/ui-locale'
 import { getCtx } from '@/modules/core/session'
 import { cuttableOrders, recentLays } from '@/modules/cutting/queries'
 
-import { PendingReadings } from '@/components/shell/pending-readings'
 import { RaisedDrafts } from '@/components/shell/raised-drafts'
 
 /**
@@ -62,8 +61,6 @@ export default async function CuttingPage() {
         ownsAmber
       />
 
-      {/* Their corrections and overrides route to an inbox they cannot see (2.1). */}
-      <PendingReadings />
       <RaisedDrafts />
 
       <nav style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>

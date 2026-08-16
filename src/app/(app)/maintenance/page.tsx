@@ -17,7 +17,6 @@ import {
   ticketBoard,
   unassigned,
 } from '@/modules/maintenance/queries'
-import { PendingReadings } from '@/components/shell/pending-readings'
 import { RaisedDrafts } from '@/components/shell/raised-drafts'
 
 /**
@@ -56,8 +55,6 @@ export default async function MaintenancePage() {
         ownsAmber
       />
 
-      {/* Their corrections and overrides route to an inbox they cannot see (2.1). */}
-      <PendingReadings />
       <RaisedDrafts />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>

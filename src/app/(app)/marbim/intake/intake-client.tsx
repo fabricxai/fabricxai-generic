@@ -194,9 +194,11 @@ export function IntakeClient({ kinds }: { kinds: readonly Kind[] }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
       {queued ? (
         <InlineAlert tone="success">
-          {queued} queued. MARBIM starts reading it now and files a draft — it will appear in
-          the approve inbox, not in the module, until somebody signs it. You will be told when
-          it is ready.
+          {queued} queued. MARBIM starts reading it now and files a draft — it comes back to
+          YOU first, on Your work, so you can check it against the paper you are holding. An
+          approver who does not have that paper cannot check it for you. It reaches the
+          approve inbox when you send it on, and nothing reaches the module until it is
+          signed. You will be told when it is ready.
         </InlineAlert>
       ) : null}
 
@@ -437,10 +439,10 @@ export function IntakeClient({ kinds }: { kinds: readonly Kind[] }) {
               color: 'var(--fx-text-tertiary)',
             }}
           >
-            Whatever it reads becomes a draft with a confidence on every field, waiting in the
-            approve inbox. Nothing reaches {kind.targetTable} until a person signs it — that is
-            what makes reading a document with a model safe, and it does not depend on the
-            model being right.
+            Whatever it reads becomes a draft with a confidence on every field. It waits on
+            Your work for you to check first, then in the approve inbox to be signed. Nothing
+            reaches {kind.targetTable} until both have happened — that is what makes reading a
+            document with a model safe, and it does not depend on the model being right.
           </p>
         </section>
       ) : null}

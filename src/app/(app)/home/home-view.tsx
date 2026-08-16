@@ -1,7 +1,6 @@
 import Link from 'next/link'
 
 import { ExceptionRow } from '@/components/fx/figures'
-import { PendingReadings } from '@/components/shell/pending-readings'
 import { EmptyState } from '@/components/fx/feedback'
 import { SectionHeading } from '@/components/fx/signature'
 import { PageHeader } from '@/components/shell/page-shell'
@@ -50,12 +49,6 @@ export function HomeView({
         ownsAmber={!calm}
       />
 
-      {/*
-        Above everything, calm or not: a reading nobody has checked is the one item on this
-        screen that is blocking itself. It renders nothing when there are none, so a person
-        who never uploads a document never sees it.
-      */}
-      <PendingReadings />
 
       {calm ? (
         <EmptyState

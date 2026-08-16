@@ -6,6 +6,7 @@ import { MarbimButton } from '@/components/shell/marbim-button'
 import { marbimEntryFor } from '@/components/shell/marbim-context'
 import { MarbimPanel } from '@/components/shell/marbim-panel'
 import { OutcomeToasts } from '@/components/shell/outcome-toasts'
+import { PendingReadings } from '@/components/shell/pending-readings'
 import { PageBody, TopBar } from '@/components/shell/page-shell'
 import { Sidebar } from '@/components/shell/sidebar'
 import { AccountMenu } from '@/components/shell/account-menu'
@@ -137,6 +138,19 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                 {/* Said before anything is typed, not after a button is pressed. The write
                     itself is still refused by the action — this is the label, not the lock. */}
                 {readOnly && item ? <ReadOnlyNote what={tui(locale, navLabelKey(item.id))} /> : null}
+                {/*
+                  A reading nobody has checked follows the PERSON, not the screen.
+                  
+                  It used to be mounted on four pages — home, store, cutting, maintenance —
+                  and a quality inspector signing in lands on `/quality/inline`, so the one
+                  item the product itself calls "blocking itself" was not on the screen they
+                  arrived at. A merchandiser's measurement chart sat unconfirmed for three
+                  days that way (Nordkap §7, F34). Mounted once here, it is wherever they are.
+                  
+                  It renders nothing when there are none, so somebody who never files a
+                  document never sees it.
+                */}
+                <PendingReadings />
                 {children}
               </>
             ) : (

@@ -236,8 +236,8 @@ export const ReadDocumentFlow = forwardRef<
           ))}
         </div>
         <span style={MONO}>
-          Pick the type, then press Send — nothing is queued until you do. The draft waits in
-          the approve inbox; nothing is written until a person signs it.
+          Pick the type, then press Send — nothing is queued until you do. The draft comes
+          back to you first, on Your work; nothing is written until it is signed after that.
         </span>
       </div>
     )
@@ -345,7 +345,7 @@ export const ReadDocumentFlow = forwardRef<
         <span style={MONO} aria-live="polite">
           {phase.step === 'queueing'
             ? `Queueing ${attachment.filename}…`
-            : `MARBIM is reading ${attachment.filename} — a draft appears in the approve inbox when it is done.`}
+            : `MARBIM is reading ${attachment.filename} — the draft comes back to you on Your work when it is done.`}
         </span>
       </div>
     )
@@ -356,10 +356,11 @@ export const ReadDocumentFlow = forwardRef<
       <div style={BOX}>
         <span style={{ font: '500 12.5px/1.4 var(--fx-font-sans)' }} aria-live="polite">
           Read. The draft ({phase.targetTable}) is{' '}
-          <a href="/approve" style={{ textDecoration: 'underline', textUnderlineOffset: 3 }}>
-            waiting in the approve inbox
+          <a href="/home" style={{ textDecoration: 'underline', textUnderlineOffset: 3 }}>
+            waiting for you on Your work
           </a>{' '}
-          with a confidence on every field — owner or admin signs it in.
+          with a confidence on every field. Check it against the paper, then it goes to the
+          approve inbox to be signed.
         </span>
       </div>
     )

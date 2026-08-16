@@ -91,7 +91,7 @@ disabled until one is chosen. The rejection is recorded with the reviewer, the t
 code and the note, and the screen says where it goes: *"goes back to whoever drafted it, with
 your reason attached. No row is written."*
 
-## F34 · MEDIUM — the reading waiting for you is not on the screen you land on
+## F34 · MEDIUM — the reading waiting for you is not on the screen you land on · FIXED
 
 An extraction raised on somebody's behalf lands in `drafted` and belongs to the raiser until
 they confirm it — sound, and the copy explains it well. But the confirm box is mounted on
@@ -103,12 +103,25 @@ which is how I found it — but only if you know to look.
 A merchandiser's chart from 2026-08-13 has been sitting in `drafted` ever since, which is what
 that gap looks like after three days.
 
-## F35 · LOW — the intake promises the approve inbox, and sends it somewhere else
+**Fixed.** Mounted once in the app shell, above every screen's content, so it follows the
+person instead of the screen; the four per-page mounts are gone. It still renders nothing
+when there are none, so somebody who never files a document never sees it. A source scan
+holds it there — the shell must mount it and nothing else may, because a second mount both
+double-renders and keeps the per-page habit alive for whoever adds the next screen.
+
+## F35 · LOW — the intake promises the approve inbox, and sends it somewhere else · FIXED
 
 `/marbim/intake` confirms with *"it will appear in the approve inbox, not in the module, until
 somebody signs it."* For an extraction raised on your behalf that is not what happens: it goes
 to **your own** queue first, and only reaches the approve inbox after you confirm it. The
 copy predates the raiser-check step and now describes the wrong pipeline.
+
+**Fixed**, in both doors and all four places — the intake screen's queued confirmation and
+its explainer, and the composer's three. They now say what actually happens: the draft comes
+back to you first, on Your work, so you can check it against the paper you are holding; an
+approver who does not have that paper cannot check it for you; it reaches the approve inbox
+when you send it on. The composer's "done" link pointed at `/approve`, where the draft was
+not; it points at Your work, where it is.
 
 ## 7e — the AQL plan · correct, but the screen cannot be reached
 

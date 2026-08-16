@@ -13,7 +13,6 @@ import { requestLocale } from '@/lib/ui-locale'
 import { getCtx } from '@/modules/core/session'
 import { recentGrns, stockOnHand } from '@/modules/store/queries'
 
-import { PendingReadings } from '@/components/shell/pending-readings'
 import { RaisedDrafts } from '@/components/shell/raised-drafts'
 
 /**
@@ -63,8 +62,6 @@ export default async function StorePage() {
         ownsAmber
       />
 
-      {/* Their corrections and overrides route to an inbox they cannot see (2.1). */}
-      <PendingReadings />
       <RaisedDrafts />
 
       {/* The store is four screens, not one: the count, the rolls behind it, what the
