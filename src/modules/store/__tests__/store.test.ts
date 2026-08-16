@@ -8,6 +8,7 @@
  */
 import { describe, expect, it } from 'vitest'
 
+import { challanMaterials } from '../stock'
 import { grnFromChallanDraft } from '../zod'
 
 describe('grnFromChallanDraft · a challan book is not a clean table', () => {
@@ -26,10 +27,17 @@ describe('grnFromChallanDraft · a challan book is not a clean table', () => {
       { itemName: '', qty: '60', unit: 'rolls' },
     ])
 
+    // The schema accepts the paper as read — including the junk row, because a read schema
+    // is handed to the model as JSON Schema and cannot filter (a `.transform()` here cost a
+    // second live failure: "Transforms cannot be represented in JSON Schema").
     expect(result.success).toBe(true)
-    expect(result.data?.lines).toHaveLength(1)
-    expect(result.data?.lines[0]?.itemCode).toBe('FAB-FLC-280')
-    expect(result.data?.lines[0]?.qty).toBe('1567.0')
+    expect(result.data?.lines).toHaveLength(2)
+
+    // Judging the rows is the next layer's job, and it keeps the material.
+    const kept = challanMaterials(result.data!.lines)
+    expect(kept).toHaveLength(1)
+    expect(kept[0]?.itemCode).toBe('FAB-FLC-280')
+    expect(kept[0]?.qty).toBe('1567.0')
   })
 
   it('keeps a genuine second material', () => {
@@ -40,11 +48,13 @@ describe('grnFromChallanDraft · a challan book is not a clean table', () => {
     ])
 
     expect(result.success).toBe(true)
-    expect(result.data?.lines).toHaveLength(2)
+    expect(challanMaterials(result.data!.lines)).toHaveLength(2)
   })
 
-  it('refuses only when nothing on the paper names a material', () => {
+  it('leaves nothing behind when no row names a material', () => {
+    // The screen's own guard: no material, no pre-fill — the form stays for typing.
     const result = read([{ itemName: '', qty: '60', unit: 'rolls' }])
-    expect(result.success).toBe(false)
+    expect(result.success).toBe(true)
+    expect(challanMaterials(result.data!.lines)).toHaveLength(0)
   })
 })

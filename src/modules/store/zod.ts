@@ -212,10 +212,11 @@ export const grnFromChallanDraft = z.object({
    * perfectly good first line — the storekeeper, standing next to a truck, got "that
    * document could not be read" and a blank form.
    *
-   * So a row is parsed loosely, rows with no material identity are dropped as the
-   * restatements they are, and the reading is refused only if NOTHING readable survives.
-   * The screen already treats a row that names a different material as a separate line, so
-   * a real second material still arrives as one.
+   * So a row is parsed loosely and the junk is dropped one layer up, by `challanMaterials`
+   * — NOT here by a `.transform()`, which was the first attempt and cost a second live
+   * failure: this schema is handed to the extract model as JSON Schema, and a transform
+   * cannot be represented in one ("openai: Transforms cannot be represented in JSON
+   * Schema"). A read schema has to stay a description of the shape, not a pipeline.
    */
   lines: z
     .array(
@@ -239,12 +240,7 @@ export const grnFromChallanDraft = z.object({
           .default([]),
       }),
     )
-    .transform((rows) =>
-      rows.filter((row) => (row.itemCode ?? '').trim() !== '' || (row.itemName ?? '').trim() !== ''),
-    )
-    .refine((rows) => rows.length > 0, {
-      message: 'no line on this challan names a material',
-    }),
+    .min(1),
 })
 
 export const STORE_ZOD_MAP = {

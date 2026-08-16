@@ -21,6 +21,7 @@ import {
   type DocumentLimits,
   type UploadedDocument,
 } from '@/lib/upload-document'
+import { challanMaterials } from '@/modules/store/stock'
 
 interface ItemOption {
   id: string
@@ -262,7 +263,18 @@ export function ReceiveClient({
     if (v.challanNo !== undefined) setChallanNo(str(v.challanNo))
     if (v.receivedAt !== undefined) setReceivedAt(str(v.receivedAt))
 
-    const lines = Array.isArray(v.lines) ? (v.lines as Record<string, unknown>[]) : []
+    /*
+     * Rows that name nothing are the challan book restating itself — row 2 of ZJH-DC-8842
+     * is row 1 again as a roll count. Dropped before anything is chosen, or the phantom
+     * becomes the material and the fabric never arrives.
+     */
+    const lines = challanMaterials<Record<string, unknown> & { itemCode: string; itemName: string }>(
+      (Array.isArray(v.lines) ? (v.lines as Record<string, unknown>[]) : []).map((line) => ({
+        ...line,
+        itemCode: str(line.itemCode),
+        itemName: str(line.itemName),
+      })),
+    )
     const first = lines[0]
     if (!first) return
 

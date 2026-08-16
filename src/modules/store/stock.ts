@@ -251,3 +251,21 @@ export function hasFreeStock(stock: ItemStock | undefined, needed: Quantity): bo
   if (!stock) return false
   return compareQty(quantity(stock.free, stock.unit), needed) >= 0
 }
+
+/**
+ * The rows on a read challan that actually name a material.
+ *
+ * A challan book restates: `ZJH-DC-8842` writes its one fabric on row 1 and the same
+ * delivery again on row 2 as a roll count, which is how the paper is kept. A row carrying
+ * neither a code nor a name is that restatement, not a second material, and receiving it as
+ * one puts a phantom item in the store.
+ *
+ * It lives here rather than in the zod because that schema is handed to the extract model as
+ * JSON Schema, and neither a transform nor a refinement can be expressed in one — the read
+ * schema describes the shape of the paper, and judging the rows is a separate job.
+ */
+export function challanMaterials<T extends { itemCode?: string | undefined; itemName?: string | undefined }>(
+  rows: readonly T[],
+): T[] {
+  return rows.filter((row) => (row.itemCode ?? '').trim() !== '' || (row.itemName ?? '').trim() !== '')
+}
