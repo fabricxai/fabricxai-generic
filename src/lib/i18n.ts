@@ -583,6 +583,8 @@ export const MESSAGES: Catalogue = {
       'This line already has an open stoppage. Close it before opening another.',
     'production.errors.downtime_ends_before_start': 'A stoppage cannot end before it began.',
     'production.errors.downtime_not_found': 'That stoppage no longer exists.',
+    'production.errors.line_out_of_scope':
+      'That line is not one of yours. You can enter only the lines you supervise — ask the office to widen them.',
     'quality.errors.final_inspection_not_found': 'That final inspection no longer exists.',
     'quality.errors.line_not_found': 'That line no longer exists.',
     'quality.errors.no_aql_rows':
@@ -630,6 +632,8 @@ export const MESSAGES: Catalogue = {
     'settings.errors.invalid_policy': 'That policy value is not one this setting accepts.',
     'settings.errors.last_owner': 'A company must keep at least one owner.',
     'settings.errors.not_a_member': 'That person is not a member of this company.',
+    'settings.errors.no_such_line':
+      'This factory has no line with that code. Check it against the line board.',
     'settings.errors.policy_is_admin_only': 'Only an admin or owner changes that policy.',
     'settings.errors.role_not_held': 'They do not hold that role.',
     'shipment.errors.carton_already_loaded': 'That carton is already loaded on a shipment.',
@@ -1047,6 +1051,10 @@ export const MESSAGES: Catalogue = {
       'এই লাইনে একটি ডাউনটাইম এখনও খোলা আছে। নতুন একটি শুরু করার আগে সেটি বন্ধ করুন।',
     'production.errors.downtime_ends_before_start': 'ডাউনটাইম শুরুর আগে শেষ হতে পারে না।',
     'production.errors.downtime_not_found': 'এই ডাউনটাইম এন্ট্রিটি আর নেই।',
+    'production.errors.line_out_of_scope':
+      'এই লাইনটি আপনার নয়। আপনি যে লাইনগুলো দেখেন শুধু সেগুলোতেই এন্ট্রি দিতে পারবেন — লাইন বাড়াতে অফিসে বলুন।',
+    'settings.errors.no_such_line':
+      'এই ফ্যাক্টরিতে এই কোডের কোনো লাইন নেই। লাইন বোর্ডের সাথে কোডটি মিলিয়ে দেখুন।',
     'quality.errors.final_inspection_not_found': 'এই ফাইনাল ইন্সপেকশনটি আর নেই।',
     'quality.errors.line_not_found': 'এই লাইনটি আর নেই।',
     'quality.errors.no_aql_rows':

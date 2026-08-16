@@ -264,6 +264,107 @@ describe('6.1 ⚡ · burst writes', () => {
   })
 })
 
+describe('6.1 · a supervisor writes only to their own lines (§9, F45)', () => {
+  /*
+   * The scope was a UI-only wall: four `.filter()` calls in page components and nothing on
+   * the server. Posting another line's uuid through the queue endpoint came back `applied`.
+   *
+   * Not a tenancy test — `scoped()` covers that and is the wall that matters. This is the
+   * narrower promise the product makes to a factory that splits its floor between chiefs.
+   */
+  const SCOPE_DAY = '2026-06-10'
+  let otherLineId: string
+  /** A chief who supervises L-07 (the fixture line) and nothing else. */
+  let chief: RequestCtx
+
+  beforeAll(async () => {
+    await db.execute(sql`select app.ensure_hourly_output_partition(${SCOPE_DAY}::date)`)
+
+    const [other] = await db
+      .insert(lines)
+      .values({ companyId: COMPANY, code: 'L-08', name: 'Line 8', capacityManpower: 40 })
+      .returning({ id: lines.id })
+    otherLineId = other!.id
+
+    chief = { companyId: COMPANY, userId: USER, roles: ['production'], lineScope: ['L-07'] }
+  })
+
+  it('takes the hour on a line they supervise', async () => {
+    const result = await recordHourlyOutputs(chief, {
+      entries: [{ lineId, producedOn: SCOPE_DAY, hourSlot: 8, target: 120, actual: 111 }],
+    })
+    expect(result.written).toBe(1)
+  })
+
+  it('refuses the hour on a line they do not, naming it by code', async () => {
+    await expect(
+      recordHourlyOutputs(chief, {
+        entries: [{ lineId: otherLineId, producedOn: SCOPE_DAY, hourSlot: 8, target: 120, actual: 999 }],
+      }),
+    ).rejects.toMatchObject({ messageKey: 'production.errors.line_out_of_scope' })
+
+    const rows = await db
+      .select()
+      .from(hourlyOutputs)
+      .where(
+        sql`${hourlyOutputs.lineId} = ${otherLineId} and ${hourlyOutputs.producedOn} = ${SCOPE_DAY}`,
+      )
+    expect(rows).toHaveLength(0)
+  })
+
+  it('refuses a batch that smuggles one line in among allowed ones', async () => {
+    // The whole batch fails. A partial write would leave the supervisor believing every row
+    // landed, which is worse than a refusal.
+    await expect(
+      recordHourlyOutputs(chief, {
+        entries: [
+          { lineId, producedOn: SCOPE_DAY, hourSlot: 9, target: 120, actual: 118 },
+          { lineId: otherLineId, producedOn: SCOPE_DAY, hourSlot: 9, target: 120, actual: 999 },
+        ],
+      }),
+    ).rejects.toMatchObject({ messageKey: 'production.errors.line_out_of_scope' })
+
+    const rows = await db
+      .select()
+      .from(hourlyOutputs)
+      .where(
+        sql`${hourlyOutputs.producedOn} = ${SCOPE_DAY} and ${hourlyOutputs.hourSlot} = 9`,
+      )
+    expect(rows).toHaveLength(0)
+  })
+
+  it('refuses a stoppage and an endline count outside the scope too', async () => {
+    // The same handlers the finding named — they share the gate, so they share the test.
+    await expect(
+      openLineDowntime(chief, {
+        lineId: otherLineId,
+        startedAt: new Date('2026-06-10T04:00:00Z').toISOString(),
+        reason: 'machine',
+      }),
+    ).rejects.toMatchObject({ messageKey: 'production.errors.line_out_of_scope' })
+
+    await expect(
+      recordEndlineCount(chief, {
+        lineId: otherLineId,
+        countedOn: SCOPE_DAY,
+        checked: 100,
+        passed: 98,
+        defective: 2,
+        defects: 2,
+        rework: 0,
+      }),
+    ).rejects.toMatchObject({ messageKey: 'production.errors.line_out_of_scope' })
+  })
+
+  it('narrows nobody who is not scoped, and no job', async () => {
+    // The common case, and the one that must cost nothing: ctx with no lineScope at all.
+    const result = await recordHourlyOutputs(ctx, {
+      entries: [{ lineId: otherLineId, producedOn: SCOPE_DAY, hourSlot: 10, target: 120, actual: 105 }],
+    })
+    expect(result.written).toBe(1)
+  })
+})
+
 describe('6.1 · why the hour went that way (§9, F43)', () => {
   /*
    * The sheet's remark reached the confirm list and died at the save button. Now it is a

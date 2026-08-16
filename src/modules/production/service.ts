@@ -23,7 +23,7 @@ import { and, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { lines } from '@/modules/planning/schema'
 
 import type { AnyCtx, RequestCtx } from '../core/ctx'
-import { AppError, conflict, notFound } from '../core/errors'
+import { AppError, conflict, forbidden, notFound } from '../core/errors'
 import { notify } from '../core/notifications'
 import { registerSyncHandler } from '../core/offline-sync'
 import { emit } from '../core/outbox'
@@ -66,6 +66,9 @@ export async function planLineDay(
   const payload = dayPlan.parse(input)
 
   return withTenantTx(ctx, async (tx) => {
+    // A chief who supervises L1 and L2 does not plan L5's day either (§9, F45).
+    await assertLinesInScope(ctx, tx, [payload.lineId])
+
     const [row] = await tx
       .insert(dailyLinePlans)
       .values({
@@ -126,6 +129,61 @@ export interface ProductionPolicy {
    * matters is the line far enough behind that somebody has to do something.
    */
   behindTargetPct?: string
+}
+
+/**
+ * A supervisor writes to the lines they supervise, and to no others.
+ *
+ * `roles.scope.lines` has narrowed what the line screens SHOW since a line chief scoped to
+ * L1/L2 saw all eight — but it narrowed nothing else. It was read in exactly four places,
+ * every one a `.filter()` in a page component, and no service, query or handler consulted it.
+ * Posting another line's uuid through the screen's own queue endpoint came back `applied`:
+ * 999 pieces written to L3 by a supervisor who does not supervise it (§9, F45). That is the
+ * shape rule 8 exists to forbid — *"gates are server-side and structured. Never UI-only."*
+ *
+ * What this is and is not: it is not a tenancy wall. `scoped()` already refuses another
+ * company's line and that is the wall that matters. This is the narrower promise the product
+ * makes to a factory that divides its floor between chiefs — and a promise that does not hold
+ * is one the system should not make.
+ *
+ * **Costs nothing for the unscoped**, which is nearly everybody: no `lineScope` on the ctx
+ * means no query. A scoped caller pays one indexed read of a table with eight rows in it,
+ * which the burst path can afford.
+ *
+ * Scope is kept as line CODES — "L1", the thing a person says — and payloads name uuids, so
+ * the codes have to be looked up. Resolving the other way (codes to ids, once) would cache a
+ * mapping that a renamed line invalidates silently.
+ */
+async function assertLinesInScope(
+  ctx: AnyCtx,
+  tx: TenantDb,
+  lineIds: readonly string[],
+): Promise<void> {
+  const scope = 'lineScope' in ctx ? ctx.lineScope : undefined
+  // Undefined means the whole floor: either an unscoped role, or one unscoped role widening
+  // the narrower ones (session.ts). A job carries no scope at all and is not narrowed here.
+  if (!scope) return
+
+  const ids = [...new Set(lineIds)]
+  if (ids.length === 0) return
+
+  const rows = await tx
+    .select({ id: lines.id, code: lines.code })
+    .from(lines)
+    .where(scoped(lines, ctx, inArray(lines.id, ids)))
+
+  const allowed = new Set(rows.filter((row) => scope.includes(row.code)).map((row) => row.id))
+  const refused = ids.filter((id) => !allowed.has(id))
+
+  if (refused.length > 0) {
+    // Named by code, not uuid — the person reading this knows their floor by "L3", and a
+    // uuid in a refusal tells them nothing they can act on.
+    const byId = new Map(rows.map((row) => [row.id, row.code]))
+    throw forbidden('production.errors.line_out_of_scope', {
+      lines: refused.map((id) => byId.get(id) ?? id),
+      scope: [...scope],
+    })
+  }
 }
 
 /** `lineId|producedOn` — a line's day, which is the grain a plan is kept at. */
@@ -189,6 +247,8 @@ export async function recordHourlyOutputsIn(
   offlineKey?: string,
 ): Promise<RecordOutputResult> {
   const payload = hourlyOutputBatch.parse(input)
+
+  await assertLinesInScope(ctx, tx, payload.entries.map((entry) => entry.lineId))
 
   // What each line was running on the day being written — see above. One query, before the
   // insert, so the batch is still a single statement.
@@ -387,6 +447,8 @@ export async function openLineDowntimeIn(
 ): Promise<{ downtimeId: string }> {
   const payload = openDowntime.parse(input)
 
+  await assertLinesInScope(ctx, tx, [payload.lineId])
+
   {
     // One open downtime per line: two would double-count lost minutes, and the second
     // close would silently do nothing.
@@ -463,6 +525,11 @@ export async function closeLineDowntimeIn(
       .for('update')
 
     if (!row) throw notFound('production.errors.downtime_not_found', { id: payload.downtimeId })
+
+    // Resolved from the row rather than the payload — closing another chief's stoppage is
+    // the same act as opening one, and this call names only the downtime (§9, F45).
+    await assertLinesInScope(ctx, tx, [row.lineId])
+
     if (row.endedAt) {
       throw conflict('production.errors.downtime_already_closed', { id: row.id })
     }
@@ -521,6 +588,8 @@ export async function recordEndlineCountIn(
   input: unknown,
 ): Promise<{ dhu: string; passRatePct: string }> {
   const payload = endlineCount.parse(input)
+
+  await assertLinesInScope(ctx, tx, [payload.lineId])
 
   if (payload.passed + payload.defective > payload.checked) {
     throw new AppError('validation_failed', 'production.errors.count_exceeds_checked', {
