@@ -13,7 +13,7 @@ reports **73.80%** where the floor did **65.60%**.
 | Scene | Result |
 |---|---|
 | 9a · this hour, live | **Pass** — saved, counted, re-entry corrects rather than doubles |
-| 9b · the sheet | **Reading passes, saving does not** — F42, F43, F44 |
+| 9b · the sheet | **Reading passes; saving did not** — F42 and F44 fixed, F43 open |
 | 9c · offline round-trip | **Pass** — queued, synced once, no duplicate under a double tap |
 | — · line scope | **Fail** — F45 (UI-only wall), F46 (no screen sets it) |
 
@@ -160,7 +160,7 @@ supervisor has been asked to check something, and reasonably believes it was kep
 `src/modules/production/zod.ts` (`hourlyOutputEntry`) ·
 `src/modules/production/schema.ts` (`hourlyOutputs` — needs the column).
 
-## F44 — a back-dated day is booked against today's order · HIGH
+## F44 — a back-dated day is booked against today's order · HIGH · FIXED `487566e` `3b73580`
 
 The catch-up dialog exists to enter a **past** day. It takes the order to book that day
 against from `dailyLinePlans` for **today**:
@@ -190,6 +190,52 @@ day that belongs to nobody.
 
 **Where:** `src/app/(app)/lines/hourly/page.tsx:161-166` (the `DayCatchupButton` props) ·
 `src/app/(app)/lines/hourly/day-catchup.tsx` (`submit`).
+
+### Fixed — `487566e`, backfilled `3b73580`
+
+**Neither client decides this any more.** `daily_line_plans` is the record of what a line ran
+on a date, so `recordHourlyOutputsIn` resolves the order from the plan for `producedOn` — one
+query per batch, keyed on line-day, before the insert. The caller's own `orderId` survives
+only as a fallback for a day with no plan, so seeds and `/api/production/outputs` keep
+naming theirs; this narrows what is trusted rather than widening it.
+
+**The board's hour edit had the other half of the same defect** and is fixed by the same
+change: `board-client.tsx` sent no order at all, so every cell corrected through that dialog
+was orphaned. Found while fixing this, not in the walk.
+
+The dialog now says what the day attaches to, resolved for the date on the sheet — and the
+old note that *"output is booked against whatever this line is running"* is gone, because it
+described the bug:
+
+> This day goes against **NKA-PO-70318 · ST-2815** — what L3 was planned to run on 2026-12-08.
+
+Switching the picker to a line with no plan for that day says so rather than saving in
+silence, which was the second half of the complaint:
+
+> Nothing was planned for L1 on 2026-12-08, so these hours will be recorded against no order
+> — the pieces will not count towards one. Plan that day on the line board first if they
+> should.
+
+The lookup is keyed on the line-day it asked about, so an answer for L3 cannot sit on screen
+after the supervisor picks L4 — verified live by switching between them.
+
+**Migration `0090` repairs what was already written** — 2,251 pieces across three live
+line-days. Two deliberate limits, both stated in the SQL: a row whose day has no plan stays
+null (there is no evidence of what it belonged to, and the nearest day's order would be a
+guess written where a buyer's order looks at it — a blank is recoverable, a wrong attribution
+is believed), and rows already naming an order are untouched, since a wrong one is
+indistinguishable here from a deliberate one. Re-entering the day through the screen corrects
+those; `order_id` is set from `excluded` on conflict, which is what makes that work.
+
+Live after deploy — L-3's nine hours, all attributed:
+
+```
+ hours | with_order | pieces
+     9 |          9 |   1295
+```
+
+and the three line-days that genuinely have no plan (test-textile L2 14 Aug, L1/L2 16 Aug)
+correctly stayed null.
 
 ## F45 — line scope is a UI-only wall · MEDIUM
 
