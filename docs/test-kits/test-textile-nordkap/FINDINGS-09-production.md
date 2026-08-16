@@ -66,7 +66,7 @@ The reading is not the problem. What happens to it at the save button is.
 
 ---
 
-## F42 — the day-close measures every day as eight hours · HIGH
+## F42 — the day-close measures every day as eight hours · HIGH · FIXED `347bd4c`
 
 `closeDay` takes `workingMinutes` with a default of **480**, and `runDayClose` — the only
 caller — never passes anything else. The sheet's day ran **nine** hours, and the system
@@ -98,6 +98,44 @@ that wants to state it.
 **Where:** `src/modules/production/service.ts` (`closeDay`, the `workingMinutes ?? 480`
 default and the `groupBy` that discards the row count) · `src/modules/production/jobs.ts`
 (`runDayClose`).
+
+### Fixed — `347bd4c`
+
+`workedMinutes(hoursRecorded)` in `metrics.ts`, beside `computeEfficiency` so the two callers
+cannot drift into disagreeing. `closeDay` now counts the rows it was already summing
+(`count(*)` alongside `sum(actual)`) and divides by what it finds. It refuses a day with no
+hours rather than falling back to a nominal shift — that would put a 0% against a line that
+never ran.
+
+**The same bug was on the wall board, pointing the other way.** `/board` computed live floor
+efficiency against the same constant 480, and it is read *mid-shift*: at ten in the morning a
+line with two hours on the clipboard was divided by a whole shift and shown at **14.76%**
+while it was running at **59.04%**, climbing all day towards the truth and only arriving at
+knocking-off time. Fixed in the same change — `row.hours.length` is the count, and a line
+with nothing entered yet is left out of the floor figure rather than counted as a zero.
+
+Planning's working-week `shiftMinutes` is untouched: that forecasts capacity, this measures a
+day that has already happened.
+
+Deployed and every existing `efficiency_daily` row rebuilt — the table is derived and
+idempotent by design, and analytics sums earned/available *across* days, so a period spanning
+the deploy would otherwise have mixed two denominators. Live, same day, same rows:
+
+```
+       slug       | code |  for_date  | earned  | available | eff_pct | output | hours | men
+ test-textile     | L3   | 2026-12-08 | 24087.00|  36720.00 |   65.60 |   1295 |     9 |  68
+ barakah-fashions | L1   | 2026-08-09 | 14480.80|  11520.00 |  125.70 |    787 |     4 |  48
+ barakah-fashions | L2   | 2026-08-09 | 10414.40|   8280.00 |  125.78 |    566 |     3 |  46
+```
+
+L-3 is the kit's 65.60% exactly. **The barakah rows are worth reading twice**: they were
+62.85% and 63.51% against the old denominator and are over 125% against the honest one. That
+is not the fix misbehaving — those are 4- and 3-hour part-days, and 787 pieces at 18.40 SMV
+across 48 operators for four hours *is* 126% of standard. The demo seed's output was chosen
+without reference to its own manpower and SMV, and the wrong denominator was flattening the
+inconsistency into a plausible-looking number. `computeEfficiency` reports over 100 rather
+than capping it for precisely this reason — *"a line that beats its SMV is telling you the SMV
+is wrong"* — and it is now telling us about the seed. Filed against the seed, not this fix.
 
 ## F43 — the sheet's remarks are read, shown, and then dropped · MEDIUM-HIGH
 
