@@ -18,6 +18,8 @@
 import { and, asc, desc, eq, getTableColumns, gte, inArray, isNull, lte, sql } from 'drizzle-orm'
 
 import { auditLog, companies, roles, users } from '@/db/schema/core'
+// `lines` belongs to planning (rule 11) — read here only to check a scope names real lines.
+import { lines } from '@/modules/planning/schema'
 
 import { recordChange, registerAuditedTables } from '../core/audit'
 import type { AnyCtx, RequestCtx, Role } from '../core/ctx'
@@ -535,6 +537,80 @@ export async function revokeRole(
     await emit(ctx, tx, {
       eventName: SETTINGS_EVENTS.roleRevoked,
       payload: { userId: input.userId, role: input.role, revokedBy: ctx.userId },
+      aggregateTable: 'roles',
+      aggregateId: input.userId,
+    })
+  })
+}
+
+/**
+ * Which lines a person's role covers.
+ *
+ * `roles.scope.lines` has been read since the schema shipped — the line screens narrow to it,
+ * and now the production service refuses a write outside it — and it could be set by nothing
+ * but a database console. On the live tenant that left L3 to L6 belonging to no supervisor at
+ * all, including the very line the factory's own test sheet is for, and a line chief moving
+ * from one line to another needed a developer (§9, F46).
+ *
+ * **An empty list means the whole floor**, and the key is removed rather than stored empty.
+ * `session.ts` treats a role with no `lines` array as unnarrowed, so an empty array would be
+ * the difference between "everywhere" and "nowhere" resting on how one reader happens to
+ * treat `[].every(...)`. Deleting the key says it once, in the data.
+ *
+ * Codes are checked against the company's real lines. A typo'd "L9" stored quietly would
+ * narrow somebody to a line that does not exist — which reads exactly like a permissions bug
+ * and is impossible to diagnose from the screen.
+ */
+export async function setLineScope(
+  ctx: RequestCtx,
+  input: { userId: string; role: Role; lineCodes: readonly string[] },
+): Promise<void> {
+  assertPolicyAdmin(ctx)
+
+  await withTenantTx(ctx, async (tx) => {
+    const wanted = [...new Set(input.lineCodes.map((code) => code.trim()).filter(Boolean))]
+
+    if (wanted.length > 0) {
+      const known = await tx
+        .select({ code: lines.code })
+        .from(lines)
+        .where(scoped(lines, ctx, inArray(lines.code, wanted)))
+
+      const unknown = wanted.filter((code) => !known.some((row) => row.code === code))
+      if (unknown.length > 0) {
+        throw notFound('settings.errors.no_such_line', { lines: unknown })
+      }
+    }
+
+    const [row] = await tx
+      .select()
+      .from(roles)
+      .where(and(eq(roles.userId, input.userId), eq(roles.role, input.role)))
+      .for('update')
+
+    if (!row) {
+      throw notFound('settings.errors.role_not_held', { userId: input.userId, role: input.role })
+    }
+    if (row.revokedAt) {
+      throw conflict('settings.errors.role_not_held', { userId: input.userId, role: input.role })
+    }
+
+    // Everything else in the scope object is left alone — this screen owns the lines key and
+    // nothing more.
+    const scopeNow = { ...((row.scope ?? {}) as Record<string, unknown>) }
+    if (wanted.length > 0) scopeNow.lines = wanted
+    else delete scopeNow.lines
+
+    await tx.update(roles).set({ scope: scopeNow }).where(eq(roles.id, row.id))
+
+    await emit(ctx, tx, {
+      eventName: SETTINGS_EVENTS.lineScopeSet,
+      payload: {
+        userId: input.userId,
+        role: input.role,
+        lines: wanted,
+        setBy: ctx.userId,
+      },
       aggregateTable: 'roles',
       aggregateId: input.userId,
     })

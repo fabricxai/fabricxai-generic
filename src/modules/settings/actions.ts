@@ -11,6 +11,7 @@ import {
   auditedTables,
   grantRole,
   revokeRole,
+  setLineScope,
   setPolicy,
   upsertCompanyProfile,
   type AuditQuery,
@@ -80,6 +81,25 @@ export async function grantUserRole(input: {
  * March" is a question a deleted row cannot answer. The service refuses to revoke the last
  * owner — a company with no owner is a company nobody can administer.
  */
+/**
+ * Set which lines a person's role covers.
+ *
+ * Empty list means the whole floor. The service checks the codes are real lines and refuses
+ * a role the person does not hold; this is the outer door (§9, F46).
+ */
+export async function setUserLineScope(input: {
+  userId: string
+  role: Role
+  lineCodes: string[]
+}): Promise<void> {
+  const ctx = await requireRole(await headers(), 'owner', 'admin')
+  await setLineScope(ctx, input)
+
+  // Narrowing changes what that person's line screens show on their very next request,
+  // and the matrix on this screen has to redraw for whoever just changed it.
+  revalidatePath('/', 'layout')
+}
+
 export async function revokeUserRole(input: {
   userId: string
   role: Role

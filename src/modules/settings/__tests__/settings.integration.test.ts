@@ -21,6 +21,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createDirectClient, createDirectDb } from '@/db/direct'
 import { auditLog, companies, roles, users } from '@/db/schema/core'
 import { buyers } from '@/modules/buyers/schema'
+import { lines } from '@/modules/planning/schema'
 import { approveCostSheet, createCostSheet } from '@/modules/costing/service'
 import type { RequestCtx } from '@/modules/core/ctx'
 import { withTenantRead } from '@/modules/core/tenancy'
@@ -39,6 +40,7 @@ import {
   isModuleEnabled,
   listPolicies,
   revokeRole,
+  setLineScope,
   roleMatrix,
   setModuleEnabled,
   setPolicy,
@@ -53,6 +55,8 @@ const OTHER = randomUUID()
 const OWNER = `set-owner-${randomUUID().slice(0, 8)}`
 const SECOND_OWNER = `set-own2-${randomUUID().slice(0, 8)}`
 const STAFF = `set-staff-${randomUUID().slice(0, 8)}`
+/** A production chief of its own, for the line-scope block — see the note there. */
+const CHIEF = `set-chief-${randomUUID().slice(0, 8)}`
 
 const ownerCtx: RequestCtx = { companyId: COMPANY, userId: OWNER, roles: ['owner'] }
 const staffCtx: RequestCtx = { companyId: COMPANY, userId: STAFF, roles: ['merchandiser'] }
@@ -86,7 +90,7 @@ afterAll(async () => {
   await db.execute(sql`delete from audit_log where company_id in (${COMPANY}, ${OTHER})`)
   await db.delete(companies).where(eq(companies.id, COMPANY))
   await db.delete(companies).where(eq(companies.id, OTHER))
-  for (const id of [OWNER, SECOND_OWNER, STAFF]) {
+  for (const id of [OWNER, SECOND_OWNER, STAFF, CHIEF]) {
     await db.delete(users).where(eq(users.id, id))
   }
   await client.end()
@@ -293,6 +297,75 @@ describe('X.3 · company profile and toggles', () => {
 
     await setModuleEnabled(ownerCtx, { moduleId: 'maintenance', enabled: true })
     await db.delete(moduleToggles).where(eq(moduleToggles.companyId, COMPANY))
+  })
+})
+
+describe('X.3 · which lines a role covers (§9, F46)', () => {
+  /*
+   * `roles.scope.lines` was readable, honoured by the line screens, enforced by the
+   * production service — and settable by nothing but a database console, which left whole
+   * lines belonging to no supervisor and a line chief needing a developer to move.
+   */
+  let lineA: string
+  /*
+   * Its own member, deliberately. Granting `production` to the shared STAFF user changed
+   * what the role-matrix test below expects to find — describes run in file order and their
+   * beforeAll hooks run first, so a fixture reached across blocks is a test that breaks its
+   * neighbour.
+   */
+  beforeAll(async () => {
+    await db.insert(users).values({ id: CHIEF, email: `${CHIEF}@fabricxai.test`, name: 'Chief' })
+    await db.insert(roles).values({ companyId: COMPANY, userId: CHIEF, role: 'production' })
+
+    const [a] = await db
+      .insert(lines)
+      .values({ companyId: COMPANY, code: 'S-01', name: 'Line one' })
+      .returning({ id: lines.id })
+    lineA = a!.id
+    await db.insert(lines).values({ companyId: COMPANY, code: 'S-02', name: 'Line two' })
+    expect(lineA).toBeTruthy()
+  })
+
+  const scopeOf = async () => {
+    const [row] = await db
+      .select()
+      .from(roles)
+      .where(and(eq(roles.userId, CHIEF), eq(roles.role, 'production')))
+    return (row!.scope ?? {}) as { lines?: unknown }
+  }
+
+  it('narrows a role to named lines', async () => {
+    await setLineScope(ownerCtx, { userId: CHIEF, role: 'production', lineCodes: ['S-01'] })
+    expect((await scopeOf()).lines).toEqual(['S-01'])
+  })
+
+  it('an empty list means the whole floor, and REMOVES the key', async () => {
+    // Not an empty array. `session.ts` reads a role with no `lines` as unnarrowed, so storing
+    // [] would leave "everywhere" and "nowhere" resting on how one reader treats [].every().
+    await setLineScope(ownerCtx, { userId: CHIEF, role: 'production', lineCodes: [] })
+    expect('lines' in (await scopeOf())).toBe(false)
+  })
+
+  it('refuses a line this factory does not have', async () => {
+    // A typo'd code stored quietly narrows somebody to a line that does not exist, which
+    // reads exactly like a permissions bug and cannot be diagnosed from the screen.
+    await expect(
+      setLineScope(ownerCtx, { userId: CHIEF, role: 'production', lineCodes: ['S-01', 'S-99'] }),
+    ).rejects.toMatchObject({ messageKey: 'settings.errors.no_such_line' })
+
+    expect('lines' in (await scopeOf())).toBe(false)
+  })
+
+  it('refuses a role the person does not hold', async () => {
+    await expect(
+      setLineScope(ownerCtx, { userId: CHIEF, role: 'finance', lineCodes: ['S-01'] }),
+    ).rejects.toMatchObject({ messageKey: 'settings.errors.role_not_held' })
+  })
+
+  it('is an owner/admin act, not something staff do to themselves', async () => {
+    await expect(
+      setLineScope(staffCtx, { userId: CHIEF, role: 'production', lineCodes: ['S-02'] }),
+    ).rejects.toThrow()
   })
 })
 

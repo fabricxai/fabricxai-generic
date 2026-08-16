@@ -8,6 +8,7 @@ export const SETTINGS_EVENTS = {
   policyChanged: 'settings.policy.changed',
   roleGranted: 'settings.role.granted',
   roleRevoked: 'settings.role.revoked',
+  lineScopeSet: 'settings.role.line_scope_set',
   moduleToggled: 'settings.module.toggled',
 } as const
 

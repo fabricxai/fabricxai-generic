@@ -6,11 +6,13 @@ import { SectionHeading } from '@/components/fx/signature'
 import { PageHeader } from '@/components/shell/page-shell'
 import { getCtx } from '@/modules/core/session'
 import { auditTrail, auditedTables, companyProfile, listPolicies, roleMatrix } from '@/modules/settings/service'
+import { activeLines } from '@/modules/production/queries'
 import { listApprovalRules } from '@/modules/approvals/queries'
 import { ApprovalRules } from './approval-rules'
 
 import { AuditViewer } from './audit-viewer'
 import { PolicySection } from './policy-section'
+import { LineScopeControls } from './line-scope'
 import { RoleControls } from './role-controls'
 import { FactoryTypePanel, ProfileForm } from './settings-client'
 
@@ -29,12 +31,17 @@ export default async function SettingsPage() {
 
   const canEdit = ctx.roles.includes('owner') || ctx.roles.includes('admin')
 
-  const [profile, policies, matrix, approvalRuleRows] = await Promise.all([
+  const [profile, policies, matrix, approvalRuleRows, lineRows] = await Promise.all([
     companyProfile(ctx),
     listPolicies(ctx),
     roleMatrix(ctx),
     listApprovalRules(ctx),
+    // Read unscoped on purpose: an admin narrowing somebody else has to see every line,
+    // including the ones they do not supervise themselves.
+    activeLines({ companyId: ctx.companyId, userId: ctx.userId, roles: ctx.roles }),
   ])
+
+  const lineCodes = lineRows.map((line) => line.code)
 
   // The trail names who did what, so it is owner and admin only — a screen showing
   // everybody every action turns an accountability record into a surveillance one.
@@ -211,10 +218,31 @@ export default async function SettingsPage() {
                 </span>
 
                 {canEdit ? (
-                  <RoleControls
-                    userId={row.userId}
-                    held={row.roles.filter((r) => !r.revokedAt).map((r) => r.role)}
-                  />
+                  <>
+                    <RoleControls
+                      userId={row.userId}
+                      held={row.roles.filter((r) => !r.revokedAt).map((r) => r.role)}
+                    />
+                    {/*
+                      * Which lines each role covers. Stored since the schema shipped, read by
+                      * the line screens and now enforced by the production service — and
+                      * settable by nothing but SQL until this (§9, F46).
+                      */}
+                    <LineScopeControls
+                      userId={row.userId}
+                      lines={lineCodes}
+                      held={row.roles
+                        .filter((r) => !r.revokedAt)
+                        .map((r) => ({
+                          role: r.role,
+                          lines: Array.isArray((r.scope as { lines?: unknown }).lines)
+                            ? ((r.scope as { lines: unknown[] }).lines.filter(
+                                (l): l is string => typeof l === 'string',
+                              ))
+                            : [],
+                        }))}
+                    />
+                  </>
                 ) : null}
               </div>
             ))}
