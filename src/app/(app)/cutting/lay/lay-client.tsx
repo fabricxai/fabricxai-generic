@@ -71,14 +71,27 @@ export function LayClient({
   const router = useRouter()
   const { capture, online, queued, syncing, refused, sync, clear } = useOfflineQueue()
 
-  const [markerId, setMarkerId] = useState(markers[0]?.id ?? '')
+  /*
+   * The CHOSEN marker, which is not always the selected one.
+   *
+   * This was seeded once with `markers[0]?.id`. The order picker swaps orders without
+   * remounting, so on a screen first rendered against a style with no marker the id stayed
+   * empty forever — while the `<select>` showed its first option, because a browser displays
+   * one when the bound value matches nothing. The marker looked chosen, `marker` was
+   * undefined, and "Create the lay" sat dead with nothing said (Nordkap §8, F38).
+   *
+   * Derived below with a fallback, so a value that matches no option is simply not a choice.
+   */
+  const [chosenMarkerId, setChosenMarkerId] = useState('')
   const [layNo, setLayNo] = useState('')
   const [colour, setColour] = useState('')
   const [plies, setPlies] = useState('')
   const [picked, setPicked] = useState<Set<string>>(new Set())
   const [spread, setSpread] = useState<string[]>([])
 
-  const marker = markers.find((m) => m.id === markerId)
+  const marker = markers.find((m) => m.id === chosenMarkerId) ?? markers[0]
+  // What the select must show: the marker actually in force, never a stale id.
+  const markerId = marker?.id ?? ''
   // eslint-disable-next-line fabricxai/no-float-money -- floor keypad ply count, pieces not money; NaN is rejected by the validPlies check on the next line
   const plyCount = Number.parseInt(plies, 10)
   const validPlies = Number.isInteger(plyCount) && plyCount > 0
@@ -115,6 +128,23 @@ export function LayClient({
   const complete =
     !blocked && Boolean(marker) && validPlies && layNo.trim() !== '' && colour.trim() !== '' &&
     pickedRolls.length > 0
+
+  /*
+   * What the button is waiting for, in the order a cutting master fills the form.
+   *
+   * A disabled control with no sentence is the same failure as a silent refusal: this screen
+   * sat complete-looking and dead, and the only way to find out why was to read the source.
+   * Null once nothing is missing — the gate's own message covers `blocked`.
+   */
+  const waitingFor = (() => {
+    if (blocked) return null
+    if (!marker) return t('ui.cutting.needs_marker')
+    if (layNo.trim() === '') return t('ui.cutting.needs_lay_no')
+    if (colour.trim() === '') return t('ui.cutting.needs_colour')
+    if (!validPlies) return t('ui.cutting.needs_plies')
+    if (pickedRolls.length === 0) return t('ui.cutting.needs_rolls')
+    return null
+  })()
 
   async function createLay() {
     if (!complete || !marker) return
@@ -227,7 +257,7 @@ export function LayClient({
             <span style={{ font: "500 12.5px/1.3 var(--fx-font-sans)" }}>
               {t('ui.cutting.field_marker')}
             </span>
-            <select value={markerId} onChange={(e) => setMarkerId(e.target.value)} style={field}>
+            <select value={markerId} onChange={(e) => setChosenMarkerId(e.target.value)} style={field}>
               {markers.map((m) => (
                 <option key={m.id} value={m.id}>
                   {m.code} · {Object.entries(m.sizeRatio).map(([s, n]) => `${s}:${n}`).join(' ')}
@@ -418,6 +448,7 @@ export function LayClient({
           {t.plural('ui.cutting.rolls_on_table', pickedRolls.length, { drawn: drawn.value })}
           {planned ? t('ui.cutting.lay_consumes_suffix', { planned: planned.value }) : ''}
           {blocked ? t('ui.cutting.blocked_suffix') : ''}
+          {waitingFor ? ` · ${waitingFor}` : ''}
         </span>
         <span style={{ marginLeft: 'auto' }}>
           <Button variant="primary" size="lg" disabled={!complete} onClick={() => void createLay()}>

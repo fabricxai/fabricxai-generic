@@ -993,6 +993,13 @@ export const UI_MESSAGES: Catalogue = {
     'ui.cutting.sent': 'Sent.',
     // Quality rejected the cloth. Named on the card, because the gate refuses it anyway and
     // a cutting master should not learn that from a failed submit.
+    // What a disabled "Create the lay" is waiting for. A dead button that says nothing is
+    // the same failure as a silent refusal.
+    'ui.cutting.needs_marker': 'waiting on a marker for this style — CAD releases it',
+    'ui.cutting.needs_lay_no': 'waiting on the lay number',
+    'ui.cutting.needs_colour': 'waiting on the colour',
+    'ui.cutting.needs_plies': 'waiting on how many plies',
+    'ui.cutting.needs_rolls': 'waiting on the rolls — tap the ones going on the table',
     'ui.cutting.roll_failed_badge': 'failed 4-point · {points}',
     'ui.cutting.roll_failed_title':
       'This roll failed 4-point inspection. It cannot be spread — quality can re-inspect it if the mill settles the claim.',
@@ -2313,6 +2320,11 @@ export const UI_MESSAGES: Catalogue = {
     'ui.cutting.rolls_on_table_other': '{count}টি রোল · টেবিলে {drawn} মি',
     'ui.cutting.save_report_button': 'কাট রিপোর্ট সেভ করুন',
     'ui.cutting.sent': 'পাঠানো হয়েছে।',
+    'ui.cutting.needs_marker': 'এই স্টাইলের মার্কারের অপেক্ষায় — CAD সেটি রিলিজ করে',
+    'ui.cutting.needs_lay_no': 'লে নম্বরের অপেক্ষায়',
+    'ui.cutting.needs_colour': 'কালারের অপেক্ষায়',
+    'ui.cutting.needs_plies': 'কত প্লাই, তার অপেক্ষায়',
+    'ui.cutting.needs_rolls': 'রোলের অপেক্ষায় — টেবিলে যেগুলো যাবে সেগুলো ট্যাপ করুন',
     'ui.cutting.roll_failed_badge': '৪-পয়েন্টে ফেল · {points}',
     'ui.cutting.roll_failed_title':
       'এই রোল ৪-পয়েন্ট ইন্সপেকশনে ফেল করেছে। এটি বিছানো যাবে না — মিলের ক্লেইম মিটলে কোয়ালিটি আবার ইন্সপেক্ট করতে পারে।',
