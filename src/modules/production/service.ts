@@ -40,6 +40,8 @@ import {
   type ForecastResult,
 } from './metrics'
 import { trailingOutput } from './queries'
+import { lineDayKey, orderForEntry } from './attribution'
+import { refusedLines } from './scope'
 import {
   dailyLinePlans,
   downtimes,
@@ -172,23 +174,22 @@ async function assertLinesInScope(
     .from(lines)
     .where(scoped(lines, ctx, inArray(lines.id, ids)))
 
-  const allowed = new Set(rows.filter((row) => scope.includes(row.code)).map((row) => row.id))
-  const refused = ids.filter((id) => !allowed.has(id))
+  // The decision itself is pure and lives in `scope.ts`, where it can be read and tested
+  // without a database. Refused lines are named by CODE — the person reading this knows
+  // their floor by "L3", and a uuid tells them nothing they can act on.
+  const { refused } = refusedLines({
+    lineIds: ids,
+    scope,
+    known: new Map(rows.map((row) => [row.id, row.code])),
+  })
 
   if (refused.length > 0) {
-    // Named by code, not uuid — the person reading this knows their floor by "L3", and a
-    // uuid in a refusal tells them nothing they can act on.
-    const byId = new Map(rows.map((row) => [row.id, row.code]))
     throw forbidden('production.errors.line_out_of_scope', {
-      lines: refused.map((id) => byId.get(id) ?? id),
+      lines: refused,
       scope: [...scope],
     })
   }
 }
-
-/** `lineId|producedOn` — a line's day, which is the grain a plan is kept at. */
-const lineDayKey = (e: { lineId: string; producedOn: string }): string =>
-  `${e.lineId}|${e.producedOn}`
 
 /**
  * Which order each line was running on the day being written.
@@ -262,7 +263,7 @@ export async function recordHourlyOutputsIn(
       payload.entries.map((entry) => ({
         companyId: ctx.companyId,
         lineId: entry.lineId,
-        orderId: planned.get(lineDayKey(entry)) ?? entry.orderId ?? null,
+        orderId: orderForEntry(planned, entry),
         producedOn: entry.producedOn,
         hourSlot: entry.hourSlot,
         target: entry.target,

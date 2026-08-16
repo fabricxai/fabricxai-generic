@@ -29,6 +29,7 @@ import { scoped } from '../core/scoped'
 import { withTenantRead, withTenantTx, type TenantDb } from '../core/tenancy'
 
 import { SETTINGS_EVENTS } from './events'
+import { cleanLineCodes, nextLineScope } from './line-scope'
 import {
   POLICY_MODULE_IDS,
   POLICY_REGISTRY,
@@ -568,7 +569,7 @@ export async function setLineScope(
   assertPolicyAdmin(ctx)
 
   await withTenantTx(ctx, async (tx) => {
-    const wanted = [...new Set(input.lineCodes.map((code) => code.trim()).filter(Boolean))]
+    const wanted = cleanLineCodes(input.lineCodes)
 
     if (wanted.length > 0) {
       const known = await tx
@@ -595,11 +596,9 @@ export async function setLineScope(
       throw conflict('settings.errors.role_not_held', { userId: input.userId, role: input.role })
     }
 
-    // Everything else in the scope object is left alone — this screen owns the lines key and
-    // nothing more.
-    const scopeNow = { ...((row.scope ?? {}) as Record<string, unknown>) }
-    if (wanted.length > 0) scopeNow.lines = wanted
-    else delete scopeNow.lines
+    // Empty means the whole floor and removes the key; everything else in the scope survives.
+    // Both rules live in `line-scope.ts`, where they can be read and tested on their own.
+    const scopeNow = nextLineScope(row.scope as Record<string, unknown> | null, wanted)
 
     await tx.update(roles).set({ scope: scopeNow }).where(eq(roles.id, row.id))
 

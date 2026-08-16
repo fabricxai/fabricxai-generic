@@ -20,6 +20,7 @@ import { withTenantRead } from '@/modules/core/tenancy'
 import { orderStyles, orders } from '@/modules/orders/schema'
 import { lines } from '@/modules/planning/schema'
 
+import { orderLabel } from './attribution'
 import { forecastCompletion, type ForecastResult } from './metrics'
 import { dailyLinePlans, downtimes, hourlyOutputs } from './schema'
 
@@ -275,6 +276,12 @@ export async function whatTheLineRan(
   const row = rows[0]
   if (!row) return null
 
-  const po = row.poNumbers[0] ?? row.orderId.slice(0, 8)
-  return { orderId: row.orderId, label: row.styleCode ? `${po} · ${row.styleCode}` : po }
+  return {
+    orderId: row.orderId,
+    label: orderLabel({
+      orderId: row.orderId,
+      poNumbers: row.poNumbers,
+      styleCode: row.styleCode,
+    }),
+  }
 }
