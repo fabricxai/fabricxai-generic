@@ -121,6 +121,36 @@ Against the product's own standard — no raw identifiers, no bare UUIDs — and
 job the screen exists for: a supervisor re-entering lost work needs the roll number and the
 order's PO number, both of which the system knows.
 
+## F32 · HIGH — material could not come back · FIXED
+
+`rollMachine` has allowed `issued → returned` since it was written, `returned` counts as on
+hand, and **nothing could make the move**. The third gap of this shape the walk turned up,
+after a purchase order that could not be cancelled and a status nobody could advance.
+
+Cloth comes back for ordinary reasons — a lay finished short, a shade was wrong — and for the
+one that found this: the three rolls issued before the inspection gate could see them had no
+way home.
+
+`returnRolls` moves the rolls through the machine, audits each, and **gives back the bonded
+draw that took them out**. A returned roll whose UD consumption still stands leaves the
+declaration permanently short of material sitting in the bond, and the drift surfaces at a
+customs reconciliation months later.
+
+Two details worth keeping:
+
+- **The draw is neither deleted nor negated.** A check constraint forbids a negative
+  quantity, and rightly — a ledger that can be written downwards is not a ledger. It is
+  marked reversed with its reason, and the balance stops counting it. The row still reads
+  *drawn on the 12th, returned on the 16th, because the cloth failed inspection*.
+- **Reversal matches on the issue line, not the quantity.** Two lines of one issue routinely
+  weigh the same — this factory has two fleece rolls at 25.40 kg — so a quantity match would
+  reverse whichever row came back first: a ledger right in total and wrong about which
+  material. `ud_consumptions.store_issue_line_id` is that link. Draws recorded before it
+  existed are matched by quantity as a documented fallback, and say so in their reason.
+
+Applied to the three rolls: all `returned`, three draws given back, `UD-2026-058` free
+balance 24,796.30 → 24,872.90, audited as `day0-…-store` with the reason on the row.
+
 ## F23 · HIGH — a trims delivery cannot be received at all
 
 `/store/receive` will not submit without at least one roll:
@@ -238,8 +268,10 @@ evidence.
 - GRN `ZJH-DC-8842` — bonded against `UD-2026-058`, 60 rolls, 1,567.00 kg
 - Material requisition for `NKA-PO-70318` · `FAB-FLC-280` · 25,401.60 kg
 - One issue: 21 rolls, 552.50 kg, drawn against `UD-2026-058`
-- A second issue of `R-F-44` + `R-F-58` (51.20 kg) — **this is F27's evidence**; those rolls
-  failed inspection and should not have left the store
+- `R-F-17`, `R-F-44` and `R-F-58` — issued before the gate could see them, now **returned**
+  and their bonded draws given back (F32). The declaration's free balance recovered exactly
+  76.60 kg, the three rolls' weights. Their inspections still read fail, so the gate keeps
+  them off the floor.
 - Fabric inspections: `R-F-17` fail (24), `R-F-44` fail (27), `R-F-58` fail (22) — the kit's
   three. `R-F-01`, `R-F-02`, `R-F-45`, `R-F-60` read pass (2) after a walker's mis-click was
   corrected through the Re-grade path.
