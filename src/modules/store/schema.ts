@@ -64,6 +64,21 @@ export const rollStatusEnum = pgEnum('roll_status', [
   'returned',
   'adjusted_out',
 ])
+/**
+ * Where a delivery came from, asked at the door.
+ *
+ * Not cosmetic, and not derivable. The 4-point gate exempts cloth the factory MADE — a knit
+ * house grades its own greige on the machine and no 4-point sheet exists for it — while
+ * gating anything a mill sold it, because the mill's own sheet came in the packet. That
+ * distinction used to be inferred from the absence of a purchase order link, and absence is
+ * not evidence: the receive screen never captured a PO, so every bought delivery looked like
+ * own production and the gate waved failed cloth onto the cutting table (Nordkap §6e, and
+ * before it the denim rolls R-D-19..21 in the Barakah kit).
+ *
+ * A storekeeper knows which it is without being asked twice. Now they are asked once.
+ */
+export const grnSourceEnum = pgEnum('grn_source', ['supplier', 'own_production'])
+
 export const inspectionStatusEnum = pgEnum('inspection_status', [
   'pending',
   'passed',
@@ -145,6 +160,12 @@ export const grns = pgTable(
     receivedAt: date('received_at').notNull(),
     /** No FK yet: `supplier_pos` belongs to module 3.2 — see docs/STUBS.md. */
     supplierPoId: uuid('supplier_po_id'),
+
+    /**
+     * Supplier delivery or the factory's own production. Defaults to `supplier`, which is
+     * the safe direction: an unanswered question means the cloth is gated, not exempted.
+     */
+    source: grnSourceEnum('source').notNull().default('supplier'),
 
     /**
      * Duty-free material received against a customs declaration. When true, `ud_id` is

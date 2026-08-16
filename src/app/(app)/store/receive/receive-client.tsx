@@ -79,11 +79,14 @@ export function ReceiveClient({
   items,
   locations,
   uds,
+  purchaseOrders,
 }: {
   items: readonly ItemOption[]
   locations: readonly LocationOption[]
   /** Live declarations, for a bonded receipt to name. */
   uds: readonly { id: string; number: string }[]
+  /** Open orders a delivery can be against. Empty for a factory buying nothing. */
+  purchaseOrders: readonly { id: string; poNumber: string; supplierName: string }[]
 }) {
   const t = useT()
   const { capture, online, queued, syncing, refused, sync, clear } = useOfflineQueue()
@@ -93,6 +96,20 @@ export function ReceiveClient({
   const [itemId, setItemId] = useState(items[0]?.id ?? '')
   const [locationId, setLocationId] = useState(locations[0]?.id ?? '')
   const [udId, setUdId] = useState('')
+  /*
+   * Where the goods came from, and against which order.
+   *
+   * Asked because it decides whether the 4-point gate applies (Nordkap §6e): a knit house
+   * grades its own greige on the machine, but cloth a mill sold it arrives with the mill's
+   * own sheet and must be inspected. That used to be inferred from the absence of a purchase
+   * order — and since this screen never captured one, every bought delivery looked like own
+   * production and failed cloth reached the cutting floor.
+   *
+   * Defaults to `supplier`, the safe answer: most deliveries are bought, and an unconsidered
+   * answer gates rather than exempts.
+   */
+  const [source, setSource] = useState<'supplier' | 'own_production'>('supplier')
+  const [supplierPoId, setSupplierPoId] = useState('')
   const [qty, setQty] = useState('')
   /*
    * The price on the challan line (live-test finding, Phase 8). The zod has accepted an
@@ -207,6 +224,8 @@ export function ReceiveClient({
       payload: {
         challanNo: challanNo.trim(),
         receivedAt,
+        source,
+        ...(source === 'supplier' && supplierPoId ? { supplierPoId } : {}),
         bonded,
         ...(bonded && udId ? { udId } : {}),
         ...(challanPhoto ? { documentId: challanPhoto.documentId } : {}),
@@ -233,6 +252,7 @@ export function ReceiveClient({
     setChallanNo('')
     setQty('')
     setUnitPrice('')
+    setSupplierPoId('')
     setRolls([])
     setChallanPhoto(null)
     setPhotoState('idle')
@@ -477,6 +497,50 @@ export function ReceiveClient({
             ))}
           </select>
         </label>
+
+        {/* Where from, and against what. The gate downstream reads this — see the state
+            comment above for why absence of an order was never evidence of own production. */}
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <span style={label}>{t('ui.store.source_label')}</span>
+          <select
+            value={source}
+            onChange={(e) => {
+              const next = e.target.value as 'supplier' | 'own_production'
+              setSource(next)
+              if (next === 'own_production') setSupplierPoId('')
+            }}
+            style={field}
+          >
+            <option value="supplier">{t('ui.store.source_supplier')}</option>
+            <option value="own_production">{t('ui.store.source_own')}</option>
+          </select>
+          <span style={{ font: "400 12px/1.5 var(--fx-font-sans)", color: 'var(--fx-text-tertiary)' }}>
+            {t('ui.store.source_hint')}
+          </span>
+        </label>
+
+        {source === 'supplier' ? (
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <span style={label}>{t('ui.store.po_label')}</span>
+            <select
+              value={supplierPoId}
+              onChange={(e) => setSupplierPoId(e.target.value)}
+              style={field}
+            >
+              <option value="">
+                {purchaseOrders.length === 0 ? t('ui.store.po_none') : t('ui.store.po_choose')}
+              </option>
+              {purchaseOrders.map((po) => (
+                <option key={po.id} value={po.id}>
+                  {po.poNumber} · {po.supplierName}
+                </option>
+              ))}
+            </select>
+            <span style={{ font: "400 12px/1.5 var(--fx-font-sans)", color: 'var(--fx-text-tertiary)' }}>
+              {t('ui.store.po_hint')}
+            </span>
+          </label>
+        ) : null}
 
         {bonded ? (
           <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>

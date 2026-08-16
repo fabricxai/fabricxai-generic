@@ -610,6 +610,13 @@
       "when": 1786823572911,
       "tag": "0086_premium_darkstar",
       "breakpoints": true
+    },
+    {
+      "idx": 87,
+      "version": "7",
+      "when": 1786841704727,
+      "tag": "0087_furry_bloodscream",
+      "breakpoints": true
     }
   ]
 }

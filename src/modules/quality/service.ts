@@ -1433,9 +1433,9 @@ export async function resolveFabricInspection(
       rollNo: rolls.rollNo,
       grnId: grnLines.grnId,
       kind: items.kind,
-      // Whether anybody sold this cloth to the factory. A purchase order behind the receipt
-      // means it arrived from a mill, with the mill's own inspection sheet in the packet.
-      supplierPoId: grns.supplierPoId,
+      // What the storekeeper said at the door. `own_production` is the only answer that
+      // exempts, and it has to be SAID — see below.
+      source: grns.source,
     })
     .from(rolls)
     .innerJoin(grnLines, eq(grnLines.id, rolls.grnLineId))
@@ -1467,10 +1467,19 @@ export async function resolveFabricInspection(
   // file a fictional one.
   const fabricRolls = rollRows.filter((r) => {
     if (r.kind !== 'fabric') return false
-    // Own cloth in a knit house: knitted here, graded on the machine, no 4-point sheet to
-    // wait for. Bought cloth is gated whatever the factory type, because somebody else made
-    // it and the sheet that says whether it is good came in the box with it.
-    if (knitsItsOwn && !r.supplierPoId) return false
+    /*
+     * Own cloth in a knit house: knitted here, graded on the machine, no 4-point sheet to
+     * wait for. Bought cloth is gated whatever the factory type, because somebody else made
+     * it and the sheet that says whether it is good came in the box with it.
+     *
+     * The exemption needs the receipt to SAY it is own production. It used to key on the
+     * absence of a purchase order link, and absence is not evidence — `/store/receive` never
+     * captured a PO, so every bought delivery satisfied "no PO" and was waved through. That
+     * is how rolls failing at 27 and 22 points against a 20-point limit reached the cutting
+     * floor of a knit-composite house (Nordkap §6e), and how R-D-19..21 did before them. An
+     * unanswered question now gates.
+     */
+    if (knitsItsOwn && r.source === 'own_production') return false
     return true
   })
   if (fabricRolls.length === 0) return { passed: true }

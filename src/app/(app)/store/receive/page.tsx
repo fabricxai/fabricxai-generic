@@ -7,6 +7,7 @@ import { PageHeader } from '@/components/shell/page-shell'
 import { tui } from '@/lib/i18n-ui'
 import { requestLocale } from '@/lib/ui-locale'
 import { udRegister } from '@/modules/commercial/ud-queries'
+import { purchaseOrders } from '@/modules/procurement/queries'
 import { getCtx } from '@/modules/core/session'
 import { itemList } from '@/modules/store/queries'
 import { locations } from '@/modules/store/schema'
@@ -39,7 +40,7 @@ export default async function StoreReceivePage() {
 
   const locale = await requestLocale()
 
-  const [items, locationRows, udCards] = await Promise.all([
+  const [items, locationRows, udCards, pos] = await Promise.all([
     itemList(ctx),
     withTenantRead(ctx, (tx) =>
       tx
@@ -49,11 +50,24 @@ export default async function StoreReceivePage() {
     // Read via 2.2's own queries (rule 11): a bonded receipt must name its declaration,
     // so the form needs the live ones to offer.
     udRegister(ctx, { now: new Date() }),
+    /*
+     * The orders a delivery can be against, read through 3.2's own queries (rule 11).
+     *
+     * A receipt that names its purchase order is what closes the PO line, feeds the supplier
+     * scorecard, and — the reason this was added — tells the 4-point gate that somebody sold
+     * this cloth to the factory rather than the factory knitting it.
+     */
+    purchaseOrders(ctx, { now: new Date() }),
   ])
 
   const uds = udCards
     .filter((card) => card.status === 'active')
     .map((card) => ({ id: card.id, number: card.number }))
+
+  // Still open: a closed or cancelled order is not what a truck at the gate is delivering.
+  const openPos = pos
+    .filter((po) => po.status !== 'received' && po.status !== 'cancelled')
+    .map((po) => ({ id: po.id, poNumber: po.poNumber, supplierName: po.supplierName }))
 
   return (
     <FloorScreen>
@@ -64,7 +78,7 @@ export default async function StoreReceivePage() {
         meta={tui(locale, 'ui.store.receive_meta')}
         ownsAmber
       />
-      <ReceiveClient items={items} locations={locationRows} uds={uds} />
+      <ReceiveClient items={items} locations={locationRows} uds={uds} purchaseOrders={openPos} />
       <FloorTabs
         tabs={[
           { href: '/store/receive', label: 'Receive' },

@@ -729,6 +729,18 @@ export const UI_MESSAGES: Catalogue = {
       '{code} is a bonded location. Duty-free cloth must be received against a Utilization Declaration — pick it below; raising a new one belongs to the commercial desk.',
     'ui.store.bonded_needs_ud':
       'A bonded receipt must name its Utilization Declaration — pick it above. If none is listed, commercial has to raise it first.',
+    // Asked because it decides whether the 4-point gate applies: cloth a mill sold the
+    // factory arrives with the mill's own sheet, cloth the factory knitted does not.
+    'ui.store.source_label': 'Where the goods came from',
+    'ui.store.source_supplier': 'A supplier sent them',
+    'ui.store.source_own': 'Our own production',
+    'ui.store.source_hint':
+      'Cloth a mill sold us is inspected before it can be issued — the mill’s own 4-point sheet came in the packet. Cloth we knitted ourselves is graded on the machine and needs no sheet.',
+    'ui.store.po_label': 'Against which purchase order',
+    'ui.store.po_choose': 'Choose the order',
+    'ui.store.po_none': 'no open purchase orders',
+    'ui.store.po_hint':
+      'The order this delivery is against. It closes the order line, counts towards the supplier’s on-time record, and is how the store knows this cloth was bought rather than made here.',
     'ui.store.ud_label': 'Utilization Declaration',
     'ui.store.ud_choose': 'Choose the declaration',
     'ui.store.ud_hint':
@@ -2028,6 +2040,16 @@ export const UI_MESSAGES: Catalogue = {
       '{code} একটি বন্ডেড জায়গা। শুল্কমুক্ত কাপড় UD ছাড়া নেওয়া যাবে না — নিচে থেকে UD বাছুন; নতুন UD করা কমার্শিয়াল ডেস্কের কাজ।',
     'ui.store.bonded_needs_ud':
       'বন্ডেড রসিদে UD-র নাম থাকতেই হবে — উপরে বাছুন। তালিকায় না থাকলে আগে কমার্শিয়ালকে UD করতে বলুন।',
+    'ui.store.source_label': 'মাল কোথা থেকে এসেছে',
+    'ui.store.source_supplier': 'সাপ্লায়ার পাঠিয়েছে',
+    'ui.store.source_own': 'আমাদের নিজেদের উৎপাদন',
+    'ui.store.source_hint':
+      'মিল থেকে কেনা কাপড় ইস্যুর আগে ইন্সপেকশন লাগে — মিলের নিজের ৪-পয়েন্ট শিট প্যাকেটেই আসে। নিজেরা নিট করা কাপড় মেশিনেই গ্রেড হয়, আলাদা শিট লাগে না।',
+    'ui.store.po_label': 'কোন পারচেজ অর্ডারের বিপরীতে',
+    'ui.store.po_choose': 'অর্ডার বাছুন',
+    'ui.store.po_none': 'খোলা কোনো পারচেজ অর্ডার নেই',
+    'ui.store.po_hint':
+      'এই ডেলিভারি যে অর্ডারের বিপরীতে। এতে অর্ডারের লাইন বন্ধ হয়, সাপ্লায়ারের সময়মতো ডেলিভারির হিসাবে যোগ হয়, আর স্টোর বুঝতে পারে কাপড়টি কেনা — নিজেদের বানানো নয়।',
     'ui.store.ud_label': 'ইউটিলাইজেশন ডিক্লারেশন',
     'ui.store.ud_choose': 'ডিক্লারেশন বাছুন',
     'ui.store.ud_hint':

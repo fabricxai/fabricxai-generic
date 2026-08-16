@@ -925,7 +925,15 @@ describe('7.1 · the 4-point gate in a knit composite house', () => {
     // Own: dyed here, no purchase order, nobody to send a claim to.
     const [ownGrn] = await db
       .insert(grns)
-      .values({ companyId: COMPANY, challanNo: `DYE-${randomUUID().slice(0, 6)}`, receivedAt: '2026-07-06', createdBy: USER })
+      .values({
+        companyId: COMPANY,
+        challanNo: `DYE-${randomUUID().slice(0, 6)}`,
+        receivedAt: '2026-07-06',
+        // Said, not inferred. This used to be an empty `supplierPoId` and nothing else,
+        // which is exactly how every bought delivery earned the exemption.
+        source: 'own_production',
+        createdBy: USER,
+      })
       .returning({ id: grns.id })
     const [ownLine] = await db
       .insert(grnLines)
@@ -974,6 +982,58 @@ describe('7.1 · the 4-point gate in a knit composite house', () => {
       resolveFabricInspection(ctx, tx, { rollIds: [ownRollId] }),
     )
     expect(verdict.passed).toBe(true)
+  })
+
+  it('blocks a delivery that never said where it came from', async () => {
+    /*
+     * The Nordkap §6e failure, in one case. `/store/receive` did not capture a purchase
+     * order, so every delivery it recorded had an empty `supplierPoId` — and the exemption
+     * read that emptiness as proof the factory had knitted the cloth itself. An imported,
+     * bonded, back-to-back funded delivery from a Chinese mill was waved through, and rolls
+     * failing at 27 and 22 points against a 20-point limit reached the cutting floor.
+     *
+     * Absence is not evidence. A receipt that says nothing is gated.
+     */
+    const [denim] = await withTenantRead(ctx, (tx) =>
+      tx.select({ id: items.id }).from(items).where(eq(items.code, 'FAB-DEN')),
+    )
+    const [location] = await withTenantRead(ctx, (tx) =>
+      tx.select({ id: locations.id }).from(locations).where(eq(locations.code, 'BOND')),
+    )
+    const [silentGrn] = await db
+      .insert(grns)
+      .values({
+        companyId: COMPANY,
+        challanNo: `SILENT-${randomUUID().slice(0, 6)}`,
+        receivedAt: '2026-07-07',
+        // No purchase order, and no claim of own production — the shape every receipt made
+        // through the screen had before the door asked.
+        createdBy: USER,
+      })
+      .returning({ id: grns.id })
+    const [silentLine] = await db
+      .insert(grnLines)
+      .values({ companyId: COMPANY, grnId: silentGrn!.id, itemId: denim!.id, qty: '150.00', unit: 'yds' })
+      .returning({ id: grnLines.id })
+    const [silentRoll] = await db
+      .insert(rolls)
+      .values({
+        companyId: COMPANY,
+        grnLineId: silentLine!.id,
+        itemId: denim!.id,
+        rollNo: `R-S-${randomUUID().slice(0, 4)}`,
+        qty: '150.00',
+        unit: 'yds',
+        locationId: location!.id,
+      })
+      .returning({ id: rolls.id })
+
+    const verdict = await withTenantRead(ctx, (tx) =>
+      resolveFabricInspection(ctx, tx, { rollIds: [silentRoll!.id] }),
+    )
+
+    expect(verdict.passed).toBe(false)
+    expect(verdict.reasonKey).toBe('gates.fabric_inspection.not_inspected')
   })
 
   it('blocks a bought roll nobody inspected at all', async () => {

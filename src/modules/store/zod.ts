@@ -81,6 +81,11 @@ export const grnReceipt = z.object({
   challanNo: z.string().min(1),
   receivedAt: calendarDate,
   supplierPoId: z.uuid().optional(),
+  /**
+   * Where the goods came from. Defaults to `supplier` because that is the safe direction:
+   * the 4-point gate exempts own production, and an unanswered question must not exempt.
+   */
+  source: z.enum(['supplier', 'own_production']).default('supplier'),
   /** Duty-free receipt. The service and a check constraint both require `udId` with it. */
   bonded: z.boolean().default(false),
   udId: z.uuid().optional(),

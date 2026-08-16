@@ -338,6 +338,7 @@ export async function receiveGrnIn(
       challanNo: payload.challanNo,
       receivedAt: payload.receivedAt,
       supplierPoId: payload.supplierPoId ?? null,
+      source: payload.source,
       bonded: payload.bonded,
       udId: payload.udId ?? null,
       documentId: payload.documentId ?? null,
