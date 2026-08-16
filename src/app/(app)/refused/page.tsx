@@ -253,6 +253,21 @@ export default async function RefusedPage() {
  */
 function reasonOf(error: Record<string, unknown> | null): string | null {
   if (!error) return null
+
+  /*
+   * The service's own sentence first.
+   *
+   * Gates compose one into `details.reason` precisely because it is the only thing that
+   * survives a boundary with its figures intact — "R-F-30 and R-F-31 have not been 4-point
+   * inspected yet" rather than `gates.fabric_inspection.not_inspected`, which is what a
+   * supervisor was reading here while deciding whether a day's counting could be re-entered.
+   */
+  const details = error.details
+  if (details && typeof details === 'object') {
+    const reason = (details as Record<string, unknown>).reason
+    if (typeof reason === 'string' && reason.trim()) return reason
+  }
+
   const message = error.message
   if (typeof message === 'string' && message.trim()) return message
   const key = error.messageKey
