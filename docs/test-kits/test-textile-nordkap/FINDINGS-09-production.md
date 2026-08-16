@@ -13,7 +13,7 @@ reports **73.80%** where the floor did **65.60%**.
 | Scene | Result |
 |---|---|
 | 9a · this hour, live | **Pass** — saved, counted, re-entry corrects rather than doubles |
-| 9b · the sheet | **Reading passes; saving did not** — F42 and F44 fixed, F43 open |
+| 9b · the sheet | **Reading passed; saving did not** — F42, F43, F44 all fixed |
 | 9c · offline round-trip | **Pass** — queued, synced once, no duplicate under a double tap |
 | — · line scope | **Fail** — F45 (UI-only wall), F46 (no screen sets it) |
 
@@ -137,7 +137,7 @@ inconsistency into a plausible-looking number. `computeEfficiency` reports over 
 than capping it for precisely this reason — *"a line that beats its SMV is telling you the SMV
 is wrong"* — and it is now telling us about the seed. Filed against the seed, not this fix.
 
-## F43 — the sheet's remarks are read, shown, and then dropped · MEDIUM-HIGH
+## F43 — the sheet's remarks are read, shown, and then dropped · MEDIUM-HIGH · FIXED `285862e`
 
 `hourlySheetDraft` reads a `remark` per hour and documents why it matters
 (*"needle chg SN-1-021", "thread break" — why an hour missed*). The confirm list displays
@@ -159,6 +159,46 @@ supervisor has been asked to check something, and reasonably believes it was kep
 **Where:** `src/app/(app)/lines/hourly/day-catchup.tsx` (`submit`) ·
 `src/modules/production/zod.ts` (`hourlyOutputEntry`) ·
 `src/modules/production/schema.ts` (`hourlyOutputs` — needs the column).
+
+### Fixed — `285862e` (migration `0091`)
+
+`hourly_outputs` gains a nullable `remark`. Null for the ordinary hour: most hours have
+nothing to say, and a column of empty strings is worse than a column of blanks.
+
+**The upsert deliberately does not take `excluded.remark`.** The hourly keypad enters one
+number per line and has no remark field, so that would blank the sheet's own words every time
+an hour was corrected — the same silent discard, one layer down. Three states instead, all
+expressible in a single `set` clause so the batch stays one statement:
+
+| The entry says | What happens |
+|---|---|
+| nothing — key absent | this write has no opinion; the existing remark stands |
+| `''` | clear it, said deliberately by the box that asks |
+| text | set it |
+
+**Read as well as written**, or the discard would only have moved into the database. The
+board's hour box shows the remark, opens holding it, and is where it is corrected — so the
+field is not write-only-from-a-photograph. A cell carrying one is marked with a dot; the dot
+is decorative, so the reason goes in the button's accessible name, or a screen-reader user
+has no way to know an hour was explained. Copy in `en` and `bn`.
+
+Live, the kit's own sheet through the real screen:
+
+```
+ hour | actual | target | remark
+    8 |    118 |    145 | first hour - feeding, 6 operators short
+    9 |    141 |    145 | (null)
+   10 |    149 |    145 | (null)
+   11 |    152 |    145 | (null)
+   12 |    147 |    145 | (null)
+   14 |    138 |    145 | needle change SN-3-014
+   15 |    151 |    145 | (null)
+   16 |    156 |    145 | (null)
+   17 |    143 |    145 | (null)
+```
+
+Two remarks, on hours 8 and 14, the rest absent rather than empty — which is what §9 asked
+for and what the reading had been getting right all along.
 
 ## F44 — a back-dated day is booked against today's order · HIGH · FIXED `487566e` `3b73580`
 
@@ -323,6 +363,35 @@ One row. No duplicate. Worth noting what actually held it: the second tap queued
 the second one is the one that caught it.
 
 ---
+
+## F48 — the board does not show the hour it just took · MEDIUM · FIXED `435ef23`
+
+Found while verifying F43 on the live tenant, not during the walk.
+
+Entering an hour from the `/lines` board queued the write and closed the box onto a board
+still showing that hour as never counted. The row was in the database, with its remark, and
+the cell read **"L1 9:00 — not counted"**. The write had landed; nothing on screen said so,
+and the only reasonable conclusion is that it did not work — so the supervisor types it
+again. It is idempotent, so nothing breaks; they simply have no way to know that.
+
+The hourly keypad already drains the queue and re-reads, with the reasoning written down
+beside it including the offline caveat. The board never got those two lines. Same fix, same
+caveat: offline, neither — `router.refresh()` would re-fetch a page the network cannot serve
+and tear down the screen the person just saved on.
+
+Sharper after F43 than before it: a remark somebody types and then cannot see is the discard
+F43 exists to end, wearing a different hat.
+
+Verified live without a reload — the cell caught up on its own:
+
+```
+before: L2 10:00 — not counted
+after : L2 10:00 — 137 of 145. bobbin jam, 15 min
+```
+
+and re-opening the box holds `"bobbin jam, 15 min"`.
+
+**Where:** `src/app/(app)/lines/board-client.tsx` (`onSave`).
 
 ## Observation, not a finding
 
