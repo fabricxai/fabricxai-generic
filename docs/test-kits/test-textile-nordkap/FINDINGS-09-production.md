@@ -15,7 +15,7 @@ reports **73.80%** where the floor did **65.60%**.
 | 9a · this hour, live | **Pass** — saved, counted, re-entry corrects rather than doubles |
 | 9b · the sheet | **Reading passed; saving did not** — F42, F43, F44 all fixed |
 | 9c · offline round-trip | **Pass** — queued, synced once, no duplicate under a double tap |
-| — · line scope | **Fail** — F45 (UI-only wall), F46 (no screen sets it) |
+| — · line scope | **Fixed** — F45 (wall now server-side), F46 (a screen sets it) |
 
 The kit's own expected figure is the one that exposes F42. §9 says *"efficiency recomputes
 from SMV × output — 1,295 × 18.6 over 68 operators × 9 h = 65.6%"*. The system computed
@@ -277,7 +277,7 @@ Live after deploy — L-3's nine hours, all attributed:
 and the three line-days that genuinely have no plan (test-textile L2 14 Aug, L1/L2 16 Aug)
 correctly stayed null.
 
-## F45 — line scope is a UI-only wall · MEDIUM
+## F45 — line scope is a UI-only wall · MEDIUM · FIXED `ee6926b`
 
 `ctx.lineScope` is built in `session.ts` and enforced in exactly four places, every one a
 render-time filter in a page component:
@@ -309,7 +309,43 @@ stoppages, which run through the same unchecked handlers.
 **Where:** `src/modules/production/service.ts` (`recordHourlyOutputsIn` and the sync handler
 registrations) — the check belongs beside the tenancy one, not in the page.
 
-## F46 — no screen assigns a line to a supervisor · MEDIUM
+### Fixed — `ee6926b`
+
+`assertLinesInScope` guards the hourly batch, stoppages open **and** close, endline counts and
+the day plan. Closing a stoppage resolves the line from the row, because that call names only
+a downtime id — checking the input would have checked nothing.
+
+A batch that smuggles one line in among allowed ones **fails whole**. A partial write would
+leave the supervisor believing every row landed, which is worse than a refusal.
+
+It costs nothing for the unscoped, which is nearly everybody: no `lineScope` on the ctx means
+no query at all. A scoped caller pays one indexed read of an eight-row table. Jobs carry no
+scope and are not narrowed.
+
+The decision itself is pure and lives in `production/scope.ts`, tested without a database —
+including the case the first draft missed, an id belonging to no line of this company, which
+is now refused rather than let through to surface as a foreign-key error where a permission
+answer belongs.
+
+**The same probe from the walk, re-run against the deployed fix** — same endpoint, same shape,
+a line outside the supervisor's scope:
+
+```
+POST /api/sync  →  200
+{"status":"rejected","errorKey":"production.errors.line_out_of_scope",
+ "details":{"lines":["L4"],"scope":["L1","L2","L3"]}}
+```
+
+No row written. The refusal names the line by **code**, not uuid — a supervisor knows their
+floor by the number painted on it.
+
+One thing worth noting about the copy: `AppError.details` does not survive a **server action**,
+so the message string carries no placeholders and reads on its own — *"That line is not one of
+yours. You can enter only the lines you supervise — ask the office to widen them."* The
+structured `details` above survive because the offline queue returns JSON rather than crossing
+that boundary. The repo has a test for the placeholder rule, and it caught the first draft.
+
+## F46 — no screen assigns a line to a supervisor · MEDIUM · FIXED `6bd140d`
 
 `roles.scope.lines` is stored, read and enforced on every line screen, and can be set by
 nothing but SQL. `/settings` has role controls and no line control; no action or tool writes
@@ -326,6 +362,47 @@ by SQL, which is the finding.
 
 **Where:** `src/app/(app)/settings/` (no control exists) · `src/modules/core/session.ts:80`
 (the reader) · seed: `pnpm seed:kit` should give the kit's supervisor the kit's line.
+
+### Fixed — `6bd140d`
+
+`setLineScope`, an owner/admin act, on the role matrix that already grants and revokes.
+`grantRole` has always accepted a `scope`; nothing ever passed one.
+
+Two rules that are easy to get wrong and unfindable afterwards, so both live in a pure
+`settings/line-scope.ts` with tests:
+
+- **an empty list means the whole floor and REMOVES the key**, rather than storing `[]`.
+  `session.ts` reads a role with no `lines` array as unnarrowed, so an empty array would leave
+  the difference between "everywhere" and "nowhere" resting on how one reader happens to treat
+  `[].every(...)`;
+- **every other key in the scope survives.** The picker owns one key.
+
+Codes are checked against the company's real lines: a typo'd `L9` stored quietly narrows
+somebody to a line that does not exist, which reads exactly like a permissions bug and cannot
+be diagnosed from the screen.
+
+The screen also says the thing that is otherwise unexplainable — **one unscoped role widens all
+the others**, so narrowing `production` for somebody who also holds `admin` changes nothing at
+all. It says so on the row where it is true, rather than leaving an admin wondering why the
+setting did not take.
+
+**Verified as a round trip through the product**, which is the only way to prove both findings
+at once. Narrowed `production@` to L1/L2 by clicking L3 off and pressing *Save lines*:
+
+```
+{"lines": ["L1", "L2"]}                          ← written by the screen
+POST /api/sync (L3) → "rejected"  line_out_of_scope, scope ["L1","L2"]
+```
+
+then clicked L3 back on and saved:
+
+```
+{"lines": ["L1", "L2", "L3"]}
+POST /api/sync (L3) → "applied"
+```
+
+The L3 grant this kit needs is now set **through the product**. The SQL used during the walk
+to make §9 walkable at all is no longer the only way it could have happened.
 
 ## F47 — "target 0" where there is no plan · LOW
 
