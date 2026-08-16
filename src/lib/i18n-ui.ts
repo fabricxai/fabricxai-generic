@@ -849,6 +849,19 @@ export const UI_MESSAGES: Catalogue = {
     'ui.store.qty_free': '{qty} free',
     'ui.store.reason_damaged': 'Damaged — water, oil, or handling',
     'ui.store.reason_found': 'Found — stock present that was not recorded',
+    // Cloth going back to the rack. A return moves ⚖ material and gives back a bonded draw,
+    // so the reason is a sentence somebody writes, not a code from a list.
+    'ui.store.send_back': 'Send back',
+    'ui.store.return_title': 'Send {roll} back to the store',
+    'ui.store.return_reason_label': 'Why is it coming back',
+    'ui.store.return_reason_placeholder': 'wrong shade for the lay · failed 4-point, held for the claim',
+    'ui.store.return_hint':
+      'The roll goes back on the rack, and what the declaration drew for it is given back. The reason stays on the record — it is what explains a returned draw to whoever reads the declaration later.',
+    'ui.store.return_bonded_note':
+      'This roll came in under {ud}. Sending it back returns what was drawn against it.',
+    'ui.store.return_submit': 'Send it back',
+    'ui.store.return_queued': '{roll} sent back',
+    'ui.store.return_failed': 'The roll was not sent back.',
     'ui.store.reason_miscount': 'Miscount — recount disagrees with the system',
     'ui.store.reason_shortage_on_receipt': 'Short on receipt — challan overstated',
     'ui.store.reason_written_off': 'Written off — nothing recoverable',
@@ -2156,6 +2169,17 @@ export const UI_MESSAGES: Catalogue = {
     'ui.store.qty_free': '{qty} ফ্রি',
     'ui.store.reason_damaged': 'নষ্ট — পানি, তেল বা নাড়াচাড়ায়',
     'ui.store.reason_found': 'পাওয়া গেছে — হিসাবে ছিল না, স্টকে আছে',
+    'ui.store.send_back': 'ফেরত পাঠান',
+    'ui.store.return_title': '{roll} স্টোরে ফেরত পাঠান',
+    'ui.store.return_reason_label': 'কেন ফেরত আসছে',
+    'ui.store.return_reason_placeholder': 'লে-র শেড মেলেনি · ৪-পয়েন্টে ফেল, ক্লেইমের জন্য রাখা',
+    'ui.store.return_hint':
+      'রোলটি র‍্যাকে ফিরে যাবে, আর এর জন্য UD থেকে যা টানা হয়েছিল তা ফেরত যাবে। কারণটি রেকর্ডে থেকে যায় — পরে যিনি ডিক্লারেশন দেখবেন, তাঁর কাছে ফেরত যাওয়া টানের ব্যাখ্যা এটিই।',
+    'ui.store.return_bonded_note':
+      'এই রোল {ud}-এর আওতায় এসেছিল। ফেরত পাঠালে এর বিপরীতে টানা পরিমাণ ফেরত যাবে।',
+    'ui.store.return_submit': 'ফেরত পাঠান',
+    'ui.store.return_queued': '{roll} ফেরত পাঠানো হয়েছে',
+    'ui.store.return_failed': 'রোলটি ফেরত পাঠানো যায়নি।',
     'ui.store.reason_miscount': 'গণনায় ভুল — আবার গুনে সিস্টেমের সাথে মিলছে না',
     'ui.store.reason_shortage_on_receipt': 'গ্রহণের সময় কম — চালানে বেশি লেখা ছিল',
     'ui.store.reason_written_off': 'বাদ — কিছুই কাজে লাগবে না',

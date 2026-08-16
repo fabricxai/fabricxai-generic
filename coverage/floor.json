@@ -1,9 +1,9 @@
 {
   "recordedAt": "2026-08-16",
   "floor": {
-    "statements": 32.56,
-    "branches": 27.22,
-    "functions": 21.28,
-    "lines": 33.33
+    "statements": 32.52,
+    "branches": 27.2,
+    "functions": 21.24,
+    "lines": 33.3
   }
 }

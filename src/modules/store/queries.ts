@@ -10,6 +10,7 @@
 import { asc, desc, eq, inArray } from 'drizzle-orm'
 import { z } from 'zod'
 
+import { uds } from '@/modules/commercial/schema'
 import type { AnyCtx } from '@/modules/core/ctx'
 import { readJsonbObject } from '@/modules/core/jsonb'
 import { scoped } from '@/modules/core/scoped'
@@ -189,6 +190,8 @@ export interface RollRow {
   /** The declaration this roll's GRN named, when bonded — what the balance preview asks
       about (adoption plan 2.3). Null for general stock. */
   udId: string | null
+  /** Its NUMBER, because a screen says UD-2026-058 and never a uuid. */
+  udNumber: string | null
 }
 
 export async function rollsForItem(ctx: AnyCtx, itemId: string): Promise<RollRow[]> {
@@ -208,11 +211,15 @@ export async function rollsForItem(ctx: AnyCtx, itemId: string): Promise<RollRow
         receivedAt: grns.receivedAt,
         challanNo: grns.challanNo,
         udId: grns.udId,
+        udNumber: uds.number,
       })
       .from(rolls)
       .innerJoin(locations, eq(locations.id, rolls.locationId))
       .innerJoin(grnLines, eq(grnLines.id, rolls.grnLineId))
       .innerJoin(grns, eq(grns.id, grnLines.grnId))
+      // Left: general stock has no declaration, and a roll without one still belongs on
+      // the list. Read through 2.2's table for the number only (rule 11 is about writes).
+      .leftJoin(uds, eq(uds.id, grns.udId))
       .where(scoped(rolls, ctx, eq(rolls.itemId, itemId)))
       // Nulls last: an ungrouped roll is not "group zero", it is a roll nobody has
       // shade-matched, and it belongs at the bottom of the pick list.

@@ -5,6 +5,7 @@ import { useState, useTransition } from 'react'
 
 import { InlineAlert, Modal } from '@/components/fx/feedback'
 import { actionErrorMessage } from '@/lib/action-error'
+import { useOfflineQueue } from '@/lib/offline/use-offline-queue'
 import { Ident } from '@/components/fx/format'
 import { useLocale, useT } from '@/components/fx/locale'
 import { Badge, Button } from '@/components/fx/primitives'
@@ -48,7 +49,9 @@ export function RollsClient({
   const t = useT()
   const router = useRouter()
   const [adjusting, setAdjusting] = useState<RollRow | null>(null)
+  const [returning, setReturning] = useState<RollRow | null>(null)
   const [drafted, setDrafted] = useState<string | null>(null)
+  const [returned, setReturned] = useState<string | null>(null)
   /*
    * Shade filter (role audit 2.7c). The shade-mix warning names GROUPS — "this order
    * already drew shade A" — and this list then made the storekeeper hunt for them row by
@@ -66,6 +69,10 @@ export function RollsClient({
         <InlineAlert tone="success">
           {t('ui.store.adjust_drafted', { summary: drafted })}
         </InlineAlert>
+      ) : null}
+
+      {returned ? (
+        <InlineAlert tone="success">{t('ui.store.return_queued', { roll: returned })}</InlineAlert>
       ) : null}
 
       {/* ── Item picker ──────────────────────────────────────────────────── */}
@@ -169,6 +176,13 @@ export function RollsClient({
                 <Button variant="ghost" onClick={() => setAdjusting(roll)}>
                   {t('ui.store.adjust_button')}
                 </Button>
+              ) : roll.status === 'issued' ? (
+                /* Cloth comes back — a lay finished short, a shade was wrong, a roll should
+                   never have gone out. The machine has always allowed it; until now nothing
+                   could make the move and the storekeeper's only option was to leave it. */
+                <Button variant="ghost" onClick={() => setReturning(roll)}>
+                  {t('ui.store.send_back')}
+                </Button>
               ) : (
                 <span style={{ font: "400 11.5px/1.3 var(--fx-font-mono)", color: 'var(--fx-text-tertiary)' }}>
                   {roll.status.replace('_', ' ')}
@@ -178,6 +192,18 @@ export function RollsClient({
           </div>
         ))}
       </div>
+
+      {returning ? (
+        <ReturnDialog
+          roll={returning}
+          onClose={() => setReturning(null)}
+          onReturned={(summary) => {
+            setReturning(null)
+            setReturned(summary)
+            router.refresh()
+          }}
+        />
+      ) : null}
 
       {adjusting ? (
         <AdjustDialog
@@ -192,6 +218,104 @@ export function RollsClient({
         />
       ) : null}
     </div>
+  )
+}
+
+/**
+ * Sending a roll back to the rack.
+ *
+ * A floor write like receiving and issuing, so it goes through the offline batch endpoint
+ * (rule 7) rather than a server action — the rack is where the signal is worst, and a
+ * storekeeper holding a roll should not have to be online to record that it came back.
+ *
+ * The reason is a sentence, not a code. A return gives back a bonded draw, and what an
+ * auditor reads months later is this line — "wrong shade for the lay" and "failed 4-point,
+ * held for the mill claim" are different facts, and no fixed list would hold them both.
+ */
+function ReturnDialog({
+  roll,
+  onClose,
+  onReturned,
+}: {
+  roll: RollRow
+  onClose: () => void
+  onReturned: (summary: string) => void
+}) {
+  const t = useT()
+  const locale = useLocale()
+  const { capture } = useOfflineQueue()
+  const [reason, setReason] = useState('')
+  const [pending, startTransition] = useTransition()
+  const [failure, setFailure] = useState<string | null>(null)
+
+  // Ten characters, the same floor the payload sets: the screen refuses first, at the one
+  // moment somebody is looking, rather than after a round trip.
+  const ready = reason.trim().length >= 10
+
+  function send() {
+    if (!ready) return
+    setFailure(null)
+    startTransition(async () => {
+      try {
+        await capture({
+          moduleId: 'store',
+          operation: 'return_rolls',
+          payload: { rollIds: [roll.id], reason: reason.trim() },
+        })
+        onReturned(roll.rollNo)
+      } catch (error) {
+        setFailure(actionErrorMessage(error, t('ui.store.return_failed'), locale))
+      }
+    })
+  }
+
+  return (
+    <Modal open onClose={onClose} title={t('ui.store.return_title', { roll: roll.rollNo })}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {failure ? <InlineAlert tone="danger">{failure}</InlineAlert> : null}
+
+        {roll.udNumber ? (
+          <InlineAlert tone="info">
+            {t('ui.store.return_bonded_note', { ud: roll.udNumber })}
+          </InlineAlert>
+        ) : null}
+
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <span style={{ font: "500 13px/1.3 var(--fx-font-sans)" }}>
+            {t('ui.store.return_reason_label')}
+          </span>
+          <textarea
+            rows={3}
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder={t('ui.store.return_reason_placeholder')}
+            style={{
+              width: '100%',
+              minWidth: 0,
+              padding: '10px 12px',
+              border: '1px solid var(--fx-border-default)',
+              borderRadius: 'var(--fx-radius-sm)',
+              background: 'var(--fx-bg-surface)',
+              color: 'var(--fx-text-primary)',
+              font: "400 14px/1.5 var(--fx-font-sans)",
+              resize: 'vertical',
+            }}
+          />
+          <span style={{ font: "400 12px/1.5 var(--fx-font-sans)", color: 'var(--fx-text-tertiary)' }}>
+            {t('ui.store.return_hint')}
+          </span>
+        </label>
+
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+          <Button variant="ghost" onClick={onClose}>
+            {t('ui.common.cancel')}
+          </Button>
+          <Button variant="primary" disabled={!ready || pending} onClick={send}>
+            {t('ui.store.return_submit')}
+          </Button>
+        </div>
+      </div>
+    </Modal>
   )
 }
 

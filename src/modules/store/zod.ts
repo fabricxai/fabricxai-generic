@@ -248,6 +248,20 @@ export const grnFromChallanDraft = z.object({
     .min(1),
 })
 
+/**
+ * Cloth going back to the rack.
+ *
+ * The reason is required and is not a code from a list: a return is one sentence a
+ * storekeeper writes about physical material — "wrong shade for the lay", "failed 4-point,
+ * held for the mill claim" — and it is the whole record of why a bonded draw was given back.
+ * Ten characters, the same floor the stock adjustment sets, because "err" explains nothing
+ * to whoever reads the declaration later.
+ */
+export const rollReturn = z.object({
+  rollIds: z.array(z.uuid()).min(1),
+  reason: z.string().trim().min(10).max(300),
+})
+
 export const STORE_ZOD_MAP = {
   grn_from_challan_v1: grnFromChallanDraft,
   stock_adjustment_v1: stockAdjustmentDraft,

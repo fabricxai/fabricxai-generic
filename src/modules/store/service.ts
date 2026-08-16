@@ -61,6 +61,7 @@ import {
   itemPayload,
   locationPayload,
   requisitionRequest,
+  rollReturn,
   stockAdjustmentDraft,
 } from './zod'
 
@@ -868,6 +869,18 @@ export async function returnRolls(
   ctx: RequestCtx,
   input: { rollIds: readonly string[]; reason: string },
 ): Promise<ReturnResult> {
+  return withTenantTx(ctx, (tx) => returnRollsIn(ctx, tx, input))
+}
+
+/**
+ * The body, taking a transaction — the floor reaches this through the offline batch
+ * endpoint (rule 7), where the whole batch shares one.
+ */
+export async function returnRollsIn(
+  ctx: AnyCtx,
+  tx: TenantDb,
+  input: { rollIds: readonly string[]; reason: string },
+): Promise<ReturnResult> {
   if (input.rollIds.length === 0) {
     throw new AppError('validation_failed', 'store.errors.nothing_to_return', {})
   }
@@ -876,7 +889,7 @@ export async function returnRolls(
     throw new AppError('validation_failed', 'store.errors.return_needs_reason', {})
   }
 
-  return withTenantTx(ctx, async (tx) => {
+  {
     const rollRows = await tx
       .select()
       .from(rolls)
@@ -1002,7 +1015,7 @@ export async function returnRolls(
     })
 
     return { rolls: rollRows.length, udReversals }
-  })
+  }
 }
 
 /** open → partial → fulfilled, derived from what has actually been issued. */
@@ -1062,6 +1075,17 @@ export function registerStoreSyncHandlers(): void {
   registerSyncHandler('store', 'issue_stock', { roles: ['store'] }, async (ctx, tx, row) => {
     const result = await issueStockIn(ctx, tx, { ...row.payload, offlineKey: row.offlineKey })
     return { rowId: result.issueId }
+  })
+
+  /*
+   * Cloth coming back. A floor write like the other two (rule 7), and the endpoint's own key
+   * table is what makes a replayed batch a no-op — a second attempt would otherwise meet the
+   * roll machine and be recorded as a refusal rather than the duplicate it is.
+   */
+  registerSyncHandler('store', 'return_rolls', { roles: ['store'] }, async (ctx, tx, row) => {
+    const payload = rollReturn.parse(row.payload)
+    await returnRollsIn(ctx, tx, payload)
+    return { rowId: payload.rollIds[0]! }
   })
 }
 

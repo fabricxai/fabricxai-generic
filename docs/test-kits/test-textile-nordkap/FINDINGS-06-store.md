@@ -151,6 +151,20 @@ Two details worth keeping:
 Applied to the three rolls: all `returned`, three draws given back, `UD-2026-058` free
 balance 24,796.30 → 24,872.90, audited as `day0-…-store` with the reason on the row.
 
+**And now there is a screen for it.** `/store/rolls` offers "Send back" on any roll that
+actually went out — beside the "Adjust" a roll on the rack gets, and nothing at all for one
+already returned or written off. The dialog asks for the reason in a sentence rather than
+from a fixed list, because "wrong shade for the lay" and "failed 4-point, held for the mill
+claim" are different facts and no list holds both; it refuses under ten characters, the same
+floor the payload sets, at the one moment somebody is looking. A bonded roll's dialog names
+the declaration that will get its draw back — by number, never by id.
+
+It writes through the offline batch endpoint like receiving and issuing (rule 7): the rack is
+where the signal is worst, and a storekeeper holding a roll should not have to be online to
+record that it came back. The endpoint's key table makes a replayed batch a no-op, which
+matters here more than elsewhere — a second attempt would otherwise meet the roll machine and
+be filed as a refusal rather than the duplicate it is.
+
 ## F23 · HIGH — a trims delivery cannot be received at all
 
 `/store/receive` will not submit without at least one roll:
