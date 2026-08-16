@@ -502,7 +502,7 @@ and re-opening the box holds `"bobbin jam, 15 min"`.
 
 **Where:** `src/app/(app)/lines/board-client.tsx` (`onSave`).
 
-## F49 — an intermittent hydration failure after saving a day plan · LOW
+## F49 — an intermittent hydration failure on a slow server · LOW · INVESTIGATED, NOT FIXED
 
 Found while verifying F47, and **not caused by it** — see below.
 
@@ -529,13 +529,43 @@ The obvious suspect was ruled out: `minutesSince()` reads `Date.now()` during re
 `hourly-client.tsx`, which would mismatch between server and client — but it only renders for
 an open stoppage, and this tenant has none at all (`downtimes` is empty).
 
-**Cause not identified.** What is known is that it needs the plan save first, which is the one
-path that calls `revalidatePath('/lines')` and then `router.refresh()`; a hard navigation
-arriving while that refresh is in flight is the shape to look at next. Recorded rather than
-guessed at.
+### Investigated — a hydration race on a streamed Suspense boundary, load-dependent
 
-**Where:** `src/modules/production/actions.ts` (`planTheLine` → `revalidatePath`) ·
-`src/app/(app)/lines/plan-day.tsx` (the `router.refresh()` after it).
+Chased properly. **No fix shipped**, because the honest conclusion is that this is a timing
+race with no data consequence, and every speculative change would have been a guess.
+
+**Ruled out, with evidence:**
+
+| Suspicion | How it was killed |
+|---|---|
+| Two builds serving the same host | The chunk sets in two responses are **identical** (17/17), and the box runs **one** app container. Two responses did declare different module maps — but every module id appears in both, only the streaming ORDER and row numbering differ, which is what React streaming does. This was the frightening possibility and it is not what is happening. |
+| Caused by F47's change | It fires on `/lines/endline` too, which F47 never touched — and direct first loads of `/lines/hourly` were clean **18/18**. |
+| Leftover client state from the server action | Cookies, `localStorage`, IndexedDB and service-worker state are byte-identical before and after the plan save. |
+| The service worker serving a stale document | `public/sw.js` intercepts only content-hashed `/_next/static/*`, never navigations or RSC payloads. Blocking it makes the error **more** likely, not less. |
+| A clock read during render | `minutesSince()` does read `Date.now()` while rendering — but only for an **open stoppage**, and this tenant has none at all. |
+
+**What is true:** it lands only on `/lines/hourly`, only on a **second navigation** within a
+browser context, and the rate moves with how busy the server is — 5/8 and 2/8 while the box
+was working through deploys and migrations, then **0/12, 0/10 and 0/20** once it went quiet.
+It does not reproduce in local dev at all, where React would have named the element.
+
+That page renders inside a Suspense boundary — the streamed HTML carries its fallback, the
+branded loading mark, as `<!--$?--><template id="B:0">`. The shape that fits every
+observation is a boundary resolving close enough to the start of hydration for the two to
+disagree; a slower server widens that window, which is exactly when it was seen.
+
+**Impact is a flicker.** React regenerates that subtree on the client. No wrong data, nothing
+lost, nothing a supervisor would report.
+
+**Left open deliberately, at LOW.** The next lever, if it ever becomes worth pulling, is the
+Suspense boundary the `(app)` layout puts around page content — not the plan save, which was
+only ever the thing that made the server slow enough to see it. Note that the minified
+production error carries no detail and `instrumentation-client.ts` would not add any: the
+element name exists only in a React development build, which is why this was chased through
+DOM-mutation capture instead.
+
+**Where:** `src/app/(app)/layout.tsx` (the Suspense boundary around `{children}`) ·
+`src/app/(app)/lines/hourly/page.tsx` (`force-dynamic`, four queries before it can resolve).
 
 ## Observation, not a finding
 
