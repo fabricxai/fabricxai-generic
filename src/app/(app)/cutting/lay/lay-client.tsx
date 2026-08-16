@@ -347,17 +347,26 @@ export function LayClient({
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           {available.map((roll) => {
             const on = picked.has(roll.rollId)
+            /*
+             * Quality rejected this cloth. The gate refuses it at create either way, but a
+             * refusal a cutting master could not see coming is the worse one — `R-F-17` was
+             * spread into a lay looking exactly like every other roll on the rack.
+             */
+            const rejected = roll.inspection === 'fail'
             return (
               <button
                 key={roll.rollId}
-                onClick={() =>
+                disabled={rejected}
+                title={rejected ? t('ui.cutting.roll_failed_title') : undefined}
+                onClick={() => {
+                  if (rejected) return
                   setPicked((current) => {
                     const next = new Set(current)
                     if (next.has(roll.rollId)) next.delete(roll.rollId)
                     else next.add(roll.rollId)
                     return next
                   })
-                }
+                }}
                 style={{
                   display: 'grid',
                   gridTemplateColumns: '28px 1.1fr 1fr 130px 110px',
@@ -367,8 +376,13 @@ export function LayClient({
                   padding: '12px 16px',
                   minHeight: 56,
                   border: '1px solid var(--fx-border-subtle)',
-                  background: on ? 'var(--fx-bg-selected)' : 'var(--fx-bg-surface)',
-                  cursor: 'pointer',
+                  background: rejected
+                    ? 'var(--fx-bg-sunken)'
+                    : on
+                      ? 'var(--fx-bg-selected)'
+                      : 'var(--fx-bg-surface)',
+                  cursor: rejected ? 'not-allowed' : 'pointer',
+                  opacity: rejected ? 0.72 : 1,
                   font: "400 14px/1.3 var(--fx-font-sans)",
                   color: 'var(--fx-text-primary)',
                 }}
@@ -383,7 +397,12 @@ export function LayClient({
                 <span style={{ font: "400 13px/1.3 var(--fx-font-mono)", textAlign: 'right' }}>
                   {roll.qty} {roll.unit}
                 </span>
-                <span style={{ textAlign: 'right' }}>
+                <span style={{ textAlign: 'right', display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                  {rejected ? (
+                    <Badge tone="danger">
+                      {t('ui.cutting.roll_failed_badge', { points: roll.inspectionPoints ?? '' })}
+                    </Badge>
+                  ) : null}
                   {roll.shadeGroup ? (
                     <Badge>{t('ui.cutting.shade_badge', { group: roll.shadeGroup })}</Badge>
                   ) : null}

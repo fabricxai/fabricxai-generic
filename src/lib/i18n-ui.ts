@@ -991,6 +991,11 @@ export const UI_MESSAGES: Catalogue = {
     'ui.cutting.rolls_on_table_other': '{count} rolls · {drawn} m on the table',
     'ui.cutting.save_report_button': 'Save the cut report',
     'ui.cutting.sent': 'Sent.',
+    // Quality rejected the cloth. Named on the card, because the gate refuses it anyway and
+    // a cutting master should not learn that from a failed submit.
+    'ui.cutting.roll_failed_badge': 'failed 4-point · {points}',
+    'ui.cutting.roll_failed_title':
+      'This roll failed 4-point inspection. It cannot be spread — quality can re-inspect it if the mill settles the claim.',
     'ui.cutting.shade_badge': 'shade {group}',
     'ui.cutting.shade_join': ' and ',
     'ui.cutting.spread_done': 'Spread {list}.',
@@ -2308,6 +2313,9 @@ export const UI_MESSAGES: Catalogue = {
     'ui.cutting.rolls_on_table_other': '{count}টি রোল · টেবিলে {drawn} মি',
     'ui.cutting.save_report_button': 'কাট রিপোর্ট সেভ করুন',
     'ui.cutting.sent': 'পাঠানো হয়েছে।',
+    'ui.cutting.roll_failed_badge': '৪-পয়েন্টে ফেল · {points}',
+    'ui.cutting.roll_failed_title':
+      'এই রোল ৪-পয়েন্ট ইন্সপেকশনে ফেল করেছে। এটি বিছানো যাবে না — মিলের ক্লেইম মিটলে কোয়ালিটি আবার ইন্সপেক্ট করতে পারে।',
     'ui.cutting.shade_badge': 'শেড {group}',
     'ui.cutting.shade_join': ' আর ',
     'ui.cutting.spread_done': '{list} বিছানো হয়েছে।',

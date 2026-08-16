@@ -21,6 +21,7 @@ import { recordChange, registerAuditedTables } from '../core/audit'
 import type { AnyCtx, RequestCtx } from '../core/ctx'
 import { AppError, conflict, notFound } from '../core/errors'
 import { assertGate, GATES, type GateResult } from '../core/gates'
+import { checkFabricInspection } from '../store/gates'
 import { emit } from '../core/outbox'
 import { defineStateMachine } from '../core/state-machine'
 import { scoped } from '../core/scoped'
@@ -301,6 +302,25 @@ async function createLayIn(
       ...fabric.facts,
     })
   }
+
+  /*
+   * 4-point, again — over the rolls about to be SPREAD (rule 8, Nordkap §8 F39).
+   *
+   * The store checks this when cloth leaves the rack, which is the right moment and not the
+   * only one. A lay draws on rolls already issued to the order, so anything that failed
+   * inspection *after* it was issued — or was returned to the rack and picked up again —
+   * reaches the cutting table by a path that gate never sees. It is how `R-F-17`, failed at
+   * 24 points against a 20-point limit, was spread into LAY-41 and cut into garments.
+   *
+   * The same seam the store calls, so the exemptions stay identical: a knit house's own
+   * greige is not gated, bought cloth is, and a roll with its own failed inspection is
+   * blocked whatever its consignment graded. Cutting is the last moment this is recoverable
+   * — after the knife it is a claim, not a decision.
+   */
+  assertGate(
+    GATES.fabricInspection,
+    await checkFabricInspection(ctx, tx, { rollIds: payload.rollsDrawn }),
+  )
 
   const expected = wrapCuttingError(() =>
     layYield(

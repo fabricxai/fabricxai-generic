@@ -21,6 +21,10 @@ import { companies, users } from '@/db/schema/core'
 import { buyers } from '@/modules/buyers/schema'
 import type { RequestCtx } from '@/modules/core/ctx'
 import { syncBatch } from '@/modules/core/offline-sync'
+import {
+  registerFabricInspectionProvider,
+  resetFabricInspectionProvider,
+} from '@/modules/store/gates'
 import { withTenantRead } from '@/modules/core/tenancy'
 import '@/modules/cutting/register'
 import {
@@ -60,7 +64,14 @@ let strayRollId: string
 
 const allowPp = () => registerPpApprovalProvider(async () => ({ passed: true }))
 
+/*
+ * The gate seam fails CLOSED with no provider, so a suite that never registers one would
+ * refuse every lay it spreads. The store's suite does the same thing for the same reason.
+ */
+const allowFabric = () => registerFabricInspectionProvider(async () => ({ passed: true }))
+
 beforeAll(async () => {
+  allowFabric()
   await db.insert(companies).values([
     { id: COMPANY, name: 'Cut Co', slug: `cut-${COMPANY.slice(0, 8)}` },
     { id: OTHER, name: 'Other Co', slug: `oth-${OTHER.slice(0, 8)}` },
@@ -186,6 +197,7 @@ afterEach(() => {
 
 afterAll(async () => {
   resetPpApprovalProvider()
+  resetFabricInspectionProvider()
   await db.execute(sql`delete from audit_log where company_id in (${COMPANY}, ${OTHER})`)
   await db.delete(companies).where(eq(companies.id, COMPANY))
   await db.delete(companies).where(eq(companies.id, OTHER))
@@ -244,6 +256,46 @@ describe('5.1 · the two preconditions on lay create', () => {
   it('blocks a lay that draws no fabric at all', async () => {
     await clearLays()
     await expect(createLay(ctx, layInput({ rollsDrawn: [] }))).rejects.toThrow(/no_rolls/)
+  })
+
+  it('refuses to spread cloth quality rejected, and says which rolls', async () => {
+    /*
+     * Nordkap §8, F39. The store's 4-point gate guards the moment cloth LEAVES the rack. A
+     * lay draws on rolls already issued to the order, so anything that failed inspection
+     * after issue — or came back to the rack and was picked up again — reached the table by
+     * a path that gate never saw. `R-F-17`, failed at 24 points against a 20-point limit,
+     * was spread into a lay and cut into garments.
+     *
+     * Cutting is the last moment it is recoverable: after the knife it is a claim.
+     */
+    await clearLays()
+    registerFabricInspectionProvider(async (_ctx, _tx, input) => ({
+      passed: false,
+      reasonKey: 'gates.fabric_inspection.failed',
+      facts: {
+        gate: 'fabric_inspection',
+        rolls: input.rollIds.length,
+        reason: '1 roll failed 4-point inspection at 24.00 points per 100 yd²: R-F-17.',
+      },
+    }))
+
+    const thrown = await createLay(ctx, layInput()).catch((error: unknown) => error)
+    expect(thrown).toMatchObject({ messageKey: 'gates.fabric_inspection.failed' })
+    // The sentence travels with it — a floor refusal that names no roll names nothing.
+    expect(String((thrown as { details?: { reason?: string } }).details?.reason)).toContain('R-F-17')
+
+    const spread = await db.select().from(lays).where(eq(lays.companyId, COMPANY))
+    expect(spread).toHaveLength(0)
+
+    allowFabric()
+  })
+
+  it('spreads the lay once quality has cleared the cloth', async () => {
+    // The release direction: the same gate that refused above lets it through.
+    await clearLays()
+    allowFabric()
+    const result = await createLay(ctx, layInput())
+    expect(result.layId).toBeTruthy()
   })
 
   it('spreads the lay and reports what it should yield', async () => {

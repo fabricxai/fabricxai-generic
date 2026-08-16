@@ -172,6 +172,15 @@ export interface IssuedRoll {
   itemCode: string
   /** Already consumed by an earlier lay on this order. */
   usedByLay: string | null
+  /**
+   * The roll's own latest 4-point verdict, when quality has graded it.
+   *
+   * Carried so the picker can SAY so. The gate refuses a failed roll at create (F39), and a
+   * refusal a cutting master could have seen coming is a worse refusal than one that
+   * explains itself on the card they are about to tap.
+   */
+  inspection: 'pass' | 'fail' | null
+  inspectionPoints: string | null
 }
 
 export async function issuedRollsForOrder(ctx: AnyCtx, orderId: string): Promise<IssuedRoll[]> {
@@ -194,6 +203,31 @@ export async function issuedRollsForOrder(ctx: AnyCtx, orderId: string): Promise
       .innerJoin(items, eq(items.id, issueLines.itemId))
       .where(scoped(issueLines, ctx, eq(issues.orderId, orderId)))
 
+    /*
+     * What quality said about each roll, latest verdict wins — a re-inspection after a mill
+     * claim is the answer that counts, the same rule the store's gate applies.
+     */
+    const { fabricInspections } = await import('@/modules/quality/schema')
+    const rollIds = rows.map((row) => row.rollId).filter((id): id is string => id !== null)
+    const verdicts = rollIds.length
+      ? await tx
+          .select({
+            rollId: fabricInspections.rollId,
+            result: fabricInspections.result,
+            points: fabricInspections.pointsPer100SqYd,
+            createdAt: fabricInspections.createdAt,
+          })
+          .from(fabricInspections)
+          .where(scoped(fabricInspections, ctx, inArray(fabricInspections.rollId, rollIds)))
+          .orderBy(asc(fabricInspections.createdAt))
+      : []
+
+    // Ascending, so the last write for a roll is the one left in the map.
+    const graded = new Map<string, { result: string; points: string | null }>()
+    for (const v of verdicts) {
+      if (v.rollId) graded.set(v.rollId, { result: v.result, points: v.points })
+    }
+
     // A roll drawn by one lay cannot be drawn by another — the fabric is on the table.
     const spread = await tx
       .select({ layNo: lays.layNo, rollsDrawn: lays.rollsDrawn })
@@ -207,7 +241,12 @@ export async function issuedRollsForOrder(ctx: AnyCtx, orderId: string): Promise
 
     return rows
       .filter((row): row is typeof row & { rollId: string } => row.rollId !== null)
-      .map((row) => ({ ...row, usedByLay: usedBy.get(row.rollId) ?? null }))
+      .map((row) => ({
+        ...row,
+        usedByLay: usedBy.get(row.rollId) ?? null,
+        inspection: (graded.get(row.rollId)?.result ?? null) as 'pass' | 'fail' | null,
+        inspectionPoints: graded.get(row.rollId)?.points ?? null,
+      }))
   })
 }
 
