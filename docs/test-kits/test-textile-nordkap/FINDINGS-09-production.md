@@ -3,7 +3,10 @@
 Walked 2026-08-16 against **baraka.fabricxai.com** as `production@`, driving the real
 screens. Every claim checked twice: once through the UI, once against the rows it wrote.
 
-**Verdict: the reading is excellent and the arithmetic is wrong.** The hourly sheet carries
+**All seven findings from this walk are fixed and deployed (F42–F48); F49 was found while
+verifying them and is open.**
+
+**Verdict as walked: the reading is excellent and the arithmetic is wrong.** The hourly sheet carries
 four traps and the extraction cleared all four — nine hours not ten, the afternoon read as
 14 rather than 2, exactly two remarks, no TOTAL row and no downtime log. Then the day is
 saved, and three things happen to it that nobody is told about: the remarks are dropped, the
@@ -404,7 +407,7 @@ POST /api/sync (L3) → "applied"
 The L3 grant this kit needs is now set **through the product**. The SQL used during the walk
 to make §9 walkable at all is no longer the only way it could have happened.
 
-## F47 — "target 0" where there is no plan · LOW
+## F47 — "target 0" where there is no plan · LOW · FIXED `f564411`
 
 A line with no `daily_line_plans` row for today shows **target 0** on the hourly board, and
 the hour saves against it. Downstream, `achievedPct` is null because `target > 0` is false,
@@ -417,6 +420,35 @@ day's output believing it is being measured, and no number is ever produced from
 
 **Where:** `src/app/(app)/lines/hourly/page.tsx` (`planByLine.get(...)?.targetPerHour ?? 0`)
 · `src/app/(app)/lines/hourly/hourly-client.tsx`.
+
+### Fixed — `f564411`
+
+The target is `null` where nothing was planned, never `0`, and the screen says what that
+costs — because a supervisor reading only *"no plan"* would take it for a detail:
+
+```
+L1   target 145
+L2   no plan today — this hour will not be measured
+L3   no plan today — this hour will not be measured
+```
+
+The hour still saves. Output happened, and refusing the write would lose a real number to
+punish a missing plan.
+
+**The other half of the silence was the day-close**, and it was the more consequential one.
+Skipping is right — with no SMV and no manpower there is nothing to compute against, and
+inventing a figure would put a fabricated one on a board — but it happened without a word.
+`closeDay` now reports which lines it could not close and why, and the nightly job tells
+whoever plans the floor, **once per day** however often it is re-run (the close is rebuildable
+by design). Verified: one notification, role `planner`, naming the line.
+
+The two reasons are told apart because the fix differs: **no plan at all** means nobody planned
+the line; **a plan missing its SMV or manpower** is a form somebody half-filled. A planner told
+only "skipped" has to go and find out which.
+
+`planForEfficiency` returns the two values rather than a bare verdict, so a caller cannot ask
+whether a day is measurable and then reach past the answer for fields that might be null —
+which is exactly what the first draft did, and the type checker said so.
 
 ---
 
@@ -469,6 +501,41 @@ after : L2 10:00 — 137 of 145. bobbin jam, 15 min
 and re-opening the box holds `"bobbin jam, 15 min"`.
 
 **Where:** `src/app/(app)/lines/board-client.tsx` (`onSave`).
+
+## F49 — an intermittent hydration failure after saving a day plan · LOW
+
+Found while verifying F47, and **not caused by it** — see below.
+
+Saving a plan on `/lines` and then navigating produces **React #418** (*hydration failed —
+the server HTML did not match the client*) about half the time. The destination renders
+correctly and React recovers by re-rendering on the client, so nothing is visibly broken; a
+floor user would see at most a flicker, and any un-committed local state on the destination
+would be lost.
+
+What was measured, on the deployed build:
+
+| Path | Result |
+|---|---|
+| `/lines`, `/lines/hourly`, `/lines/endline` — plain load | clean |
+| `/lines/hourly` — six consecutive loads with plans present | 6/6 clean |
+| save a plan → navigate to `/lines/hourly` | 2 of 3 errored |
+| save a plan → navigate to `/lines/endline` | 1 of 2 errored |
+| save a plan → navigate to `/maintenance` | clean |
+
+**It is not F47's change.** The error appears going to `/lines/endline`, a screen that change
+never touched, and the hourly screen alone is clean six times out of six.
+
+The obvious suspect was ruled out: `minutesSince()` reads `Date.now()` during render in
+`hourly-client.tsx`, which would mismatch between server and client — but it only renders for
+an open stoppage, and this tenant has none at all (`downtimes` is empty).
+
+**Cause not identified.** What is known is that it needs the plan save first, which is the one
+path that calls `revalidatePath('/lines')` and then `router.refresh()`; a hard navigation
+arriving while that refresh is in flight is the shape to look at next. Recorded rather than
+guessed at.
+
+**Where:** `src/modules/production/actions.ts` (`planTheLine` → `revalidatePath`) ·
+`src/app/(app)/lines/plan-day.tsx` (the `router.refresh()` after it).
 
 ## Observation, not a finding
 
