@@ -1,13 +1,20 @@
 # Deploy on tag — the deliberate act between "CI is green" and "the factory runs it".
 #
-# Pushing to main builds, tests and publishes an image; it deploys NOTHING. Shipping to
-# the VPS happens only when somebody either pushes a `v*` tag or presses Run workflow —
-# so a merged mistake cannot reach a live factory by momentum alone (handover audit GL-10,
-# closed by choosing the gated option deliberately).
+# NOTE (platform.fabricxai.com): this deployment's PRIMARY ship path is the VPS-side
+# auto-deploy timer (ops/vps-platform/), which polls GHCR's `:main` tag and deploys the
+# newest green build by digest — no repo secret involved. This workflow is the manual,
+# push-button alternative; it stays dormant until the three DEPLOY_* secrets below are
+# set on the repo (needs repo admin).
 #
-# The SSH key this uses is forced to a single command on the VPS (`/opt/fabricxai/
-# deploy.sh`) that accepts exactly one thing: a bare image digest. A leaked key can
-# re-deploy an already-published image and nothing else — no shell, no pty, no forwarding.
+# Pushing to main builds, tests and publishes an image; it deploys NOTHING here. This
+# workflow ships to the VPS only when somebody either pushes a `v*` tag or presses Run
+# workflow — so a merged mistake cannot reach a live deployment by momentum alone
+# (handover audit GL-10, closed by choosing the gated option deliberately).
+#
+# The SSH key this uses is forced to a single command on the VPS
+# (`/opt/fabricxai-platform/ops/vps-platform/deploy.sh`) that accepts exactly one thing:
+# a bare image digest. A leaked key can re-deploy an already-published image and nothing
+# else — no shell, no pty, no forwarding.
 #
 # The image must already exist: main CI publishes `ghcr.io/<repo>:<commit-sha>` for every
 # green push. Tagging a commit that never went through main CI fails here with a clear
@@ -30,7 +37,7 @@ concurrency:
 
 jobs:
   deploy:
-    name: deploy · baraka VPS
+    name: deploy · platform VPS
     runs-on: ubuntu-latest
     permissions:
       contents: read

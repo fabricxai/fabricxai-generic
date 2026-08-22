@@ -1,0 +1,77 @@
+# Overlay for the shared-host deployment at platform.fabricxai.com.
+#
+# This instance runs BESIDE the baraka factory stack on the same VPS (169.58.141.169),
+# so three things about the single-factory compose file cannot hold as written:
+#
+#   1. Ports 80/443 are already owned by the baraka stack's Caddy. That Caddy fronts
+#      BOTH domains (its Caddyfile has a `platform.fabricxai.com` site block), so this
+#      stack's own caddy service must not start — it is parked behind a profile nothing
+#      activates. A future dedicated host runs the base file alone and gets caddy back.
+#   2. The two Caddy↔app hops cross compose projects, which Docker only allows over a
+#      network both sides joined: the pre-created external `edge` network. Only the two
+#      services the proxy must reach join it, under stable aliases — the databases stay
+#      reachable from their own project only.
+#   3. Container names: the base file's `fxai-*` names are taken. `fxp-*` here, so
+#      `docker ps` on the host reads unambiguously.
+#
+# Always use BOTH files and an explicit project name (volumes and the default network
+# are namespaced by it — the explicit -p is what keeps this stack's volumes apart from
+# baraka's):
+#
+#   docker compose -p fabricxai-platform \
+#     -f docker-compose.prod.yml -f docker-compose.platform.yml \
+#     --env-file .env.production <cmd>
+#
+# ops/vps-platform/ has the deploy scripts and systemd units that do exactly that.
+
+services:
+  caddy:
+    # Never started on the shared host — see note 1. `docker compose --profile
+    # standalone-ingress up -d caddy` would bring it back deliberately.
+    profiles: [standalone-ingress]
+
+  app:
+    container_name: fxp-app
+    networks:
+      default: {}
+      edge:
+        aliases: [platform-app]
+
+  worker:
+    container_name: fxp-worker
+
+  migrate:
+    container_name: fxp-migrate
+
+  postgres:
+    container_name: fxp-postgres
+
+  pgbouncer:
+    container_name: fxp-pgbouncer
+
+  redis:
+    container_name: fxp-redis
+
+  minio:
+    container_name: fxp-minio
+    # On edge because presigned URLs are served on the app's own origin: the shared
+    # Caddy routes platform.fabricxai.com/{S3_BUCKET}/* straight to this MinIO.
+    networks:
+      default: {}
+      edge:
+        aliases: [platform-minio]
+
+  minio-init:
+    container_name: fxp-minio-init
+
+  backup:
+    container_name: fxp-backup
+
+  docs-sync:
+    container_name: fxp-docs-sync
+
+networks:
+  # Created once on the host with `docker network create edge`; shared with the baraka
+  # stack's Caddy. External so no compose project claims to own it.
+  edge:
+    external: true

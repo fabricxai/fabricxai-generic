@@ -1,0 +1,12 @@
+# Every 2 minutes; systemd will not start a run while the previous one is active, so
+# polls never overlap a deploy in flight.
+[Unit]
+Description=FabricXAI platform — poll GHCR for a newer main image
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=2min
+AccuracySec=30s
+
+[Install]
+WantedBy=timers.target

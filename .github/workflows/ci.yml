@@ -643,13 +643,20 @@ jobs:
       # Tagged by commit SHA, never `:latest`. The tag is for humans reading the registry;
       # what gets deployed is the digest below, because a tag can be moved and a digest
       # cannot.
+      #
+      # `:main` is the one deliberate exception: a moving tag the VPS auto-deploy timer
+      # (ops/vps-platform/autodeploy.sh) polls to learn that a newer green build exists.
+      # It is a POINTER, not what runs — the poller resolves it to a digest and pins
+      # .env.production to that digest, so "which build is running" stays answerable.
       - name: Build and push
         id: push
         uses: docker/build-push-action@v6
         with:
           context: .
           push: true
-          tags: ghcr.io/${{ github.repository }}:${{ github.sha }}
+          tags: |
+            ghcr.io/${{ github.repository }}:${{ github.sha }}
+            ghcr.io/${{ github.repository }}:main
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
