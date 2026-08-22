@@ -5,9 +5,9 @@ import { redirect } from 'next/navigation'
 import { EmptyState, InlineAlert } from '@/components/fx/feedback'
 import { Badge } from '@/components/fx/primitives'
 import { Eyebrow, SectionHeading } from '@/components/fx/signature'
-import { Ident } from '@/components/fx/format'
 import { ShipmentActions } from '@/components/fx/shipment-actions'
 import { SavableCard } from '@/components/fx/save-card'
+import { EntityRef } from '@/components/shell/entity-drawer'
 import { FloorTabs } from '@/components/shell/floor-tabs'
 import { PageHeader } from '@/components/shell/page-shell'
 import { eq } from 'drizzle-orm'
@@ -187,7 +187,14 @@ function ShipmentCard({ shipment }: { shipment: ShipmentRow }) {
     >
       <div style={{ padding: '16px 22px', display: 'flex', flexDirection: 'column', gap: 12, flex: 1 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          {shipment.poNumber ? <Ident size={14}>{shipment.poNumber}</Ident> : null}
+          {/* The PO peeks (spec §3): the clerk mid-packing reads the order — buyer,
+              quantity, ex-factory, filed papers — without losing this board. Wrapped in
+              Ident's own face, since Ident takes only a string. */}
+          {shipment.poNumber ? (
+            <span data-mono style={{ font: '400 14px/1.3 var(--fx-font-mono)', color: 'var(--fx-text-primary)' }}>
+              <EntityRef kind="order" reference={shipment.poNumber} />
+            </span>
+          ) : null}
           <Badge>partial {shipment.partialNo}</Badge>
           <Badge>{shipment.mode}</Badge>
           {shipment.lcNumber ? (
