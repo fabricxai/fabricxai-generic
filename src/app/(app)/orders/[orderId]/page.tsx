@@ -8,19 +8,27 @@ import { RunRateCard } from '@/components/fx/run-rate'
 import { SectionHeading } from '@/components/fx/signature'
 import { FactPair } from '@/components/fx/tna'
 import { PageHeader } from '@/components/shell/page-shell'
-import { canWrite, NAV } from '@/components/shell/nav'
+import { canSee, canWrite, NAV } from '@/components/shell/nav'
+import { requestLocale } from '@/lib/ui-locale'
+import { activeModuleIds } from '@/modules/core/activation'
 import { getCtx } from '@/modules/core/session'
 import { companyProfile } from '@/modules/settings/service'
-import { orderDetail, tnaTemplateChoices } from '@/modules/orders/queries'
-import { orderStatusMachine, type OrderStatus } from '@/modules/orders/service'
+import { orderDetail, orderFileRefs, orderTimeline, tnaTemplateChoices } from '@/modules/orders/queries'
+import { orderPulse, orderStatusMachine, type OrderStatus } from '@/modules/orders/service'
 import { orderRunRate } from '@/modules/production/queries'
 import { preFinalReadiness, type QualityPolicy } from '@/modules/quality/service'
+import { checkPpApprovalFor } from '@/modules/sampling/service'
 import { getPolicy } from '@/modules/settings/service'
+import { shipmentBoard } from '@/modules/shipment/queries'
 import { factoryToday, FACTORY_TIMEZONE } from '@/lib/dates'
 
 import { OrderBreakdown } from './breakdown-client'
+import { OrderDocuments } from './documents'
+import { PulseStrip } from './pulse-strip'
 import { OrderStatusControl } from './status-control'
+import { OrderTimeline } from './timeline'
 import { OrderTna } from './tna-client'
+import { WorkspaceTabs, type WorkspaceTab } from './workspace-tabs'
 
 /**
  * 1.3 Order Desk — one order.
@@ -34,8 +42,10 @@ export const dynamic = 'force-dynamic'
 
 export default async function OrderDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ orderId: string }>
+  searchParams: Promise<{ tab?: string }>
 }) {
   const ctx = await getCtx(await headers())
   if (!ctx) redirect('/login')
@@ -47,11 +57,27 @@ export default async function OrderDetailPage({
   // The same decision the shell's read-only banner makes, asked here so the timeline is
   // given no hand to move it with rather than offering a button that a role check refuses.
   const profile = await companyProfile(ctx)
-  const mayWrite = canWrite(
-    NAV.find((n) => n.id === 'orders')!,
-    ctx.roles,
-    profile?.factoryType ?? 'woven',
-  )
+  const factoryType = profile?.factoryType ?? 'woven'
+  const mayWrite = canWrite(NAV.find((n) => n.id === 'orders')!, ctx.roles, factoryType)
+
+  /*
+   * Which tabs exist: module activation ∩ role permission (spec §2).
+   *
+   * Both answers come from where they already live — `activeModuleIds` is the tenant's
+   * switchboard and `canSee` is the nav's own audience rule, the same one the sidebar
+   * and MARBIM's tool scope read. A second list here would be a third truth about who
+   * may see a department's numbers, and the one that drifted would be this one.
+   *
+   * Tabs are (nav id → module id) because a tab is a WINDOW onto another module: the
+   * production tab shows what `lines` shows, gated by whether `production` runs here.
+   */
+  const activeModules = await activeModuleIds(ctx)
+  const tabAllowed = (navId: string, moduleId: string): boolean => {
+    const item = NAV.find((n) => n.id === navId)
+    return Boolean(item) && activeModules.has(moduleId) && canSee(item!, ctx.roles, factoryType)
+  }
+
+  const locale = await requestLocale(profile?.locale)
 
   /*
    * A viewer sees the operation, not the commercial terms (live-test finding, Phase 9:
@@ -62,32 +88,78 @@ export default async function OrderDetailPage({
 
   const po = order.poNumbers[0] ?? order.id.slice(0, 8)
   const late = order.milestones.filter((m) => m.status === 'late').length
+  const today = factoryToday()
+
+  const showProduction = tabAllowed('lines', 'production')
+  const showShipping = tabAllowed('shipment', 'shipment')
+
+  const files = await orderFileRefs(ctx, order.id)
+
+  const TABS: WorkspaceTab[] = [
+    { id: 'overview', label: 'Overview' },
+    { id: 'timeline', label: 'Timeline' },
+    ...(files.length > 0
+      ? [{ id: 'documents', label: 'Documents', hint: String(files.length) }]
+      : [{ id: 'documents', label: 'Documents' }]),
+    ...(showProduction ? [{ id: 'production', label: 'Production' }] : []),
+    ...(showShipping ? [{ id: 'shipping', label: 'Shipping' }] : []),
+  ]
+
+  // A tab a caller cannot see falls back to Overview rather than 404ing: the link may
+  // have been pasted by somebody whose roles differ, and an order they CAN read should
+  // still open.
+  const requested = (await searchParams).tab ?? 'overview'
+  const tab = TABS.some((t) => t.id === requested) ? requested : 'overview'
+
+  /*
+   * The pulse (spec §2), assembled through each owner's read surface — sampling answers
+   * its own gate, the shipment board its own numbers — and decided by a pure function.
+   * Read on every tab: the strip is the reason the workspace exists, and hiding it
+   * behind Overview would mean the blocker vanishes exactly when somebody goes looking
+   * at the department it blocks.
+   */
+  const ppGate = order.style
+    ? await checkPpApprovalFor(ctx, { orderId: order.id, orderStyleId: order.style.id })
+    : null
+  const shipRows = showShipping
+    ? (await shipmentBoard(ctx)).filter((row) => row.orderId === order.id)
+    : []
+  const pulse = orderPulse({
+    status: order.status as OrderStatus,
+    today,
+    milestones: order.milestones,
+    ppGate,
+    shipments: shipRows,
+  })
 
   // The run rate is only meaningful once there is a quantity to burn down against. An order
   // with no contracted quantity is still being negotiated, and a card that reads "completes
   // never" on it is noise on a screen a merchandiser lives in.
   const contractedQty = order.style?.contractedQty ?? null
-  const forecast = contractedQty
-    ? await orderRunRate(ctx, {
-        orderId: order.id,
-        contractedQty,
-        asOf: factoryToday(),
-        milestoneDate:
-          order.milestones.find((m) => m.name === 'sewing_end')?.plannedDate ?? null,
-      })
-    : null
+  const forecast =
+    contractedQty && tab === 'production'
+      ? await orderRunRate(ctx, {
+          orderId: order.id,
+          contractedQty,
+          asOf: today,
+          milestoneDate:
+            order.milestones.find((m) => m.name === 'sewing_end')?.plannedDate ?? null,
+        })
+      : null
 
   /*
    * Will this order fail its final? (adoption plan 5.2). `preFinalReadiness` reached only a
    * MARBIM tool — a question neither the merchandiser nor the QC desk knew to ask. Read for
    * THIS order out of the window's list; null when its final is outside the horizon.
    */
-  const today = factoryToday()
   const qualityPolicy = await getPolicy<QualityPolicy>(ctx, 'quality')
   const readiness =
     (await preFinalReadiness(ctx, { today, windowDays: 21 }, qualityPolicy)).find(
       (row) => row.orderId === order.id,
     ) ?? null
+
+  // Only the tab being rendered pays for its own read — the point of server tabs.
+  const events = tab === 'timeline' ? await orderTimeline(ctx, order.id) : []
 
   return (
     <>
@@ -102,6 +174,76 @@ export default async function OrderDetailPage({
       />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 36 }}>
+        {/* The strip, then the tabs — what the order needs before where to look. */}
+        <PulseStrip pulse={pulse} locale={locale} />
+
+        <WorkspaceTabs tabs={TABS} active={tab} basePath={`/orders/${order.id}`} />
+
+        {tab === 'timeline' ? <OrderTimeline events={events} /> : null}
+        {tab === 'documents' ? <OrderDocuments files={files} /> : null}
+
+        {tab === 'production' ? (
+          forecast ? (
+            <section>
+              <SectionHeading eyebrow="read-only · a window into the sewing floor">
+                Where production has got to
+              </SectionHeading>
+              <RunRateCard forecast={forecast} />
+            </section>
+          ) : (
+            <p style={{ font: '400 14px/1.6 var(--fx-font-sans)', color: 'var(--fx-text-secondary)' }}>
+              Nothing has been sewn against this order yet, or it has no contracted quantity
+              to burn down against.
+            </p>
+          )
+        ) : null}
+
+        {tab === 'shipping' ? (
+          shipRows.length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {shipRows.map((row) => (
+                <div
+                  key={row.id}
+                  style={{
+                    display: 'flex',
+                    gap: 14,
+                    flexWrap: 'wrap',
+                    alignItems: 'baseline',
+                    padding: '13px 18px',
+                    background: 'var(--fx-bg-surface)',
+                    border: '1px solid var(--fx-border-subtle)',
+                    borderRadius: 'var(--fx-radius-md)',
+                  }}
+                >
+                  <Badge>partial {row.partialNo}</Badge>
+                  <Badge tone={row.expNumber ? 'success' : 'danger'}>
+                    {row.expNumber ? `EXP ${row.expNumber}` : 'no EXP'}
+                  </Badge>
+                  <span data-mono style={{ font: '400 13px/1.4 var(--fx-font-mono)' }}>
+                    {row.actualExFactory ?? row.plannedExFactory ?? '—'}
+                  </span>
+                  {/* The blockers the board already computes — one list, not a second
+                      opinion about what stops a bank submission. */}
+                  <span
+                    style={{
+                      font: '400 13px/1.4 var(--fx-font-sans)',
+                      color: row.blockers.length > 0 ? 'var(--fx-danger)' : 'var(--fx-text-tertiary)',
+                    }}
+                  >
+                    {row.blockers.length > 0 ? row.blockers.join(' · ') : 'ready for the bank'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p style={{ font: '400 14px/1.6 var(--fx-font-sans)', color: 'var(--fx-text-secondary)' }}>
+              No shipment has been raised against this order yet.
+            </p>
+          )
+        ) : null}
+
+        {tab !== 'overview' ? null : (
+        <>
         <FinalReadinessStrip readiness={readiness} />
 
         <Card>
@@ -145,15 +287,6 @@ export default async function OrderDetailPage({
             </FactPair>
           </div>
         </Card>
-
-        {forecast ? (
-          <section>
-            <SectionHeading eyebrow="read-only · a window into the sewing floor">
-              Where production has got to
-            </SectionHeading>
-            <RunRateCard forecast={forecast} />
-          </section>
-        ) : null}
 
         <section>
           <SectionHeading eyebrow={late > 0 ? `${late} late` : undefined}>
@@ -275,6 +408,8 @@ export default async function OrderDetailPage({
             </div>
           </section>
         ) : null}
+        </>
+        )}
       </div>
     </>
   )
