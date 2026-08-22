@@ -15,7 +15,7 @@ import { readJsonbArray } from '@/modules/core/jsonb'
 import { scoped } from '@/modules/core/scoped'
 import { withTenantRead } from '@/modules/core/tenancy'
 
-import { documents, users } from '@/db/schema/core'
+import { auditLog, documents, pendingChanges, users } from '@/db/schema/core'
 
 import {
   orderBreakdowns,
@@ -579,6 +579,9 @@ export interface OrderFileRef {
   filename: string
   /** What the filer called it — "buyer PO scan" — when they said; the filename otherwise. */
   label: string | null
+  /** The document's domain kind ('buyer_po', 'lc', …) — the Documents tab groups by it. */
+  kind: string | null
+  filedAt: Date
 }
 
 /**
@@ -597,6 +600,8 @@ export async function orderFileRefs(ctx: AnyCtx, orderId: string): Promise<Order
         documentId: orderFiles.documentId,
         filename: documents.filename,
         label: orderFiles.label,
+        kind: documents.kind,
+        filedAt: orderFiles.createdAt,
       })
       .from(orderFiles)
       .innerJoin(
@@ -606,4 +611,205 @@ export async function orderFileRefs(ctx: AnyCtx, orderId: string): Promise<Order
       .where(scoped(orderFiles, ctx, eq(orderFiles.orderId, orderId)))
       .orderBy(desc(orderFiles.createdAt)),
   )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The Order File timeline (specs/order-centric-core.md §2)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * One entry in the order's life, whichever table it left its trace in.
+ *
+ * A discriminated union rather than a prose string: the screen renders each kind in its
+ * own shape, and a future consumer (the Pulse, a MARBIM narration) reads facts, not
+ * sentences.
+ */
+export type TimelineEvent =
+  | { kind: 'created'; at: Date; byName: string | null }
+  | { kind: 'status'; at: Date; byName: string | null; from: string | null; to: string | null }
+  | {
+      kind: 'approval'
+      at: Date
+      byName: string | null
+      targetTable: string
+      source: string
+    }
+  | {
+      kind: 'document'
+      at: Date
+      byName: string | null
+      documentId: string
+      filename: string
+      label: string | null
+    }
+  | { kind: 'milestone'; at: Date; byName: string | null; name: string }
+  | { kind: 'revision'; at: Date; byName: string | null; revision: number; reason: string | null }
+
+/**
+ * Everything that ever happened to this order, newest first — the Order File's spine.
+ *
+ * A READ MODEL, not a new store (spec §2 decided): the traces already exist — the ⚖
+ * interceptor's `audit_log` rows, committed `pending_changes`, `order_files`, actualised
+ * TNA milestones, `order_revisions` — and this merges them live. Nothing writes here, so
+ * nothing can drift; if volume ever demands it, a materialised projection is an
+ * optimisation behind the same shape, not a redesign.
+ *
+ * `audit_log` and `pending_changes` are CORE tables, read here the way this file already
+ * reads `users` and `documents` — rule 11 is about the other MODULES' tables, and their
+ * rows (requests, when X-4 lands) will come through their owners' queries.
+ */
+export async function orderTimeline(
+  ctx: AnyCtx,
+  orderId: string,
+  input: { limit?: number } = {},
+): Promise<TimelineEvent[]> {
+  const limit = input.limit ?? 200
+
+  return withTenantRead(ctx, async (tx) => {
+    const [orderRow] = await tx
+      .select({ at: orders.createdAt, byName: users.name })
+      .from(orders)
+      .leftJoin(users, eq(users.id, orders.createdBy))
+      .where(scoped(orders, ctx, eq(orders.id, orderId)))
+    // Tenant-invisible and nonexistent are the same answer, as everywhere.
+    if (!orderRow) return []
+
+    const statusRows = await tx
+      .select({
+        at: auditLog.occurredAt,
+        byName: users.name,
+        before: auditLog.before,
+        after: auditLog.after,
+      })
+      .from(auditLog)
+      .leftJoin(users, eq(users.id, auditLog.actorUserId))
+      .where(
+        scoped(
+          auditLog,
+          ctx,
+          and(
+            eq(auditLog.targetTable, 'orders'),
+            eq(auditLog.targetId, orderId),
+            eq(auditLog.action, 'update'),
+            sql`'status' = ANY(${auditLog.changedFields})`,
+          ),
+        ),
+      )
+
+    const approvalRows = await tx
+      .select({
+        at: pendingChanges.committedAt,
+        byName: users.name,
+        targetTable: pendingChanges.targetTable,
+        source: pendingChanges.source,
+      })
+      .from(pendingChanges)
+      .leftJoin(users, eq(users.id, pendingChanges.reviewedBy))
+      .where(
+        scoped(
+          pendingChanges,
+          ctx,
+          and(
+            eq(pendingChanges.moduleId, 'orders'),
+            eq(pendingChanges.committedRowId, orderId),
+            eq(pendingChanges.status, 'committed'),
+          ),
+        ),
+      )
+
+    const fileRows = await tx
+      .select({
+        at: orderFiles.createdAt,
+        documentId: orderFiles.documentId,
+        filename: documents.filename,
+        label: orderFiles.label,
+      })
+      .from(orderFiles)
+      .innerJoin(
+        documents,
+        and(eq(documents.id, orderFiles.documentId), isNull(documents.deletedAt)),
+      )
+      .where(scoped(orderFiles, ctx, eq(orderFiles.orderId, orderId)))
+
+    const milestoneRows = await tx
+      .select({ name: tnaMilestones.name, actualDate: tnaMilestones.actualDate })
+      .from(tnaMilestones)
+      .where(
+        scoped(
+          tnaMilestones,
+          ctx,
+          and(eq(tnaMilestones.orderId, orderId), sql`${tnaMilestones.actualDate} IS NOT NULL`),
+        ),
+      )
+
+    const revisionRows = await tx
+      .select({
+        at: orderRevisions.createdAt,
+        byName: users.name,
+        revision: orderRevisions.revision,
+        reason: orderRevisions.reason,
+      })
+      .from(orderRevisions)
+      .leftJoin(users, eq(users.id, orderRevisions.createdBy))
+      .where(scoped(orderRevisions, ctx, eq(orderRevisions.orderId, orderId)))
+
+    const events: TimelineEvent[] = [
+      { kind: 'created', at: orderRow.at, byName: orderRow.byName },
+      ...statusRows.map(
+        (row): TimelineEvent => ({
+          kind: 'status',
+          at: row.at,
+          byName: row.byName,
+          from: typeof row.before?.status === 'string' ? row.before.status : null,
+          to: typeof row.after?.status === 'string' ? row.after.status : null,
+        }),
+      ),
+      ...approvalRows.flatMap((row): TimelineEvent[] =>
+        // committedAt is set in the same statement that marks the row committed; a null
+        // here would be a corrupt row, and the timeline skips rather than invents a date.
+        row.at
+          ? [
+              {
+                kind: 'approval',
+                at: row.at,
+                byName: row.byName,
+                targetTable: row.targetTable,
+                source: row.source,
+              },
+            ]
+          : [],
+      ),
+      ...fileRows.map(
+        (row): TimelineEvent => ({
+          kind: 'document',
+          at: row.at,
+          byName: null,
+          documentId: row.documentId,
+          filename: row.filename,
+          label: row.label,
+        }),
+      ),
+      ...milestoneRows.map(
+        (row): TimelineEvent => ({
+          kind: 'milestone',
+          // A date column, not a timestamp: the completion is a factory-day fact, pinned
+          // to midnight UTC so it sorts stably among the timestamped rows.
+          at: new Date(`${row.actualDate}T00:00:00Z`),
+          byName: null,
+          name: row.name,
+        }),
+      ),
+      ...revisionRows.map(
+        (row): TimelineEvent => ({
+          kind: 'revision',
+          at: row.at,
+          byName: row.byName,
+          revision: row.revision,
+          reason: row.reason,
+        }),
+      ),
+    ]
+
+    return events.sort((a, b) => b.at.getTime() - a.at.getTime()).slice(0, limit)
+  })
 }

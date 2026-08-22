@@ -88,6 +88,186 @@ const PRODUCTION_STARTED: readonly OrderStatus[] = [
 ]
 
 // ─────────────────────────────────────────────────────────────────────────────
+// The Pulse (specs/order-centric-core.md §2)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** The slice of a milestone the pulse reasons over. Structural, so any caller fits. */
+export interface PulseMilestone {
+  name: string
+  plannedDate: string | null
+  actualDate: string | null
+  status: string
+  ownerRole: string | null
+}
+
+/** The slice of a shipment the pulse reasons over — the shipment board's own facts. */
+export interface PulseShipment {
+  partialNo: number
+  expNumber: string | null
+  portStatus: string
+  /** Days between (actual ?? planned) ex-factory and the LC's latest-shipment clause. */
+  daysAgainstLatestShipment: number | null
+}
+
+/**
+ * One thing the pulse strip says. `key` is a MESSAGES catalogue key (the gate
+ * reasonKeys land here verbatim — they are already sentences with copy in both
+ * languages); `params` are its numbers. Structured facts, never prose: the strip
+ * renders them, and a MARBIM primer can narrate them, from the same rows.
+ */
+export interface PulseFact {
+  key: string
+  params: Record<string, unknown>
+  severity: 'warning' | 'critical'
+}
+
+export interface OrderPulse {
+  status: OrderStatus
+  /** The next undone milestone by planned date — what the order is waiting FOR. */
+  next: {
+    name: string
+    plannedDate: string | null
+    daysTo: number | null
+    ownerRole: string | null
+  } | null
+  /** What is in the way, worst first. Empty means the order is simply in motion. */
+  facts: PulseFact[]
+}
+
+const dayDiff = (fromIso: string, toIso: string): number =>
+  Math.round(
+    (new Date(`${toIso}T00:00:00Z`).getTime() - new Date(`${fromIso}T00:00:00Z`).getTime()) /
+      86_400_000,
+  )
+
+/**
+ * "The platform drives the user" as a pure function over the order aggregate.
+ *
+ * Deliberately computation-free of I/O: the caller assembles the inputs through each
+ * owner's read surface (`checkPpApprovalFor` from sampling, `shipmentBoard` from
+ * shipment, the order's own milestones) and this decides what the strip says. Open
+ * requests join these facts when the X-4 module lands — the shape already has room,
+ * because a fact is a fact whichever module states it.
+ *
+ * Severity is the triage the floor actually uses: `critical` is money or a legal
+ * deadline (a breached LC clause, a missing EXP, a late critical path); `warning` is
+ * the thing to fix this week before it becomes one.
+ */
+export function orderPulse(input: {
+  status: OrderStatus
+  /** The factory's today, ISO date — passed in so the function stays clock-free. */
+  today: string
+  milestones: readonly PulseMilestone[]
+  /** Sampling's PP gate for the headline style; null when there is no style to gate. */
+  ppGate: { passed: boolean; reasonKey?: string; facts?: Record<string, unknown> } | null
+  shipments: readonly PulseShipment[]
+}): OrderPulse {
+  // A closed or cancelled order has no pulse — the file stays readable, the strip
+  // stops claiming anything is owed.
+  if (input.status === 'closed' || input.status === 'cancelled') {
+    return { status: input.status, next: null, facts: [] }
+  }
+
+  const pending = input.milestones
+    .filter((m) => m.actualDate === null)
+    .sort((a, b) => {
+      if (a.plannedDate === null) return b.plannedDate === null ? 0 : 1
+      if (b.plannedDate === null) return -1
+      return a.plannedDate < b.plannedDate ? -1 : a.plannedDate > b.plannedDate ? 1 : 0
+    })
+  const nextMilestone = pending[0] ?? null
+
+  const facts: PulseFact[] = []
+
+  const late = input.milestones.filter((m) => m.status === 'late')
+  if (late.length > 0) {
+    facts.push({
+      key: 'pulse.milestones_late',
+      params: { count: late.length, worst: late[0]!.name },
+      severity: 'critical',
+    })
+  }
+  const atRisk = input.milestones.filter((m) => m.status === 'at_risk')
+  if (atRisk.length > 0) {
+    facts.push({
+      key: 'pulse.milestones_at_risk',
+      params: { count: atRisk.length },
+      severity: 'warning',
+    })
+  }
+
+  /*
+   * The PP gate matters exactly while cutting has not happened (1.4 → 5.1). Once a
+   * cutting_start milestone carries an actual date the gate is history, whatever a
+   * re-check would say — re-litigating it on the strip would tell a merchandiser to
+   * chase an approval for fabric already on the tables.
+   */
+  const cutDone = input.milestones.some(
+    (m) => m.name === 'cutting_start' && m.actualDate !== null,
+  )
+  if (input.ppGate && !input.ppGate.passed && !cutDone) {
+    const cuttingLate = input.milestones.some(
+      (m) => m.name === 'cutting_start' && m.status === 'late',
+    )
+    facts.push({
+      key: input.ppGate.reasonKey ?? 'gates.pp_approval.not_approved',
+      params: input.ppGate.facts ?? {},
+      severity: cuttingLate ? 'critical' : 'warning',
+    })
+  }
+
+  for (const shipment of input.shipments) {
+    // The board's own rule: a shipment still merely planned owes nobody an EXP yet.
+    if (!shipment.expNumber && shipment.portStatus !== 'planned') {
+      facts.push({
+        key: 'pulse.exp_missing',
+        params: { partialNo: shipment.partialNo },
+        severity: 'critical',
+      })
+    }
+    if (shipment.daysAgainstLatestShipment !== null) {
+      if (shipment.daysAgainstLatestShipment < 0) {
+        facts.push({
+          key: 'pulse.lc_deadline_breached',
+          params: {
+            partialNo: shipment.partialNo,
+            days: -shipment.daysAgainstLatestShipment,
+          },
+          severity: 'critical',
+        })
+      } else if (shipment.daysAgainstLatestShipment <= 7) {
+        facts.push({
+          key: 'pulse.lc_deadline_near',
+          params: {
+            partialNo: shipment.partialNo,
+            days: shipment.daysAgainstLatestShipment,
+          },
+          severity: 'warning',
+        })
+      }
+    }
+  }
+
+  // Worst first, original order within a severity — the strip reads top-down.
+  facts.sort((a, b) => (a.severity === b.severity ? 0 : a.severity === 'critical' ? -1 : 1))
+
+  return {
+    status: input.status,
+    next: nextMilestone
+      ? {
+          name: nextMilestone.name,
+          plannedDate: nextMilestone.plannedDate,
+          daysTo: nextMilestone.plannedDate
+            ? dayDiff(input.today, nextMilestone.plannedDate)
+            : null,
+          ownerRole: nextMilestone.ownerRole,
+        }
+      : null,
+    facts,
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Breakdown
 // ─────────────────────────────────────────────────────────────────────────────
 

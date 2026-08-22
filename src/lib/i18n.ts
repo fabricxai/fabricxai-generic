@@ -435,6 +435,16 @@ export const MESSAGES: Catalogue = {
       'That material is not on this Utilization Declaration. A declaration covers named materials only.',
     'commercial.ud.unit_mismatch':
       'This asks in a different unit from the one the declaration authorises, and converting between them is a customs question.',
+    /* The pulse strip (specs/order-centric-core.md §2) — what the order is blocked on,
+       said over the workspace. Gate reasonKeys join these verbatim. */
+    'pulse.milestones_late': '{count} milestone(s) late — worst: {worst}.',
+    'pulse.milestones_at_risk': '{count} milestone(s) at risk of slipping.',
+    'pulse.exp_missing':
+      'Shipment {partialNo} has no EXP number — the bank will not take its documents.',
+    'pulse.lc_deadline_breached':
+      'Shipment {partialNo} is {days} day(s) past the LC’s latest-shipment date.',
+    'pulse.lc_deadline_near':
+      'Shipment {partialNo} is {days} day(s) from the LC’s latest-shipment date.',
     'gates.pp_approval.not_approved':
       'The buyer has not approved the PP sample for this style, so cutting cannot start.',
     'gates.pp_approval.no_sample':
@@ -914,6 +924,14 @@ export const MESSAGES: Catalogue = {
       'এই মালটি এই UD-তে নেই। UD শুধু নাম-উল্লেখ করা মালামাল কভার করে।',
     'commercial.ud.unit_mismatch':
       'UD যে এককে অনুমোদন দিয়েছে, চাওয়া হয়েছে অন্য এককে — এক থেকে অন্যটিতে রূপান্তর কাস্টমসের প্রশ্ন।',
+    'pulse.milestones_late': '{count}টি মাইলফলক দেরিতে — সবচেয়ে খারাপ: {worst}।',
+    'pulse.milestones_at_risk': '{count}টি মাইলফলক পিছিয়ে পড়ার ঝুঁকিতে।',
+    'pulse.exp_missing':
+      'শিপমেন্ট {partialNo}-এর EXP নম্বর নেই — ব্যাংক এর কাগজ নেবে না।',
+    'pulse.lc_deadline_breached':
+      'শিপমেন্ট {partialNo} এলসির শেষ-শিপমেন্ট তারিখ {days} দিন পেরিয়ে গেছে।',
+    'pulse.lc_deadline_near':
+      'শিপমেন্ট {partialNo} এলসির শেষ-শিপমেন্ট তারিখ থেকে {days} দিন দূরে।',
     'gates.pp_approval.not_approved':
       'এই স্টাইলের PP স্যাম্পল বায়ার এখনও অ্যাপ্রুভ করেননি, তাই কাটিং শুরু করা যাবে না।',
     'gates.pp_approval.no_sample':

@@ -28,6 +28,7 @@ import {
 import { runTnaScan } from '@/modules/orders/jobs'
 import { ordersModule } from '@/modules/orders/register'
 import { peekEntity } from '@/modules/core/drawer'
+import { orderTimeline } from '@/modules/orders/queries'
 import { approve, propose } from '@/modules/core/pending-changes'
 import { __resetRegistry, registerModule } from '@/modules/core/registry'
 import { pendingChanges } from '@/db/schema/core'
@@ -661,5 +662,41 @@ describe('the order peek (spec §3)', () => {
       code: 'not_found',
       messageKey: 'errors.reference_not_found',
     })
+  })
+})
+
+describe('the Order File timeline (spec §2)', () => {
+  it('merges every trace this suite already left, newest first', async () => {
+    // The suite above IS the fixture: an order created, its status advanced twice, a
+    // milestone actualised, breakdown revisions committed through the approve loop, and
+    // a document filed by the peek tests. The timeline's job is that none of those
+    // traces is missing and none needed a new table.
+    const events = await orderTimeline(ctxA, orderId)
+    const kinds = new Set(events.map((e) => e.kind))
+
+    expect(kinds).toContain('created')
+    expect(kinds).toContain('status')
+    expect(kinds).toContain('milestone')
+    expect(kinds).toContain('revision')
+    expect(kinds).toContain('approval')
+    expect(kinds).toContain('document')
+
+    for (let i = 1; i < events.length; i++) {
+      expect(events[i - 1]!.at.getTime()).toBeGreaterThanOrEqual(events[i]!.at.getTime())
+    }
+
+    // The status entry carries the transition itself, read back from the ⚖ audit row.
+    const transitions = events.filter((e) => e.kind === 'status')
+    expect(transitions).toContainEqual(
+      expect.objectContaining({ from: 'confirmed', to: 'in_production' }),
+    )
+
+    // The approval entry knows what was signed and from which source.
+    const approval = events.find((e) => e.kind === 'approval')
+    expect(approval).toMatchObject({ targetTable: 'order_breakdowns' })
+  })
+
+  it('is empty across the fence — not an error, the same nothing as everywhere', async () => {
+    expect(await orderTimeline(ctxB, orderId)).toEqual([])
   })
 })
