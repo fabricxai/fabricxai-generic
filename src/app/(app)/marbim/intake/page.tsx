@@ -9,6 +9,7 @@ import { LockedState } from '@/components/fx/feedback'
 import { PageHeader } from '@/components/shell/page-shell'
 import { env } from '@/lib/env'
 import { FloorTabs } from '@/components/shell/floor-tabs'
+import { activeModuleIds } from '@/modules/core/activation'
 import { getCtx } from '@/modules/core/session'
 import { withTenantRead } from '@/modules/core/tenancy'
 import { intakeKindsFor } from '@/modules/marbim/intake'
@@ -66,7 +67,7 @@ export default async function IntakePage() {
    * throw being masked in production, refused as React #441). Those kinds are read from
    * their own screens; the proforma's home is the procurement quote dialog.
    */
-  const kinds = intakeKindsFor(ctx.roles)
+  const kinds = intakeKindsFor(ctx.roles, await activeModuleIds(ctx))
 
   const recent = await withTenantRead(ctx, (tx) =>
     tx

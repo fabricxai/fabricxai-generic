@@ -12,6 +12,7 @@ import { companyProfile, getPolicy } from '@/modules/settings/service'
 import { listModules, resolveReadSchema } from '@/modules/core/registry'
 import { TEXT_EXTRACTABLE_MIME } from '@/lib/document-text'
 
+import { activeModuleIds, assertModuleActive } from '@/modules/core/activation'
 import { AppError } from '@/modules/core/errors'
 import type { AnyCtx } from '@/modules/core/ctx'
 import { buyerAccounts } from '@/modules/buyers/queries'
@@ -100,7 +101,14 @@ export async function ask(
 
     // Only modules that actually registered a primer, and only ones this caller's
     // roles can already read — MARBIM never widens what a person can see.
-    const registered = listModules()
+    //
+    // Filtered by the company's active-module set FIRST (spec §1): a switched-off
+    // module contributes no primer, no pack and no tools, so the assistant cannot
+    // narrate or draft into a department the factory has shelved. An inactive
+    // `fromModule` falls out of `known` below and the scope widens to everything
+    // active, which is what opening MARBIM from a stale tab deserves.
+    const active = await activeModuleIds(ctx)
+    const registered = listModules().filter((m) => active.has(m.id))
     const known = new Set(registered.map((m) => m.id))
     const lead = fromModule && known.has(fromModule) ? fromModule : undefined
 
@@ -219,6 +227,9 @@ export async function intakeContext(
     if (!mayFileKind(kind, ctx.roles)) {
       throw new AppError('forbidden', 'marbim.errors.kind_not_your_desk', { kindId })
     }
+    // The desk wall, then the tenant wall — a kind whose module this factory has
+    // switched off has no inbox for the draft to land in.
+    await assertModuleActive(ctx, kind.moduleId)
 
     const resolved = []
     for (const field of kind.context ?? []) {
@@ -296,6 +307,10 @@ export async function readDocument(input: {
     if (!mayFileKind(kind, ctx.roles)) {
       throw new AppError('forbidden', 'marbim.errors.kind_not_your_desk', { kindId: kind.id })
     }
+
+    // Same second wall as `intakeContext`: the module the draft would land in must be
+    // active for THIS company, whatever chips a stale screen still shows.
+    await assertModuleActive(ctx, kind.moduleId)
 
     /*
      * A form-filling kind has no proposable target, so queueing it would create a job that can
@@ -445,6 +460,10 @@ export async function readIntoForm(input: {
     if (!mayReadKind(kind, ctx.roles)) {
       throw new AppError('forbidden', 'marbim.errors.kind_not_your_desk', { kindId: kind.id })
     }
+    // Reading fills a form whose SAVE lives behind the module's own actions — and those
+    // refuse when the module is off. Refusing here spares the person filling a form
+    // whose save button can only 403.
+    await assertModuleActive(ctx, kind.moduleId)
 
     const sourceText = input.sourceText?.trim() ? input.sourceText : undefined
     if (!sourceText) {
@@ -544,9 +563,10 @@ export async function listIntakeKinds(): Promise<
   const ctx = await requireRole(await headers(), ...INTAKE_ROLES)
 
   return surfaced(async () =>
-    // The caller's OWN kinds. Chips that 403 on submit are worse than no chips, and a wage
-    // gazette offered to a merchandiser invites them to file into payroll's inbox.
-    intakeKindsFor(ctx.roles).map((kind) => ({
+    // The caller's OWN kinds, in THIS company's active modules. Chips that 403 on submit
+    // are worse than no chips — that is as true of a switched-off module's paper as of a
+    // wage gazette offered to a merchandiser.
+    intakeKindsFor(ctx.roles, await activeModuleIds(ctx)).map((kind) => ({
       id: kind.id,
       label: kind.label,
       hint: kind.hint,

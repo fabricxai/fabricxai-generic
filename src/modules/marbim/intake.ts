@@ -325,9 +325,20 @@ const SUPERVISORY: readonly Role[] = ['owner', 'admin']
  * `readDocument` refuses them, so offering one as a chip on the intake screen would be a
  * door onto a wall. They are reached from their own dialog instead, which is the whole point
  * of them.
+ *
+ * `active` is the company's active-module set (`activeModuleIds`, spec §1) — a kind whose
+ * module the factory has switched off is not offered to anybody, owner included, because its
+ * approve inbox is behind a wall every action in that module now refuses at. Required, not
+ * defaulted: a caller who has not asked "active for whom?" has not finished asking. The
+ * matching wall is `assertModuleActive` at each intake door, reading the same set.
  */
-export function intakeKindsFor(roles: readonly Role[]): readonly IntakeKind[] {
-  const fileable = INTAKE_KINDS.filter((kind) => !kind.fillsFormOnly)
+export function intakeKindsFor(
+  roles: readonly Role[],
+  active: ReadonlySet<string>,
+): readonly IntakeKind[] {
+  const fileable = INTAKE_KINDS.filter(
+    (kind) => !kind.fillsFormOnly && active.has(kind.moduleId),
+  )
   if (roles.some((role) => SUPERVISORY.includes(role))) return fileable
   return fileable.filter((kind) => kind.roles.some((role) => roles.includes(role)))
 }

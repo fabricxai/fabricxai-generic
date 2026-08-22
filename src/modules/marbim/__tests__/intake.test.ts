@@ -192,6 +192,13 @@ describe('MARBIM intake kinds', () => {
  * somebody with no standing in it. The chips and the wall are built from one list here so
  * they cannot drift: what a person is shown is exactly what they may queue.
  */
+/**
+ * "Every module on" — what `activeModuleIds` returns for a company that has flipped
+ * nothing. The desk tests below run against it so they stay about ROLES; the activation
+ * axis has its own describe.
+ */
+const ALL_ON: ReadonlySet<string> = new Set(INTAKE_KINDS.map((kind) => kind.moduleId))
+
 describe('a kind belongs to a desk', () => {
   it('every kind names at least one keyholder', () => {
     // The same rule sync handlers hold to. A kind with no roles is a door anyone with
@@ -202,7 +209,7 @@ describe('a kind belongs to a desk', () => {
   })
 
   it('shows a merchandiser their own documents and not another desk’s', () => {
-    const ids = intakeKindsFor(['merchandiser']).map((k) => k.id)
+    const ids = intakeKindsFor(['merchandiser'], ALL_ON).map((k) => k.id)
 
     expect(ids).toContain('buyer_enquiry')
     expect(ids).toContain('buyer_po')
@@ -215,7 +222,7 @@ describe('a kind belongs to a desk', () => {
     // Sorted on both sides — the assertion is about WHICH kinds a desk holds, not about
     // where they happen to sit in the display list.
     const idsFor = (role: Parameters<typeof intakeKindsFor>[0][number]) =>
-      intakeKindsFor([role]).map((k) => k.id).sort()
+      intakeKindsFor([role], ALL_ON).map((k) => k.id).sort()
 
     expect(idsFor('hr')).toEqual(['wage_gazette'])
     expect(idsFor('compliance')).toEqual(['audit_report'])
@@ -231,10 +238,10 @@ describe('a kind belongs to a desk', () => {
     // Form-filling kinds are absent for everyone: there is no inbox for them to land in,
     // so a chip offering one would be a door onto a wall.
     const fileable = INTAKE_KINDS.filter((kind) => !kind.fillsFormOnly)
-    expect(intakeKindsFor(['owner'])).toEqual(fileable)
-    expect(intakeKindsFor(['admin'])).toEqual(fileable)
+    expect(intakeKindsFor(['owner'], ALL_ON)).toEqual(fileable)
+    expect(intakeKindsFor(['admin'], ALL_ON)).toEqual(fileable)
     // And a supervisory role alongside a narrow one still widens, never narrows.
-    expect(intakeKindsFor(['hr', 'admin'])).toEqual(fileable)
+    expect(intakeKindsFor(['hr', 'admin'], ALL_ON)).toEqual(fileable)
   })
 
   it('a form-filling kind cannot be filed by anybody, and is readable by its desk', () => {
@@ -249,21 +256,45 @@ describe('a kind belongs to a desk', () => {
   })
 
   it('offers nothing to a role that files no documents', () => {
-    expect(intakeKindsFor(['planner'])).toEqual([])
-    expect(intakeKindsFor([])).toEqual([])
+    expect(intakeKindsFor(['planner'], ALL_ON)).toEqual([])
+    expect(intakeKindsFor([], ALL_ON)).toEqual([])
   })
 
   it('answers the wall with the same list it draws the chips from', () => {
     // `mayFileKind` is what `readDocument` refuses on. If it ever disagreed with
     // `intakeKindsFor`, a chip would appear that 403s when pressed.
     for (const roles of [['merchandiser'], ['hr'], ['store'], ['owner'], ['planner']] as const) {
-      const offered = intakeKindsFor(roles)
+      const offered = intakeKindsFor(roles, ALL_ON)
       for (const kind of INTAKE_KINDS) {
         expect(mayFileKind(kind, roles), `${kind.id} for ${roles.join('+')}`).toBe(
           offered.includes(kind),
         )
       }
     }
+  })
+})
+
+describe('a kind belongs to an ACTIVE module', () => {
+  it('a switched-off module keeps its paper out of everybody’s chips, owner included', () => {
+    // The factory shelved compliance (spec §1). The audit report is still compliance's
+    // paper and the role rule still holds — there is simply no inbox behind the chip, so
+    // the chip must not exist. Supervision does not override a wall that is about the
+    // TENANT rather than the desk.
+    const without = new Set([...ALL_ON].filter((id) => id !== 'compliance'))
+
+    for (const roles of [['compliance'], ['owner']] as const) {
+      const ids = intakeKindsFor(roles, without).map((k) => k.id)
+      expect(ids).not.toContain('audit_report')
+    }
+
+    // And nothing else went with it — the filter is per module, not a kill switch.
+    expect(intakeKindsFor(['owner'], without)).toEqual(
+      intakeKindsFor(['owner'], ALL_ON).filter((kind) => kind.moduleId !== 'compliance'),
+    )
+  })
+
+  it('an empty active set offers nothing at all', () => {
+    expect(intakeKindsFor(['owner'], new Set())).toEqual([])
   })
 })
 
