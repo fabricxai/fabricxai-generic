@@ -17,13 +17,22 @@
  * This is the same shape as `action-reachability` and `marbim-off`: a document is allowed to
  * be prose, but the parts of it that are claims about code are checked.
  *
+ * ## Pre-build handoffs (the rule finally honoured)
+ *
+ * Since X-4/X-5 a second class exists: a handoff written BEFORE its module, which is what
+ * the PLAYBOOK demanded all along. It must say "Pre-build" (the mirror of the honesty rule —
+ * a contract must not read as a description, nor the reverse), and its §5/§6/§7 claims are
+ * about code that does not exist yet. So the code checks apply the moment
+ * `src/modules/<m>/` appears, and not before: the contract starts being enforced exactly
+ * when there is code to hold to it.
+ *
  * ## What it deliberately does not check
  *
  * Whether the description beside each name is accurate, whether §7's reasoning is sound, or
  * whether §8 is honest. Those are judgements, and a test that pretended to make them would
  * be the decoration this file exists to avoid.
  */
-import { readFileSync, readdirSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
@@ -33,6 +42,10 @@ const HANDOFF_DIR = 'docs/handoffs'
 interface Handoff {
   file: string
   module: string
+  /** Written after the code (the eight pilots) — code checks always apply. */
+  retroactive: boolean
+  /** `src/modules/<m>/` exists — a pre-build handoff's checks arm only once this is true. */
+  built: boolean
   operations: string[]
   machines: string[]
   gates: string[]
@@ -67,7 +80,15 @@ function parse(file: string): Handoff {
   const machines = [...section(text, 6).matchAll(/`([a-zA-Z]+Machine)`/g)].map((m) => m[1]!)
   const gates = [...section(text, 7).matchAll(/`GATES\.([a-zA-Z]+)`/g)].map((m) => m[1]!)
 
-  return { file, module: moduleId, operations: [...new Set(operations)], machines: [...new Set(machines)], gates: [...new Set(gates)] }
+  return {
+    file,
+    module: moduleId,
+    retroactive: /Retroactive/i.test(text),
+    built: existsSync(join('src', 'modules', moduleId)),
+    operations: [...new Set(operations)],
+    machines: [...new Set(machines)],
+    gates: [...new Set(gates)],
+  }
 }
 
 const handoffs = readdirSync(HANDOFF_DIR)
@@ -88,9 +109,10 @@ describe('the pilot set has a handoff at all', () => {
     /*
      * Not "some handoffs exist". The pilot set is store, cutting, production, quality,
      * sampling, commercial, workforce and approvals, and a missing one is a module going into
-     * a factory with no acceptance checklist.
+     * a factory with no acceptance checklist. Pre-build handoffs for modules not yet built
+     * are a different class and sit outside this list.
      */
-    expect(handoffs.map((h) => h.module).sort()).toEqual([
+    expect(handoffs.filter((h) => h.retroactive).map((h) => h.module).sort()).toEqual([
       'approvals',
       'commercial',
       'cutting',
@@ -102,19 +124,43 @@ describe('the pilot set has a handoff at all', () => {
     ])
   })
 
-  it('each says which module it is about and admits it is retroactive', () => {
+  it('each says which class it is, and carries §8', () => {
     for (const handoff of handoffs) {
       const text = readFileSync(join(HANDOFF_DIR, handoff.file), 'utf8')
-      // The honesty is the point. A retroactive handoff presenting itself as a design lock
-      // would be a worse document than none.
-      expect(text, handoff.file).toMatch(/Retroactive/i)
+      // The honesty is the point, in both directions: a retroactive handoff presenting
+      // itself as a design lock would be a worse document than none, and a pre-build
+      // contract reading as a description would let the gate quietly rot again.
+      expect(text, handoff.file).toMatch(handoff.retroactive ? /Retroactive/i : /Pre-build/i)
       expect(text, handoff.file).toContain('## §8 · Open questions')
+    }
+  })
+
+  it('a built module has outgrown its DRAFT status', () => {
+    /*
+     * "Pre-build" stays true forever — it records that the contract preceded the code, which
+     * is the whole point. What may NOT survive the build is "Status: DRAFT until §8 is
+     * resolved": the PLAYBOOK locks a handoff with §8 empty BEFORE kickoff, so code existing
+     * under a still-draft contract means the gate was skipped again, visibly this time.
+     */
+    for (const handoff of handoffs.filter((h) => !h.retroactive && h.built)) {
+      const text = readFileSync(join(HANDOFF_DIR, handoff.file), 'utf8')
+      expect(
+        /Status: DRAFT/.test(text),
+        `${handoff.file} is still marked DRAFT but src/modules/${handoff.module} exists — ` +
+          `resolve §8, lock the handoff, and remove the DRAFT status line`,
+      ).toBe(false)
     }
   })
 })
 
+/**
+ * Code checks run against built modules only — a pre-build handoff's claims arm the moment
+ * its module directory appears. All eight retroactive handoffs are built by definition.
+ */
+const buildable = handoffs.filter((h) => h.built)
+
 describe('§5 · every operation named is one that exists', () => {
-  it.each(handoffs.map((h) => [h.module, h] as const))('%s', (_module, handoff) => {
+  it.each(buildable.map((h) => [h.module, h] as const))('%s', (_module, handoff) => {
     const service = readFileSync(join('src', 'modules', handoff.module, 'service.ts'), 'utf8')
 
     const missing = handoff.operations.filter(
@@ -137,7 +183,7 @@ describe('§5 · every operation named is one that exists', () => {
 })
 
 describe('§6 · every state machine named is one that exists', () => {
-  it.each(handoffs.map((h) => [h.module, h] as const))('%s', (_module, handoff) => {
+  it.each(buildable.map((h) => [h.module, h] as const))('%s', (_module, handoff) => {
     const source = moduleSource(handoff.module)
 
     const missing = handoff.machines.filter(
@@ -164,7 +210,7 @@ describe('§6 · every state machine named is one that exists', () => {
 })
 
 describe('§7 · every gate named is one the module reaches for', () => {
-  it.each(handoffs.map((h) => [h.module, h] as const))('%s', (_module, handoff) => {
+  it.each(buildable.map((h) => [h.module, h] as const))('%s', (_module, handoff) => {
     const source = moduleSource(handoff.module)
 
     const missing = handoff.gates.filter((gate) => !source.includes(`GATES.${gate}`))
