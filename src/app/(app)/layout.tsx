@@ -25,6 +25,7 @@ import { env } from '@/lib/env'
 import { requestLocale } from '@/lib/ui-locale'
 import { marbimTrust, routedPendingCount } from '@/modules/approvals/queries'
 import type { ApprovalsPolicy } from '@/modules/approvals/service'
+import { activeModuleIds } from '@/modules/core/activation'
 import { listUnread } from '@/modules/core/notifications'
 import { getCtx, signedInUser } from '@/modules/core/session'
 import { providerSurfaceLabel } from '@/modules/marbim/provider'
@@ -59,14 +60,18 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const ctx = await getCtx(requestHeaders)
   if (!ctx) redirect('/login')
 
-  const [me, profile, displayName, trust, approvalsPolicy, unread] = await Promise.all([
-    signedInUser(requestHeaders),
-    companyProfile(ctx),
-    companyDisplayName(ctx),
-    marbimTrust(ctx),
-    getPolicy<ApprovalsPolicy>(ctx, 'approvals'),
-    listUnread(ctx, 20),
-  ])
+  const [me, profile, displayName, trust, approvalsPolicy, unread, activeModules] =
+    await Promise.all([
+      signedInUser(requestHeaders),
+      companyProfile(ctx),
+      companyDisplayName(ctx),
+      marbimTrust(ctx),
+      getPolicy<ApprovalsPolicy>(ctx, 'approvals'),
+      listUnread(ctx, 20),
+      // Which modules THIS factory runs (spec §1) — the sidebar and the route wall
+      // below both read the one set, so they cannot disagree.
+      activeModuleIds(ctx),
+    ])
 
   // Approve badge counts what is routed to THIS reviewer, not every draft in the company.
   // A storekeeper whose inbox reads "Nothing routed to you" must not carry a "4" on every
@@ -95,7 +100,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
    * with MARBIM off" was not a configuration this product supported.
    */
   const marbimEnabled = env.MARBIM_ENABLED
-  const nav = visibleNav(ctx.roles, factoryType, marbimEnabled)
+  const nav = visibleNav(ctx.roles, factoryType, marbimEnabled, activeModules)
 
   /*
    * Which screen is being rendered, and whether this role may. The decision itself lives in
@@ -103,11 +108,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
    * path with no registry entry is refused there, not waved through.
    */
   const pathname = requestHeaders.get('x-pathname') ?? ''
-  const { item, allowed, readOnly, subject } = resolveAccess(
+  const { item, allowed, readOnly, subject, inactive } = resolveAccess(
     pathname,
     ctx.roles,
     factoryType,
     (key, params) => tui(locale, key, params),
+    activeModules,
   )
 
   return (
@@ -154,7 +160,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                 {children}
               </>
             ) : (
-              <LockedState what={subject} />
+              // `off` changes the sentence, not the wall: "switched off for this
+              // factory" instead of "you don't have access", because sending an owner
+              // to ask themselves for permission would be nonsense.
+              <LockedState what={subject} off={inactive} />
             )}
           </PageBody>
         </div>

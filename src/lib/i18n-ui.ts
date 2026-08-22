@@ -59,6 +59,9 @@ export const UI_MESSAGES: Catalogue = {
     'ui.common.saving': 'Saving …',
     'ui.common.no_access': 'You don’t have access to {what}',
     'ui.common.ask_owner': 'Ask an owner or admin if you need it.',
+    // A statement about the FACTORY, not the caller — see LockedState's `off` prop.
+    'ui.common.module_off': '{what} is switched off for this factory',
+    'ui.common.module_off_hint': 'An owner can switch it back on in Settings → Modules.',
     'ui.common.read_only': 'Read only',
     'ui.common.read_only_body':
       'Your role can read {what} but not change it. Ask an owner or admin if you need to.',
@@ -1435,6 +1438,8 @@ export const UI_MESSAGES: Catalogue = {
     'ui.common.saving': 'সেভ হচ্ছে …',
     'ui.common.no_access': '{what} দেখার অনুমতি আপনার নেই',
     'ui.common.ask_owner': 'দরকার হলে ওনার বা অ্যাডমিনকে বলুন।',
+    'ui.common.module_off': '{what} এই কারখানার জন্য বন্ধ করা আছে',
+    'ui.common.module_off_hint': 'ওনার চাইলে সেটিংস → মডিউল থেকে আবার চালু করতে পারেন।',
     'ui.common.read_only': 'শুধু পড়া',
     'ui.common.read_only_body':
       'আপনার রোল {what} পড়তে পারে, বদলাতে পারে না। দরকার হলে ওনার বা অ্যাডমিনকে বলুন।',

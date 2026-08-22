@@ -490,7 +490,20 @@ export function ErrorState({
  * (day-one finding D2). Naming the holder leaks nothing the role list does not
  * already publish.
  */
-export function LockedState({ what, holders }: { what: string; holders?: string }) {
+export function LockedState({
+  what,
+  holders,
+  off = false,
+}: {
+  what: string
+  holders?: string
+  /**
+   * The module is switched off for this FACTORY (spec §1) — not a fact about the
+   * caller's role. "You don't have access" would send a person to ask an owner for a
+   * permission they may already hold; the truthful sentence names the switch.
+   */
+  off?: boolean
+}) {
   const t = useT()
 
   return (
@@ -508,7 +521,7 @@ export function LockedState({ what, holders }: { what: string; holders?: string 
       <MarbimMark state="blocked" size={32} label={null} />
       <div>
         <div style={{ font: "600 16px/1.3 var(--fx-font-sans)" }}>
-          {t('ui.common.no_access', { what })}
+          {t(off ? 'ui.common.module_off' : 'ui.common.no_access', { what })}
         </div>
         <div
           style={{
@@ -517,7 +530,7 @@ export function LockedState({ what, holders }: { what: string; holders?: string 
             marginTop: 4,
           }}
         >
-          {holders ?? t('ui.common.ask_owner')}
+          {holders ?? t(off ? 'ui.common.module_off_hint' : 'ui.common.ask_owner')}
         </div>
       </div>
     </div>

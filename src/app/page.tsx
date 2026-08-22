@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 
 import { landingFor, type FactoryType } from '@/components/shell/nav'
 import { env } from '@/lib/env'
+import { activeModuleIds } from '@/modules/core/activation'
 import { getCtx } from '@/modules/core/session'
 import { companyProfile } from '@/modules/settings/service'
 
@@ -23,5 +24,8 @@ export default async function Home() {
   const profile = await companyProfile(ctx)
   const factoryType: FactoryType = profile?.factoryType ?? 'woven'
 
-  redirect(landingFor(ctx.roles, factoryType, env.MARBIM_ENABLED))
+  // The active set travels into landingFor so nobody's morning starts on the locked
+  // card of a module their factory switched off — the landing falls through to the
+  // next screen that actually exists here.
+  redirect(landingFor(ctx.roles, factoryType, env.MARBIM_ENABLED, await activeModuleIds(ctx)))
 }

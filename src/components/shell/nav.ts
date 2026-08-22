@@ -82,6 +82,19 @@ export interface NavItem {
    * `canSee` never reads it, and the access sweep proves that stays true.
    */
   railHiddenFor?: readonly Role[]
+  /**
+   * The MODULE whose per-tenant activation this screen follows (spec §1).
+   *
+   * Nav ids are screens and module ids are folders, and they are not one list — `lcs`
+   * and `ud` are two doors into `commercial`, `lines` opens `production`. When the
+   * factory switches a module off, every screen carrying its id leaves the sidebar and
+   * `resolveAccess` refuses the URL. Absent means shell-level — `home`, `refused`,
+   * `factory`, `setup` compose across modules and are always available.
+   *
+   * Like `requiresMarbim`, the ANSWER is passed in (`activeModules`): the active set is
+   * a tenant read and this file is imported by client components.
+   */
+  moduleId?: string
   section: NavSection
 }
 
@@ -218,6 +231,7 @@ export const NAV: readonly NavItem[] = [
   },
   {
     id: 'approve',
+    moduleId: 'approvals',
     label: 'Approve inbox',
     href: '/approve',
     section: 'work',
@@ -230,6 +244,7 @@ export const NAV: readonly NavItem[] = [
   },
   {
     id: 'marbim',
+    moduleId: 'marbim',
     label: 'MARBIM',
     href: '/marbim',
     section: 'work',
@@ -241,6 +256,7 @@ export const NAV: readonly NavItem[] = [
   },
   {
     id: 'orders',
+    moduleId: 'orders',
     railHiddenFor: ['production'],
     label: 'Order desk & TNA',
     href: '/orders',
@@ -252,6 +268,7 @@ export const NAV: readonly NavItem[] = [
   },
   {
     id: 'memory',
+    moduleId: 'memory',
     label: 'Order memory',
     href: '/memory',
     section: 'work',
@@ -266,6 +283,7 @@ export const NAV: readonly NavItem[] = [
   },
   {
     id: 'sampling',
+    moduleId: 'sampling',
     railHiddenFor: ['production'],
     label: 'Sampling room',
     href: '/sampling',
@@ -279,6 +297,7 @@ export const NAV: readonly NavItem[] = [
   // ── Commercial ──────────────────────────────────────────
   {
     id: 'buyers',
+    moduleId: 'buyers',
     label: 'Buyer & lead desk',
     href: '/buyers',
     section: 'commercial',
@@ -287,6 +306,7 @@ export const NAV: readonly NavItem[] = [
   },
   {
     id: 'rfq',
+    moduleId: 'rfq',
     label: 'RFQ & quotation',
     href: '/rfq',
     section: 'commercial',
@@ -295,6 +315,7 @@ export const NAV: readonly NavItem[] = [
   },
   {
     id: 'costing',
+    moduleId: 'costing',
     label: 'Costing studio',
     href: '/costing',
     section: 'commercial',
@@ -303,6 +324,7 @@ export const NAV: readonly NavItem[] = [
   },
   {
     id: 'lcs',
+    moduleId: 'commercial',
     label: 'LC register',
     href: '/lcs',
     section: 'commercial',
@@ -312,6 +334,7 @@ export const NAV: readonly NavItem[] = [
   },
   {
     id: 'finance',
+    moduleId: 'finance',
     label: 'Commercial finance',
     href: '/finance',
     section: 'commercial',
@@ -320,6 +343,7 @@ export const NAV: readonly NavItem[] = [
   },
   {
     id: 'procurement',
+    moduleId: 'procurement',
     label: 'Procurement',
     href: '/procurement',
     section: 'commercial',
@@ -331,6 +355,7 @@ export const NAV: readonly NavItem[] = [
   // ── Floor ───────────────────────────────────────────────
   {
     id: 'planning',
+    moduleId: 'planning',
     railHiddenFor: ['production'],
     label: 'Planning board',
     href: '/planning',
@@ -341,6 +366,7 @@ export const NAV: readonly NavItem[] = [
   },
   {
     id: 'store',
+    moduleId: 'store',
     railHiddenFor: ['production'],
     label: 'Store',
     href: '/store',
@@ -352,6 +378,7 @@ export const NAV: readonly NavItem[] = [
   },
   {
     id: 'ud',
+    moduleId: 'commercial',
     lockedAs: 'the UD workbench',
     label: 'UD workbench',
     href: '/ud',
@@ -370,6 +397,7 @@ export const NAV: readonly NavItem[] = [
   },
   {
     id: 'cutting',
+    moduleId: 'cutting',
     label: 'Cutting',
     href: '/cutting',
     section: 'floor',
@@ -379,6 +407,7 @@ export const NAV: readonly NavItem[] = [
   },
   {
     id: 'lines',
+    moduleId: 'production',
     label: 'Line tracking',
     href: '/lines',
     section: 'floor',
@@ -388,6 +417,7 @@ export const NAV: readonly NavItem[] = [
   },
   {
     id: 'quality',
+    moduleId: 'quality',
     railHiddenFor: ['production'],
     label: 'Quality',
     href: '/quality',
@@ -398,6 +428,7 @@ export const NAV: readonly NavItem[] = [
   },
   {
     id: 'shipment',
+    moduleId: 'shipment',
     label: 'Shipment',
     href: '/shipment',
     section: 'floor',
@@ -406,6 +437,7 @@ export const NAV: readonly NavItem[] = [
   },
   {
     id: 'maintenance',
+    moduleId: 'maintenance',
     label: 'Maintenance',
     href: '/maintenance',
     section: 'floor',
@@ -417,6 +449,7 @@ export const NAV: readonly NavItem[] = [
   // ── Oversight ───────────────────────────────────────────
   {
     id: 'dashboard',
+    moduleId: 'analytics',
     lockedAs: 'the owner dashboard',
     label: 'Owner dashboard',
     href: '/dashboard',
@@ -432,6 +465,7 @@ export const NAV: readonly NavItem[] = [
   },
   {
     id: 'workforce',
+    moduleId: 'workforce',
     lockedAs: 'workforce',
     label: 'Workforce & payroll',
     href: '/workforce',
@@ -443,6 +477,7 @@ export const NAV: readonly NavItem[] = [
   },
   {
     id: 'compliance',
+    moduleId: 'compliance',
     label: 'Compliance',
     href: '/compliance',
     section: 'oversight',
@@ -508,6 +543,7 @@ export const NAV: readonly NavItem[] = [
   },
   {
     id: 'settings',
+    moduleId: 'settings',
     label: 'Settings',
     href: '/settings',
     section: 'system',
@@ -573,6 +609,12 @@ export function visibleNav(
   factoryType: FactoryType,
   /** Whether the copilot is configured. Server-side truth, passed in — see `requiresMarbim`. */
   marbimEnabled = true,
+  /**
+   * The tenant's active modules (`activeModuleIds`, spec §1), passed in like the flag
+   * above and for the same reason. Absent means unfiltered — the pure-function callers
+   * (tests, landing precedence) that are not asking about a particular company.
+   */
+  activeModules?: ReadonlySet<string>,
 ): NavItem[] {
   return NAV.filter(
     (item) =>
@@ -581,7 +623,10 @@ export function visibleNav(
       // trim is about a supervisor's daily scan, not about an owner covering a desk.
       !(item.railHiddenFor && roles.every((r) => item.railHiddenFor!.includes(r))) &&
       canSee(item, roles, factoryType) &&
-      (marbimEnabled || !item.requiresMarbim),
+      (marbimEnabled || !item.requiresMarbim) &&
+      // A switched-off module's screens leave the sidebar for everyone, owner included —
+      // the owner's way back is Settings → Modules, which never goes dark.
+      (!activeModules || !item.moduleId || activeModules.has(item.moduleId)),
   )
 }
 
@@ -638,10 +683,12 @@ export function landingFor(
   roles: readonly Role[],
   factoryType: FactoryType,
   marbimEnabled = true,
+  /** The tenant's active modules — a landing must be a screen that exists HERE. */
+  activeModules?: ReadonlySet<string>,
 ): string {
   if (roles.some((r) => r === 'owner' || r === 'admin' || r === 'merchandiser')) return '/home'
 
-  const nav = visibleNav(roles, factoryType, marbimEnabled)
+  const nav = visibleNav(roles, factoryType, marbimEnabled, activeModules)
   const visible = new Set(nav.map((item) => item.id))
 
   for (const landing of ROLE_LANDINGS) {
@@ -678,6 +725,13 @@ export interface RouteAccess {
   readOnly: boolean
   /** What the locked card names, when it has to render one. */
   subject: string
+  /**
+   * Refused because the factory switched the module OFF, not because of who is asking.
+   * The card must say so: "you don't have access" sends a person to ask an owner for a
+   * permission they may already hold — the truthful sentence is that the module is off
+   * and Settings → Modules is where it comes back.
+   */
+  inactive: boolean
 }
 
 export function resolveAccess(
@@ -685,6 +739,8 @@ export function resolveAccess(
   roles: readonly Role[],
   factoryType: FactoryType,
   words?: Words,
+  /** The tenant's active modules. Absent means the activation wall is not consulted. */
+  activeModules?: ReadonlySet<string>,
 ): RouteAccess {
   const item = navItemFor(pathname)
   if (!item) {
@@ -693,6 +749,21 @@ export function resolveAccess(
       allowed: false,
       readOnly: false,
       subject: words ? words('ui.nav.this_screen') : 'this screen',
+      inactive: false,
+    }
+  }
+
+  // The activation wall, before the role question: a switched-off module's URL is
+  // refused for everyone — a sidebar that merely hid it would leave every bookmark,
+  // notification href and typed path still opening the screens of a module whose
+  // actions all refuse (spec §1: the UI reflects the gate, it never is the gate).
+  if (activeModules && item.moduleId && !activeModules.has(item.moduleId)) {
+    return {
+      item,
+      allowed: false,
+      readOnly: false,
+      subject: lockedSubject(item, words),
+      inactive: true,
     }
   }
 
@@ -721,6 +792,7 @@ export function resolveAccess(
     // contradictory statements about the same permission.
     readOnly: allowed && item.writeRoles.length > 0 && !canWrite(item, roles, factoryType),
     subject: lockedSubject(item, words),
+    inactive: false,
   }
 }
 
