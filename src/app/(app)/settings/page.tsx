@@ -4,6 +4,8 @@ import { redirect } from 'next/navigation'
 import { Badge } from '@/components/fx/primitives'
 import { SectionHeading } from '@/components/fx/signature'
 import { PageHeader } from '@/components/shell/page-shell'
+import { activeModuleIds, NON_DISABLEABLE } from '@/modules/core/activation'
+import { dependentsOf, listModules } from '@/modules/core/registry'
 import { getCtx } from '@/modules/core/session'
 import { auditTrail, auditedTables, companyProfile, listPolicies, roleMatrix } from '@/modules/settings/service'
 import { activeLines } from '@/modules/production/queries'
@@ -14,6 +16,8 @@ import { AuditViewer } from './audit-viewer'
 import { PolicySection } from './policy-section'
 import { LineScopeControls } from './line-scope'
 import { RoleControls } from './role-controls'
+import { ModuleControls, type ModuleRow } from './module-controls'
+import { MODULE_COPY } from './module-copy'
 import { FactoryTypePanel, ProfileForm } from './settings-client'
 
 /**
@@ -42,6 +46,32 @@ export default async function SettingsPage() {
   ])
 
   const lineCodes = lineRows.map((line) => line.code)
+
+  /*
+   * The activation panel's rows (specs/order-centric-core.md §1), computed from the same
+   * two reads every wall uses: the tenant's active set and the registry's dependency
+   * graph. The hints ("needed by Store") are worked out HERE so the owner reads a
+   * refusal before pressing rather than after — the service still refuses for itself.
+   */
+  const activeModules = await activeModuleIds(ctx)
+  const moduleRows: ModuleRow[] = listModules()
+    .map((m) => ({
+      id: m.id,
+      enabled: activeModules.has(m.id),
+      locked: (NON_DISABLEABLE as readonly string[]).includes(m.id),
+      activeDependents: dependentsOf(m.id)
+        .filter((dep) => activeModules.has(dep.id))
+        .map((dep) => dep.id),
+      missingRequires: (m.requires ?? []).filter((id) => !activeModules.has(id)),
+    }))
+    .sort((a, b) =>
+      (MODULE_COPY[a.id]?.label ?? a.id).localeCompare(MODULE_COPY[b.id]?.label ?? b.id),
+    )
+  const modulesOff = moduleRows.filter((row) => !row.enabled).length
+
+  // Owner only, and narrower than the page's own canEdit on purpose: shelving a
+  // department is an ownership act, the same line `setModuleEnabled` draws.
+  const canFlipModules = ctx.roles.includes('owner')
 
   // The trail names who did what, so it is owner and admin only — a screen showing
   // everybody every action turns an accountability record into a surveillance one.
@@ -73,6 +103,7 @@ export default async function SettingsPage() {
           {[
             ['#identity', 'Identity'],
             ['#factory-type', 'What it makes'],
+            ['#modules', 'Modules'],
             ['#rules-commercial', 'Money & documents'],
             ['#rules-floor', 'Floor & planning'],
             ['#rules-quality', 'Quality'],
@@ -130,6 +161,15 @@ export default async function SettingsPage() {
         <section id="factory-type" style={{ scrollMarginTop: 76 }}>
           <SectionHeading eyebrow="changes which modules exist">What this unit makes</SectionHeading>
           <FactoryTypePanel current={profile?.factoryType ?? 'woven'} />
+        </section>
+
+        <section id="modules" style={{ scrollMarginTop: 76 }}>
+          <SectionHeading
+            eyebrow={modulesOff > 0 ? `${modulesOff} switched off` : 'everything is on'}
+          >
+            Which modules this factory runs
+          </SectionHeading>
+          <ModuleControls rows={moduleRows} canEdit={canFlipModules} />
         </section>
 
         <PolicySection

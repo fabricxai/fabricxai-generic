@@ -4,6 +4,7 @@ import { headers } from 'next/headers'
 import { revalidatePath } from 'next/cache'
 
 import { surfaced, type ActionFailure } from '@/lib/action-failure'
+import { setModuleEnabled } from '@/modules/core/activation'
 import { requireRole } from '@/modules/core/session'
 
 import {
@@ -108,6 +109,33 @@ export async function revokeUserRole(input: {
   await revokeRole(ctx, input)
 
   revalidatePath('/', 'layout')
+}
+
+/**
+ * Switch a module on or off for this factory (specs/order-centric-core.md §1).
+ *
+ * The real gate — owner-only, the dependency graph in both directions, `settings`
+ * never disableable — lives in core's `setModuleEnabled`, where every caller meets
+ * it. This is the outer door, and it requires `owner` rather than the usual
+ * owner-or-admin pair because shelving a department is an ownership act: the same
+ * line the service draws, drawn where the screen can see it too.
+ */
+export async function setCompanyModule(input: {
+  moduleId: string
+  enabled: boolean
+}): Promise<{ moduleId: string; enabled: boolean } | ActionFailure> {
+  const ctx = await requireRole(await headers(), 'owner')
+
+  // Refusals as values: "other modules depend on it" is a sentence the owner must
+  // actually read, not production's masked React #441.
+  return surfaced(async () => {
+    const result = await setModuleEnabled(ctx, input.moduleId, input.enabled)
+
+    // Which modules exist changes the nav, MARBIM's scope and every module's actions,
+    // so the whole shell re-renders, not just this screen.
+    revalidatePath('/', 'layout')
+    return result
+  })
 }
 
 /**
