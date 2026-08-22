@@ -346,6 +346,8 @@ export const MESSAGES: Catalogue = {
     'errors.reference_empty': 'That lookup needs something to look up — a code or an id.',
     'errors.reference_kind_unknown':
       'Nothing in this system knows how to look that kind of thing up. This is a wiring fault rather than anything you typed.',
+    'errors.drawer_kind_unknown':
+      'Nothing here knows how to show a quick view of that kind of thing. This is a wiring fault rather than anything you clicked.',
     'errors.reference_not_found':
       'No record here matches that reference. Check the code against the screen it came from — it is looked up exactly, never guessed at, because the nearest match is how a shipment ends up against the wrong buyer.',
     'errors.document_not_found': 'That document no longer exists.',
@@ -799,6 +801,8 @@ export const MESSAGES: Catalogue = {
         'errors.reference_empty': 'কী খুঁজতে হবে সেটাই দেওয়া হয়নি — একটি কোড বা আইডি লাগবে।',
     'errors.reference_kind_unknown':
       'এই ধরনের জিনিস কীভাবে খুঁজতে হয় সিস্টেম জানে না। এটি আপনার লেখা কিছুর ভুল নয়, ভেতরের সংযোগের সমস্যা।',
+    'errors.drawer_kind_unknown':
+      'এই ধরনের জিনিসের দ্রুত-দেখা কীভাবে দেখাতে হয় সিস্টেম জানে না। এটি আপনার ক্লিকের ভুল নয়, ভেতরের সংযোগের সমস্যা।',
     'errors.reference_not_found':
       'এই রেফারেন্সের সঙ্গে মিলে এমন কিছু পাওয়া যায়নি। যে স্ক্রিন থেকে কোডটি নিয়েছেন সেটির সঙ্গে মিলিয়ে দেখুন — হুবহু মেলানো হয়, কাছাকাছি কিছু ধরে নেওয়া হয় না।',
     'costing.errors.bom_line_no_consumption':

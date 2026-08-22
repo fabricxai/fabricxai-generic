@@ -11,6 +11,7 @@ import type { ZodType } from 'zod'
 
 import type { AnyCtx, Role } from './ctx'
 import { isDevReload } from './dev-reload'
+import type { EntityDrawer } from './drawer'
 import type { RefResolver } from './refs'
 import { AppError } from './errors'
 import type { TenantDb } from './tenancy'
@@ -82,6 +83,15 @@ export interface ModuleDefinition {
    * service.ts (CLAUDE.md, module folder contract).
    */
   domainPrimer?: { version: string; text: string }
+  /**
+   * Drawer peeks for kinds this module owns, keyed by the same vocabulary as
+   * `refResolvers` — `order`, `buyer` — so a reference chip anywhere in the product can
+   * open a side peek of the row (spec §3). The provider builds a declarative
+   * `DrawerPeek` through this module's own `queries.ts` (rule 11); one shell component
+   * renders every kind, and `peekEntity` walks activation and roles before any query
+   * runs. See `core/drawer.ts` for why the payload is data rather than a component.
+   */
+  drawers?: Readonly<Record<string, EntityDrawer>>
   /**
    * Whether a company with no `company_modules` row for this module has it on.
    *

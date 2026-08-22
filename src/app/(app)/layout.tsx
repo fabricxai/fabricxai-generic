@@ -10,6 +10,7 @@ import { PendingReadings } from '@/components/shell/pending-readings'
 import { PageBody, TopBar } from '@/components/shell/page-shell'
 import { Sidebar } from '@/components/shell/sidebar'
 import { AccountMenu } from '@/components/shell/account-menu'
+import { EntityDrawerProvider } from '@/components/shell/entity-drawer'
 import {
   describeRoles,
   navLabelKey,
@@ -118,6 +119,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <LocaleProvider locale={locale}>
+      {/* The entity drawer (spec §3) wraps the whole shell: a reference chip on any
+          screen — a PO on the shipment board, a document in an approve row — opens its
+          peek without that screen mounting anything. */}
+      <EntityDrawerProvider>
       <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh' }}>
         <TopBar
           companyName={displayName ?? 'FabricXAI'}
@@ -189,6 +194,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             (live-test feedback, Phase 9). */}
         <OutcomeToasts />
       </div>
+      </EntityDrawerProvider>
     </LocaleProvider>
   )
 }

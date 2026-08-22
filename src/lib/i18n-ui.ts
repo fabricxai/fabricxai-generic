@@ -62,6 +62,13 @@ export const UI_MESSAGES: Catalogue = {
     // A statement about the FACTORY, not the caller — see LockedState's `off` prop.
     'ui.common.module_off': '{what} is switched off for this factory',
     'ui.common.module_off_hint': 'An owner can switch it back on in Settings → Modules.',
+    /* The entity drawer (spec §3) — chrome for the one component that renders every peek. */
+    'ui.drawer.back': 'Back',
+    'ui.drawer.open_full': 'Open the full screen',
+    'ui.drawer.loading': 'Fetching …',
+    'ui.drawer.peek': 'Details',
+    'ui.peek.doc_size': 'File size',
+    'ui.peek.doc_status': 'Status',
     'ui.common.read_only': 'Read only',
     'ui.common.read_only_body':
       'Your role can read {what} but not change it. Ask an owner or admin if you need to.',
@@ -1440,6 +1447,12 @@ export const UI_MESSAGES: Catalogue = {
     'ui.common.ask_owner': 'দরকার হলে ওনার বা অ্যাডমিনকে বলুন।',
     'ui.common.module_off': '{what} এই কারখানার জন্য বন্ধ করা আছে',
     'ui.common.module_off_hint': 'ওনার চাইলে সেটিংস → মডিউল থেকে আবার চালু করতে পারেন।',
+    'ui.drawer.back': 'পেছনে',
+    'ui.drawer.open_full': 'পুরো স্ক্রিন খুলুন',
+    'ui.drawer.loading': 'আনা হচ্ছে …',
+    'ui.drawer.peek': 'বিস্তারিত',
+    'ui.peek.doc_size': 'ফাইলের আকার',
+    'ui.peek.doc_status': 'অবস্থা',
     'ui.common.read_only': 'শুধু পড়া',
     'ui.common.read_only_body':
       'আপনার রোল {what} পড়তে পারে, বদলাতে পারে না। দরকার হলে ওনার বা অ্যাডমিনকে বলুন।',
