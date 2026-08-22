@@ -251,6 +251,32 @@ export const roles = pgTable(
   ],
 ).enableRLS()
 
+/**
+ * Per-tenant module activation (specs/order-centric-core.md §1) — the table that makes
+ * "the factory chooses its modules" true rather than a sentence.
+ *
+ * Sparse by design: no row means the module's registered default applies, so a new module
+ * can ship dark (or lit) without a backfill migration. `enabled` is therefore an explicit
+ * override in BOTH directions, and history lives in the outbox event the flip emits, not
+ * in this row — it holds only the latest decision and who made it.
+ */
+export const companyModules = pgTable(
+  'company_modules',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    companyId: uuid('company_id')
+      .notNull()
+      .references(() => companies.id, { onDelete: 'cascade' }),
+    /** The `registerModule` id ('orders', 'procurement', …) — validated against the registry, not an enum, so a new module needs no migration here. */
+    moduleId: text('module_id').notNull(),
+    enabled: boolean('enabled').notNull(),
+    enabledBy: text('enabled_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('company_modules_company_module_key').on(t.companyId, t.moduleId)],
+).enableRLS()
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Documents (MinIO / S3)
 // ─────────────────────────────────────────────────────────────────────────────

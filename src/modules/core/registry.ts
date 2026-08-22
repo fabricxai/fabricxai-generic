@@ -82,6 +82,22 @@ export interface ModuleDefinition {
    * service.ts (CLAUDE.md, module folder contract).
    */
   domainPrimer?: { version: string; text: string }
+  /**
+   * Whether a company with no `company_modules` row for this module has it on.
+   *
+   * Undefined means true — every module that existed before per-tenant activation
+   * (specs/order-centric-core.md §1) keeps working for every tenant without a backfill.
+   * A module shipping dark declares `defaultEnabled: false` and lights up per company.
+   */
+  defaultEnabled?: boolean
+  /**
+   * Module ids whose machinery this module's server-side gates depend on — store names
+   * commercial because `GATES.udBalance` is answered there. Activation walks this graph:
+   * a module cannot be disabled while an ACTIVE module requires it, and cannot be enabled
+   * while something it requires is off. Declared here rather than in a hand-kept list so
+   * the graph and the modules stay in one file per module.
+   */
+  requires?: readonly string[]
 }
 
 const registry = new Map<string, ModuleDefinition>()
@@ -139,6 +155,14 @@ export const getCommitHandler = (
   targetTable: string,
 ): PendingCommitHandler | undefined => registry.get(moduleId)?.commitHandlers?.[targetTable]
 export const listModules = (): readonly ModuleDefinition[] => [...registry.values()]
+
+/**
+ * Registered modules that declare `requires: [moduleId]` — the ones a disable of
+ * `moduleId` would leave enforcing gates against a dark module. Activation refuses the
+ * disable while any of these is active for the tenant.
+ */
+export const dependentsOf = (moduleId: string): readonly ModuleDefinition[] =>
+  [...registry.values()].filter((m) => m.requires?.includes(moduleId) ?? false)
 
 /**
  * Resolve the schema for a draft, or throw. Called at insert AND at approve — a schema

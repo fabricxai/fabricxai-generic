@@ -360,6 +360,15 @@ export const MESSAGES: Catalogue = {
     'errors.empty_update': 'Nothing was changed, so nothing was saved.',
     'errors.forbidden': 'Your role does not allow this.',
     'errors.illegal_transition': 'That status cannot follow the current one.',
+    'errors.module_inactive':
+      'This module is switched off for this factory. An owner can enable it in Settings.',
+    'errors.module_not_disableable':
+      'This module is part of the platform’s core and cannot be switched off.',
+    'errors.module_required_by':
+      'Other active modules depend on this one. Switch those off first.',
+    'errors.module_requires':
+      'This module depends on modules that are switched off. Enable those first.',
+    'errors.owner_only': 'Only an owner can change which modules this factory runs.',
     'errors.invalid_identifier':
       'This draft carries a field the target table has no column for, so it cannot be written. Its module needs to own the commit.',
     'errors.not_an_approver': 'You are not one of the approvers this change requires.',
@@ -1014,6 +1023,13 @@ export const MESSAGES: Catalogue = {
     'errors.empty_update': 'কিছু বদলানো হয়নি, তাই কিছু সংরক্ষণও হয়নি।',
     'errors.forbidden': 'আপনার role-এ এই কাজের অনুমতি নেই।',
     'errors.illegal_transition': 'এখনকার স্টেটাস থেকে সরাসরি ওই স্টেটাসে যাওয়া যায় না।',
+    'errors.module_inactive':
+      'এই মডিউলটি এই কারখানার জন্য বন্ধ আছে। মালিক সেটিংস থেকে চালু করতে পারেন।',
+    'errors.module_not_disableable': 'এই মডিউলটি প্ল্যাটফর্মের মূল অংশ — বন্ধ করা যায় না।',
+    'errors.module_required_by': 'অন্য চালু মডিউল এটির উপর নির্ভর করে। আগে সেগুলো বন্ধ করুন।',
+    'errors.module_requires':
+      'এই মডিউলটি এমন মডিউলের উপর নির্ভর করে যেগুলো বন্ধ আছে। আগে সেগুলো চালু করুন।',
+    'errors.owner_only': 'কারখানায় কোন মডিউল চলবে তা কেবল মালিকই বদলাতে পারেন।',
     'errors.invalid_identifier':
       'এই ড্রাফটে এমন একটি ঘর আছে যার কলাম টার্গেট টেবিলে নেই, তাই লেখা যাচ্ছে না। এটি যে মডিউলের, কমিট সেই মডিউলকেই করতে হবে।',
     'errors.not_an_approver': 'এই পরিবর্তনে যাদের অনুমোদন লাগে, আপনি তাদের একজন নন।',
