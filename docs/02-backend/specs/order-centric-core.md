@@ -6,7 +6,7 @@ rule 12 each ships as its own PR, never mixed into a module PR. The two new busi
 modules that build on them have pre-build handoffs: `HANDOFF-X-4-requests.md` and
 `HANDOFF-X-5-mailroom.md`.
 
-Status: DRAFT — decisions marked ⚑ are owed before the corresponding build starts.
+Status: LOCKED 2026-08-22 — the ⚑ decisions below were resolved in owner review.
 
 ---
 
@@ -39,8 +39,15 @@ happens when its counterpart is off. First instance: with procurement disabled, 
 costing studio's "ask procurement for a price" compose becomes a manual price-entry field
 — the merchandiser flow never dead-ends (see HANDOFF-X-4 §7/§8).
 
-⚑ Owed decisions: who may flip modules (owner only, or admin too); whether disabling a
-module with open rows (e.g. procurement with open POs) is refused, warned, or allowed.
+⚑ Decided: **owner only** flips modules — buying and shelving capability is an ownership
+act, not administration. Disabling never deletes anything: rows stay, actions refuse,
+re-enabling restores. The one refusal is dependency-shaped: a module that an ACTIVE
+module's server-side gate depends on cannot be disabled while its dependent runs
+(commercial cannot go dark while store still enforces `GATES.udBalance` against it).
+Dependencies are declared in `registerModule({ requires: [...] })` so the registry can
+check the graph, not a hand-kept list. Open in-flight rows (e.g. procurement with open
+POs) get a warning listing them, not a block — the block would just breed support calls
+for a decision the owner has already made.
 
 ---
 
@@ -80,9 +87,9 @@ i18n keys, rendered two ways:
 = module activation ∩ role permission. Same data contract per tab, different emphasis per
 role — the desktop equivalent of the mobile role skins. No per-role page forks.
 
-⚑ Owed decision: whether the timeline query is computed live (union over sources) or
-maintained as a materialized projection once volume demands it. Start live; the read
-model shape makes the projection a later optimization, not a redesign.
+⚑ Decided: the timeline query computes live (a union over sources). The read-model shape
+makes a materialized projection a later optimization if volume ever demands it, not a
+redesign.
 
 ---
 
@@ -118,9 +125,12 @@ queries.
    kinds (order, document) to prove the registration seam.
 3. **Orders module PR** — Order File timeline query + `orderPulse` + the workspace tabs.
    (Orders-module work, not core; touches no other module's tables.)
-4. **`requests` module** — after HANDOFF-X-4 §8 is resolved and emptied; brief first.
-5. **`mailroom` module** — after the X-5 §8 transport decision; brief first.
-6. Role homes / task inboxes — after 3 and 4 exist to feed them.
+4. **`requests` module** — HANDOFF-X-4 locked 2026-08-22; brief exists.
+5. **Buyers PR** — `buyers.owner_user_id` (the handling merchandiser), small and its own
+   slice; the mailroom's auto-assignment depends on it.
+6. **`mailroom` module** — HANDOFF-X-5 locked 2026-08-22 (transport: Outlook redirect →
+   per-tenant inbound address → webhook adapter); brief exists.
+7. Role homes / task inboxes — after 3 and 4 exist to feed them.
 
-Each of 4 and 5 follows the PLAYBOOK per-module loop, HANDOFF locked before kickoff —
-the gate holds for what is built next.
+The two new modules (4 and 6) follow the PLAYBOOK per-module loop, HANDOFF locked before
+kickoff — the gate holds for what is built next.

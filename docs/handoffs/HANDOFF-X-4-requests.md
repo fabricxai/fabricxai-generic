@@ -5,12 +5,11 @@
 > below exists in `src/` yet, and `docs/__tests__/handoff-contract.test.ts` knows to start
 > checking §5/§6/§7 against code the moment `src/modules/requests` appears.
 >
-> **Status: DRAFT until §8 is resolved.** The PLAYBOOK locks a handoff with §8 empty. The
-> questions currently in §8 are decisions the review owes; once they are answered the
-> answers move into the body, §8 empties, and the build may start. The brief
-> (`docs/02-backend/briefs/X-4-requests.md`) is owed before the build too.
+> **Status: LOCKED 2026-08-22.** §8's questions were resolved in owner review the same day
+> they were asked; the answers live in the body and §8 records only that they were
+> answered. The build may start.
 
-**Module:** `src/modules/requests` · **Brief:** owed — to be written before build
+**Module:** `src/modules/requests` · **Brief:** `docs/02-backend/briefs/X-4-requests.md`
 
 ## §1 · Purpose & roles
 
@@ -27,7 +26,8 @@ a message. Chat is not a fallback; a request that cannot name its kind is a conv
 belongs in MARBIM, not here.
 
 Any role may create and be targeted by requests. Targeting is **by role** (department), not
-by person — the department triages its own inbox. Owner/admin see everything.
+by person — the department triages its own inbox, and naming individuals would invite the
+bypass this module exists to end. Owner/admin see everything.
 
 ## §2 · Screens
 
@@ -61,8 +61,10 @@ indexed by it; a general ask like "send me the latest gazette table" is legal), 
 (enum: `price_quote` · `document` · `approval` · `info`), `from_user_id`, `from_role`,
 `to_role`, `subject`, `body`, `payload` (jsonb, kind-specific shape validated by
 `zod.ts` at create — e.g. price_quote: item description, quantity, unit, needed-by),
-`status`, `sla_due_at`, `fulfilled_by`, `fulfilled_at`, `fulfillment_ref` (jsonb
-`{table, id}` — the typed artifact; see §7), `created_at`, `updated_at`.
+`status`, `sla_due_at` (defaulted per kind at create — `price_quote` 48h, everything else
+24h; fixed in code for v1, Settings-configurable later), `fulfilled_by`, `fulfilled_at`,
+`fulfillment_ref` (jsonb `{table, id}` — the typed artifact; see §7), `created_at`,
+`updated_at`.
 
 Indexes: `(company_id, to_role, status)` for the inbox; `(company_id, order_id)` for the
 timeline; partial on `status IN ('requested','acknowledged')` for overdue scans.
@@ -102,8 +104,11 @@ No money gate of its own. The invariant that plays the gate's role is **fulfillm
 artifact, never prose** — enforced server-side in `fulfillRequest`, per kind:
 
 - `price_quote` → must reference a `supplier_quotes` row, verified through procurement's
-  `queries.ts` (rule 11 — never a raw table read). Costing then consumes the quote row
-  itself; the request is how it was asked for, not where the number lives.
+  `queries.ts` (rule 11 — never a raw table read). The quote arrives through procurement's
+  own rails — a purchase requisition quoted via `recordSupplierQuote` — not a side door;
+  fulfilling a price request with a number that has no requisition behind it is exactly
+  the WhatsApp habit this module replaces. Costing then consumes the quote row itself;
+  the request is how it was asked for, not where the number lives.
 - `document` → must reference a `documents` row (core), which lands in `order_files` when
   the request is order-bound — so answering a document request files it in the order file
   in the same transaction.
@@ -114,25 +119,21 @@ artifact, never prose** — enforced server-side in `fulfillRequest`, per kind:
   forcing an artifact where none exists would push people back to WhatsApp.
 
 Cross-module: `modules/core` for notify/outbox/audit (⚖ table — every transition is
-audited); module activation check at create (a request cannot target a department whose
-module the factory did not enable — compose shows why, the server refuses regardless);
-consumers read requests only via this module's `queries.ts`.
+audited); consumers read requests only via this module's `queries.ts`.
+
+**Module activation gates the artifact kinds only.** `price_quote` and `approval` need
+their fulfilling machinery (procurement, approvals) active for this tenant — create
+refuses server-side, compose says why, and with procurement disabled the costing studio
+degrades to a manual price-entry field. `info` and `document` may target any role
+regardless of activation: a department exists whether or not the factory bought its
+module, and asking it for a paper must never dead-end.
 
 ## §8 · Open questions
 
-*To be resolved in review; this section must be empty before the build starts.*
-
-1. **Does `price_quote` fulfillment require a purchase requisition?** Procurement already
-   has PR → quote rails (`purchase_requisitions`, `supplier_quotes`). Option A: fulfilling
-   a price request REQUIRES quoting through a PR (one flow, more ceremony). Option B: a
-   standalone quote row is acceptable and a PR is optional. Leaning A for traceability.
-2. **SLA defaults** — fixed per kind (e.g. price_quote 48h) or configurable in Settings
-   per company? Leaning: fixed defaults now, settings later.
-3. **Person-targeting** — may a request name a specific user in addition to the role?
-   Leaning no for v1: departments triage their own inbox; naming people invites bypass.
-4. **When the target module is inactive** — hard refusal, or allow `info`/`document`
-   kinds to any role regardless of module activation (a department can exist without its
-   module)? Leaning: activation gates only `price_quote` and `approval`.
+**None open.** Locked 2026-08-22 after owner review resolved the four drafted questions:
+quote fulfillment goes through procurement's requisition rails (§7); SLA defaults are
+fixed per kind in code (§4); targeting is role-only (§1); activation gates only the
+artifact kinds (§7).
 
 ## §9 · Non-functional
 

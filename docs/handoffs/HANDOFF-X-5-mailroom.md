@@ -4,11 +4,11 @@
 > intends to honour. `docs/__tests__/handoff-contract.test.ts` begins checking §5/§6/§7
 > against code the moment `src/modules/mailroom` appears.
 >
-> **Status: DRAFT until §8 is resolved** — §8 currently holds the transport decision, which
-> only the owner can make. Once resolved, answers move into the body, §8 empties, the build
-> may start. The brief (`docs/02-backend/briefs/X-5-mailroom.md`) is owed before the build.
+> **Status: LOCKED 2026-08-22.** The transport question §8 was written for has been
+> answered by the owner (factories run on Microsoft Outlook); the decision and the rest of
+> the resolutions live in the body. The build may start.
 
-**Module:** `src/modules/mailroom` · **Brief:** owed — to be written before build
+**Module:** `src/modules/mailroom` · **Brief:** `docs/02-backend/briefs/X-5-mailroom.md`
 
 ## §1 · Purpose & roles
 
@@ -18,6 +18,18 @@ amendment in the body text. Today the platform's document intake (`modules/marbi
 downloaded the attachment uploads it back. The mailroom removes that hop: the email arrives
 IN the platform, its attachments are already documents, and the merchandiser's job shrinks
 to confirming what each one is.
+
+**Transport (decided).** Factories run on Microsoft Outlook / M365, and buyers write to
+addresses they already know — so the platform never asks either side to change where mail
+goes, and never holds a mailbox credential. Each tenant gets an inbound address,
+`orders-<slug>@in.fabricxai.com` (MX on `in.fabricxai.com` → an inbound-parse provider —
+Postmark inbound, behind an adapter — which POSTs signed JSON to a webhook route), and the
+factory sets one Outlook rule **redirecting** buyer mail there. Redirect, not forward:
+redirect preserves the original `From:`, which buyer matching lives on; a plain forward
+arrives from the merchandiser and matches nobody. The rule setup is a one-page runbook per
+tenant. `receiveInboundEmail` is the seam — a Microsoft Graph connector (mailbox
+subscription, admin-consented) can become a second transport later without touching
+anything downstream.
 
 What this module is **not**: an extractor or an auto-creator of orders. It is a transport
 and a triage desk. Every draft still goes through the existing intake pipeline —
@@ -57,6 +69,12 @@ idempotency key; a webhook retry or a re-poll must not duplicate), `from_address
 queries; unmatched is a triage state, not an error), `assigned_to` (nullable user),
 `subject`, `body_text`, `raw_document_id` (the full .eml stored via core documents),
 `order_id` (nullable — linked at filing), `status`, `received_at`, `created_at`.
+
+Auto-assignment reads the new `buyers.owner_user_id` — the merchandiser who handles this
+buyer (the buyer belongs to the factory; the relationship is handled by a person). That
+field is a buyers-module change and ships in its own small PR before this module. A buyer
+with no owner, or an unmatched sender, lands in the shared triage view rather than
+guessing.
 
 `inbound_email_attachments`: `id`, `company_id`, `email_id`, `document_id` (core documents
 row — the quarantine pipeline applies to mailed files exactly as to uploaded ones),
@@ -115,27 +133,13 @@ transitions are the typed 409.
 
 ## §8 · Open questions
 
-*To be resolved in review; this section must be empty before the build starts.*
-
-1. **Transport** (the owner's call — Resend, our outbound provider, does not do inbound):
-   - **A. Inbound webhook provider** (Postmark inbound / SES + SNS / Cloudflare Email
-     Routing → worker): per-tenant address `orders-<slug>@in.fabricxai.com`, push
-     delivery, signature-verified route. Cleanest; adds a vendor.
-   - **B. IMAP polling** of the factory's own existing mailbox via a BullMQ repeat job:
-     no new vendor, works with the address buyers already write to; polling lag, one
-     credential per tenant to hold.
-   - Either way the transport is an adapter in `jobs.ts`/an API route; `receiveInboundEmail`
-     is the seam and does not care.
-2. **Buyer→merchandiser ownership** — auto-assignment needs "who owns this buyer"
-   recorded. Buyers module has no owner field today; add `buyers.owner_user_id`, or derive
-   from who created the buyer's recent orders? Leaning: explicit field (a buyers-module
-   change, its own PR).
-3. **Body-only amendments** — an email with no attachment ("increase style X to 5,000
-   pcs") — v1 scope? Leaning: out; the body is readable in the peek drawer and the person
-   acts manually. An `email_body` intake kind can come later.
-4. **Non-buyer mail** (suppliers' proformas, bank advices — both already intake kinds):
-   one shared mailroom with role-scoped desks, or buyer-mail only for v1? Leaning: buyer
-   mail only, schema deliberately not buyer-specific.
+**None open.** Locked 2026-08-22 after owner review resolved the four drafted questions:
+transport is Outlook-redirect → per-tenant inbound address → webhook provider adapter,
+with a Graph connector as a possible later second transport (§1); buyer ownership is the
+explicit `buyers.owner_user_id` handling-merchandiser field, its own PR (§4); body-only
+amendments are out of v1 — readable in the peek drawer, acted on manually, an
+`email_body` intake kind can come later; v1 is buyer mail only, with the schema
+deliberately not buyer-specific so supplier and bank desks can join without a migration.
 
 ## §9 · Non-functional
 
