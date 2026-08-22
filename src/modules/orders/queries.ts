@@ -6,7 +6,7 @@
  * "is this late?" would eventually disagree with the job that escalates it, and
  * then the desk and the alert would be telling a merchandiser different things.
  */
-import { and, asc, desc, eq, ilike, inArray, or, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, ilike, inArray, isNull, or, sql } from 'drizzle-orm'
 
 import { buyers } from '@/modules/buyers/schema'
 import { likePattern } from '@/lib/search-text'
@@ -15,10 +15,11 @@ import { readJsonbArray } from '@/modules/core/jsonb'
 import { scoped } from '@/modules/core/scoped'
 import { withTenantRead } from '@/modules/core/tenancy'
 
-import { users } from '@/db/schema/core'
+import { documents, users } from '@/db/schema/core'
 
 import {
   orderBreakdowns,
+  orderFiles,
   orderRevisions,
   orderStyles,
   orders,
@@ -571,4 +572,38 @@ export async function orderIdByPoNumber(ctx: AnyCtx, poNumber: string): Promise<
       .limit(2)
     return rows.length === 1 ? rows[0]!.id : null
   })
+}
+
+export interface OrderFileRef {
+  documentId: string
+  filename: string
+  /** What the filer called it — "buyer PO scan" — when they said; the filename otherwise. */
+  label: string | null
+}
+
+/**
+ * The order's filed documents, for the peek and (later) the workspace Documents tab.
+ *
+ * `order_files` has been the order↔document registry since the schema shipped and was
+ * read by nothing; this is its first reader. Joined to core's `documents` for the
+ * filename the way this file already joins `buyers` and `users` — a read, so rule 11's
+ * single-writer concern does not arise, and soft-deleted files stay out the same way
+ * `documentMeta` keeps them out.
+ */
+export async function orderFileRefs(ctx: AnyCtx, orderId: string): Promise<OrderFileRef[]> {
+  return withTenantRead(ctx, (tx) =>
+    tx
+      .select({
+        documentId: orderFiles.documentId,
+        filename: documents.filename,
+        label: orderFiles.label,
+      })
+      .from(orderFiles)
+      .innerJoin(
+        documents,
+        and(eq(documents.id, orderFiles.documentId), isNull(documents.deletedAt)),
+      )
+      .where(scoped(orderFiles, ctx, eq(orderFiles.orderId, orderId)))
+      .orderBy(desc(orderFiles.createdAt)),
+  )
 }

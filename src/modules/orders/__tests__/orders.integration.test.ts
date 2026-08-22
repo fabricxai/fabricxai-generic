@@ -12,11 +12,11 @@ import { and, eq, sql } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { createDirectClient, createDirectDb } from '@/db/direct'
-import { auditLog, companies, outbox, users } from '@/db/schema/core'
+import { auditLog, companies, documents, outbox, users } from '@/db/schema/core'
 import { buyers } from '@/modules/buyers/schema'
 import type { RequestCtx, SystemCtx } from '@/modules/core/ctx'
 import { AppError } from '@/modules/core/errors'
-import { orderBreakdowns, orderRevisions, orderStyles, orders, tnaMilestones, tnaTemplates } from '@/modules/orders/schema'
+import { orderBreakdowns, orderFiles, orderRevisions, orderStyles, orders, tnaMilestones, tnaTemplates } from '@/modules/orders/schema'
 import {
   actualizeMilestone,
   generateTna,
@@ -27,6 +27,7 @@ import {
 } from '@/modules/orders/service'
 import { runTnaScan } from '@/modules/orders/jobs'
 import { ordersModule } from '@/modules/orders/register'
+import { peekEntity } from '@/modules/core/drawer'
 import { approve, propose } from '@/modules/core/pending-changes'
 import { __resetRegistry, registerModule } from '@/modules/core/registry'
 import { pendingChanges } from '@/db/schema/core'
@@ -601,5 +602,64 @@ describe('1.3 · applyRevision — the AI → approve → commit loop', () => {
 
     const [styleAfter] = await db.select().from(orderStyles).where(eq(orderStyles.id, styleId))
     expect(styleAfter!.activeRevision).toBe(styleBefore!.activeRevision)
+  })
+})
+
+describe('the order peek (spec §3)', () => {
+  it('answers the drawer with the desk facts, by the PO a person can actually see', async () => {
+    // The chip carries the code, not the uuid — resolution rides the module's own
+    // refResolver, so the peek and the copilot answer the same references.
+    const peek = await peekEntity(ctxA, 'order', 'PO-9931')
+
+    expect(peek.id).toBe(orderId)
+    expect(peek.title).toBe('PO-9931')
+    expect(peek.subtitle).toContain('H&M')
+    expect(peek.subtitle).toContain('ST-100')
+    expect(peek.href).toBe(`/orders/${orderId}`)
+    expect(peek.facts).toContainEqual({
+      labelKey: 'ui.peek.order_qty',
+      value: '10,000',
+      mono: true,
+    })
+  })
+
+  it('carries the filed papers as onward peeks — the one-level stack in its natural use', async () => {
+    const docId = randomUUID()
+    await db.insert(documents).values({
+      id: docId,
+      companyId: COMPANY_A,
+      bucket: 'test',
+      objectKey: `ord-peek/${docId}`,
+      filename: 'po-9931.pdf',
+      mimeType: 'application/pdf',
+      sizeBytes: 52_120,
+      status: 'ready',
+    })
+    // First reader of order_files: the registry existed since the schema shipped and
+    // nothing consumed it until the peek.
+    await db.insert(orderFiles).values({
+      companyId: COMPANY_A,
+      orderId,
+      documentId: docId,
+      label: 'buyer PO scan',
+    })
+
+    const peek = await peekEntity(ctxA, 'order', orderId)
+    expect(peek.related).toContainEqual({
+      kind: 'document',
+      reference: docId,
+      label: 'buyer PO scan',
+    })
+
+    // And the onward peek answers through core's document kind.
+    const doc = await peekEntity(ctxA, 'document', docId)
+    expect(doc.title).toBe('po-9931.pdf')
+  })
+
+  it('is invisible across the fence', async () => {
+    await expect(peekEntity(ctxB, 'order', orderId)).rejects.toMatchObject({
+      code: 'not_found',
+      messageKey: 'errors.reference_not_found',
+    })
   })
 })

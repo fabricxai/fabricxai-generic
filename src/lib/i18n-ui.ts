@@ -69,6 +69,9 @@ export const UI_MESSAGES: Catalogue = {
     'ui.drawer.peek': 'Details',
     'ui.peek.doc_size': 'File size',
     'ui.peek.doc_status': 'Status',
+    'ui.peek.order_qty': 'Contracted quantity',
+    'ui.peek.order_value': 'Order value',
+    'ui.peek.order_ship': 'Planned ex-factory',
     'ui.common.read_only': 'Read only',
     'ui.common.read_only_body':
       'Your role can read {what} but not change it. Ask an owner or admin if you need to.',
@@ -1453,6 +1456,9 @@ export const UI_MESSAGES: Catalogue = {
     'ui.drawer.peek': 'বিস্তারিত',
     'ui.peek.doc_size': 'ফাইলের আকার',
     'ui.peek.doc_status': 'অবস্থা',
+    'ui.peek.order_qty': 'চুক্তির পরিমাণ',
+    'ui.peek.order_value': 'অর্ডারের মূল্য',
+    'ui.peek.order_ship': 'পরিকল্পিত এক্স-ফ্যাক্টরি',
     'ui.common.read_only': 'শুধু পড়া',
     'ui.common.read_only_body':
       'আপনার রোল {what} পড়তে পারে, বদলাতে পারে না। দরকার হলে ওনার বা অ্যাডমিনকে বলুন।',

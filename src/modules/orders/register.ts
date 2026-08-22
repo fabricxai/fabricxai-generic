@@ -27,6 +27,81 @@ export const ordersModule = registerModule({
     },
   },
 
+  /**
+   * The order peek (spec §3) — what a PO chip on any screen opens. Same audience as the
+   * order desk's nav entry: the roles that may open `/orders` may peek one, and the
+   * shipment clerk mid-packing reads the order without losing their place.
+   */
+  drawers: {
+    order: {
+      roles: ['merchandiser', 'commercial', 'planner', 'production', 'viewer', 'shipment'],
+      peek: async (ctx, id) => {
+        const { orderDetail, orderFileRefs } = await import('./queries')
+        const detail = await orderDetail(ctx, id)
+        if (!detail) return null
+
+        const files = await orderFileRefs(ctx, id)
+        const primaryPo = detail.poNumbers[0] ?? detail.id.slice(0, 8)
+
+        return {
+          kind: 'order',
+          id: detail.id,
+          // The buyer's own number is the identity; extra POs ride as a count, the way
+          // the desk's list shows them.
+          title:
+            detail.poNumbers.length > 1
+              ? `${primaryPo} +${detail.poNumbers.length - 1}`
+              : primaryPo,
+          subtitle: [detail.buyerName, detail.style?.styleCode].filter(Boolean).join(' · '),
+          // The status VALUE with the health TONE: the same words the desk's badges use,
+          // coloured by the worst thing true about the order.
+          status: {
+            label: detail.status,
+            tone: (
+              { ok: 'success', risk: 'warning', late: 'danger', done: 'neutral' } as const
+            )[detail.health],
+          },
+          facts: [
+            ...(detail.style?.contractedQty != null
+              ? [
+                  {
+                    labelKey: 'ui.peek.order_qty',
+                    value: detail.style.contractedQty.toLocaleString('en-US'),
+                    mono: true,
+                  },
+                ]
+              : []),
+            ...(detail.totalValue
+              ? [
+                  {
+                    labelKey: 'ui.peek.order_value',
+                    value: `${detail.currency} ${detail.totalValue}`,
+                    mono: true,
+                  },
+                ]
+              : []),
+            ...(detail.plannedExFactoryDate
+              ? [
+                  {
+                    labelKey: 'ui.peek.order_ship',
+                    value: detail.plannedExFactoryDate,
+                    mono: true,
+                  },
+                ]
+              : []),
+          ],
+          href: `/orders/${detail.id}`,
+          // Filed papers peek onward — the drawer's one-level stack in its natural use.
+          related: files.map((file) => ({
+            kind: 'document',
+            reference: file.documentId,
+            label: file.label ?? file.filename,
+          })),
+        }
+      },
+    },
+  },
+
   zodMap: ORDERS_ZOD_MAP,
 
   /**
