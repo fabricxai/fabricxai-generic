@@ -3,22 +3,35 @@ import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 
 import { Badge } from '@/components/fx/primitives'
+import { StatTile } from '@/components/fx/data'
 import { EmptyState } from '@/components/fx/feedback'
 import { Ident } from '@/components/fx/format'
 import { milestoneLabel } from '@/components/fx/tna'
-import { StatusLabel } from '@/components/fx/signature'
+import { SectionHeading, StatusLabel } from '@/components/fx/signature'
 import { AskAboutRow } from '@/components/shell/ask-about-row'
 import { PageHeader } from '@/components/shell/page-shell'
 import { WorkCue } from '@/components/shell/work-cue'
 import { canWrite, NAV } from '@/components/shell/nav'
 import { FloorTabs } from '@/components/shell/floor-tabs'
+import { env } from '@/lib/env'
+import { factoryToday, FACTORY_TIMEZONE } from '@/lib/dates'
+import { activeModuleIds } from '@/modules/core/activation'
 import { getCtx } from '@/modules/core/session'
 import { buyerAccounts } from '@/modules/buyers/queries'
-import { companyProfile } from '@/modules/settings/service'
-import { orderList, type OrderHealth } from '@/modules/orders/queries'
+import { lcCoverageForOrders, type LcCoverageRow } from '@/modules/commercial/queries'
+import { companyProfile, getPolicy } from '@/modules/settings/service'
+import type { BankDocsPolicy } from '@/modules/commercial/service'
+import {
+  orderBookSummary,
+  orderList,
+  weekMilestones,
+  type OrderHealth,
+} from '@/modules/orders/queries'
 import { requestLocale } from '@/lib/ui-locale'
 
+import { AskStrip } from './ask-strip'
 import { NewOrderButton } from './new-order'
+import { WeekStrip, weekDays } from './week-strip'
 
 /**
  * 1.3 Order Desk — the book.
@@ -61,12 +74,51 @@ const STATUS_WORD: Record<string, string> = {
   cancelled: 'cancelled',
 }
 
+/**
+ * The credit behind a PO, in one cell (design canvas, "Your week").
+ *
+ * Two facts and no more: which credit, and whether this order's own dates fit inside it.
+ * `conflict` means the plan already ships after the date the bank named — documents will
+ * be refused for goods that left too late — so it is said in words on the row rather than
+ * left to a colour, and it reads before the expiry countdown because it bites first.
+ *
+ * An order with no credit is not an error. It is an order confirmed before the LC arrived,
+ * which is most of them for their first few weeks, and the cell says so plainly instead of
+ * showing a dash somebody has to interpret.
+ */
+function LcCell({ row }: { row: LcCoverageRow | null }) {
+  if (!row) {
+    return (
+      <span style={{ font: '400 12.5px/1.3 var(--fx-font-sans)', color: 'var(--fx-text-tertiary)' }}>
+        no LC yet
+      </span>
+    )
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
+      <span data-mono style={{ font: '400 13px/1.3 var(--fx-font-mono)', color: 'var(--fx-text-secondary)' }}>
+        {row.number}
+      </span>
+      {row.conflict ? (
+        <StatusLabel status="late">conflict</StatusLabel>
+      ) : row.daysToExpiry !== null ? (
+        <span style={{ font: '400 12px/1.3 var(--fx-font-mono)', color: 'var(--fx-text-tertiary)' }}>
+          {row.daysToExpiry >= 0 ? `${row.daysToExpiry} d` : `expired ${-row.daysToExpiry} d ago`}
+        </span>
+      ) : null}
+    </div>
+  )
+}
+
 export default async function OrdersPage() {
   const ctx = await getCtx(await headers())
   if (!ctx) redirect('/login')
 
   const locale = await requestLocale()
-  const rows = await orderList(ctx, { now: new Date() })
+  const now = new Date()
+  const today = factoryToday()
+  const rows = await orderList(ctx, { now })
   const late = rows.filter((r) => r.health === 'late').length
   const risk = rows.filter((r) => r.health === 'risk').length
 
@@ -86,17 +138,190 @@ export default async function OrdersPage() {
     ...(risk > 0 ? [{ label: `${risk} at risk`, href: '/orders' }] : []),
   ]
 
+  /*
+   * The week, the headline figures, and the credit behind each PO (design canvas,
+   * "Your week"). Everything below is a read; the desk gains no new way to write.
+   *
+   * The LC column exists only where the tenant actually runs `commercial`. An order desk
+   * in a factory with the LC register switched off would otherwise carry a column that is
+   * empty for a reason nobody on that desk can see — the same rule the workspace tabs
+   * follow, asked of the same switchboard.
+   */
+  const activeModules = await activeModuleIds(ctx)
+  const showLc = activeModules.has('commercial')
+
+  const [summary, week, coverage] = await Promise.all([
+    orderBookSummary(ctx, { now }),
+    weekMilestones(ctx, { from: today, to: weekDays(today, 5)[4]! }),
+    showLc
+      ? getPolicy<BankDocsPolicy>(ctx, 'commercial').then((policy) =>
+          lcCoverageForOrders(ctx, rows.map((row) => row.id), {
+            now,
+            limitPct: policy.btbLimitPct ?? 75,
+          }),
+        )
+      : Promise.resolve([] as LcCoverageRow[]),
+  ])
+
+  // One order can draw on more than one credit. The column shows the one that bites
+  // first — a conflict before a clean credit, then the nearest expiry — because a cell
+  // showing the healthiest of two credits is a cell that hides the refusal.
+  const lcByOrder = new Map<string, LcCoverageRow>()
+  for (const row of coverage) {
+    const held = lcByOrder.get(row.orderId)
+    if (
+      !held ||
+      (row.conflict && !held.conflict) ||
+      (row.conflict === held.conflict &&
+        (row.daysToExpiry ?? Infinity) < (held.daysToExpiry ?? Infinity))
+    ) {
+      lcByOrder.set(row.orderId, row)
+    }
+  }
+
+  const lcConflicts = [...lcByOrder.values()].filter((row) => row.conflict)
+
+  // One track list, used by the header and every row — they are one table, and two copies
+  // of a grid template is how a header stops lining up with the columns beneath it.
+  const COLUMNS = showLc
+    ? '1.1fr 1fr 1.6fr .8fr .9fr .8fr .9fr .9fr'
+    : '1.1fr 1fr 1.6fr .8fr .9fr .8fr .9fr'
+
+  const monthName = summary.shipping
+    ? new Intl.DateTimeFormat('en-GB', { timeZone: FACTORY_TIMEZONE, month: 'long' }).format(
+        new Date(`${summary.shipping.month}-01T00:00:00Z`),
+      )
+    : null
+
+  const weekOf = new Intl.DateTimeFormat('en-GB', {
+    timeZone: FACTORY_TIMEZONE,
+    day: 'numeric',
+    month: 'short',
+  }).format(new Date(`${today}T00:00:00Z`))
+
   return (
     <>
       <PageHeader
-        eyebrow="Order desk"
-        title={rows.length === 0 ? 'No orders yet' : `${rows.length} orders`}
-        meta={late > 0 ? `${late} late` : undefined}
+        eyebrow={`Order desk · week of ${weekOf}`}
+        title={rows.length === 0 ? 'No orders yet' : 'Your week'}
+        meta={
+          rows.length === 0
+            ? undefined
+            : `${summary.openOrders} open order${summary.openOrders === 1 ? '' : 's'}${
+                late > 0 ? ` · ${late} late` : ''
+              }`
+        }
         ownsAmber
         actions={mayWrite ? <NewOrderButton buyers={buyers} /> : undefined}
       />
 
       <WorkCue items={cueItems} />
+
+      {rows.length > 0 ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 28, marginBottom: 32 }}>
+          {/*
+            * The four figures the desk is asked for before anything else. Each says what
+            * it was measured against and when it was measured — a stale number is worse
+            * than a missing one, and these are read at 8am against a scan that ran at 5.
+            */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
+              gap: 14,
+            }}
+          >
+            <StatTile
+              label="Order book value"
+              value={
+                <span data-numeric data-mono style={{ font: '600 26px/1.1 var(--fx-font-mono)' }}>
+                  {!seesPrices
+                    ? '•••'
+                    : summary.bookValue.length === 0
+                      ? '—'
+                      : summary.bookValue
+                          .map((entry) => `${entry.total} ${entry.currency}`)
+                          .join(' · ')}
+                </span>
+              }
+              basis={`${summary.openOrders} open order${summary.openOrders === 1 ? '' : 's'}`}
+            />
+            <StatTile
+              label={monthName ? `Shipping in ${monthName}` : 'Shipping'}
+              value={
+                <span data-numeric data-mono style={{ font: '600 26px/1.1 var(--fx-font-mono)' }}>
+                  {summary.shipping ? summary.shipping.qty.toLocaleString() : '—'}
+                  <span style={{ font: '400 13px/1 var(--fx-font-sans)', color: 'var(--fx-text-secondary)' }}>
+                    {' '}
+                    pcs
+                  </span>
+                </span>
+              }
+              basis={
+                summary.shipping && summary.shipping.poNumbers.length > 0
+                  ? summary.shipping.poNumbers.slice(0, 2).join(' and ')
+                  : 'nothing dated yet'
+              }
+            />
+            <StatTile
+              label="At-risk milestones"
+              value={
+                <span data-numeric data-mono style={{ font: '600 26px/1.1 var(--fx-font-mono)' }}>
+                  {summary.atRiskMilestones + summary.lateMilestones}
+                </span>
+              }
+              basis={
+                summary.lateMilestones > 0
+                  ? `${summary.lateMilestones} already late`
+                  : 'none late yet'
+              }
+              status={
+                summary.lateMilestones > 0
+                  ? 'late'
+                  : summary.atRiskMilestones > 0
+                    ? 'at-risk'
+                    : 'on-track'
+              }
+              critical={summary.lateMilestones > 0}
+            />
+            {showLc ? (
+              <StatTile
+                label="LC conflicts"
+                value={
+                  <span data-numeric data-mono style={{ font: '600 26px/1.1 var(--fx-font-mono)' }}>
+                    {lcConflicts.length}
+                  </span>
+                }
+                basis={
+                  lcConflicts.length === 0
+                    ? 'every credit covers its dates'
+                    : lcConflicts
+                        .slice(0, 2)
+                        .map((row) => {
+                          const po = rows.find((r) => r.id === row.orderId)?.poNumbers[0]
+                          return `${po ?? 'order'} vs ${row.number}`
+                        })
+                        .join(' · ')
+                }
+                status={lcConflicts.length > 0 ? 'late' : 'on-track'}
+                critical={lcConflicts.length > 0}
+              />
+            ) : null}
+          </div>
+
+          {env.MARBIM_ENABLED ? <AskStrip /> : null}
+
+          <section>
+            <SectionHeading eyebrow="every milestone on your orders">This week</SectionHeading>
+            <WeekStrip
+              days={weekDays(today, 5)}
+              milestones={week}
+              today={today}
+              locale={locale}
+            />
+          </section>
+        </div>
+      ) : null}
 
       {rows.length === 0 ? (
         <EmptyState
@@ -131,6 +356,8 @@ export default async function OrdersPage() {
          * column says there is more to the right, which a page that quietly grew wider
          * than the screen does not.
          */
+        <section>
+        <SectionHeading eyebrow="every open PO · sorted by ex-factory">Order book</SectionHeading>
         <div
           className="fx-scroll-x"
           // Focusable, or a keyboard cannot scroll it (WCAG 2.1.1). Found by 7.2's
@@ -147,8 +374,8 @@ export default async function OrdersPage() {
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: '1.1fr 1fr 1.6fr .8fr .9fr .8fr .9fr',
-              minWidth: 780,
+              gridTemplateColumns: COLUMNS,
+              minWidth: showLc ? 900 : 780,
               gap: 14,
               padding: '10px 18px 10px 21px',
               background: 'var(--fx-bg-sunken)',
@@ -164,6 +391,7 @@ export default async function OrdersPage() {
             <div style={{ textAlign: 'right' }}>Qty</div>
             <div style={{ textAlign: 'right' }}>Value</div>
             <div>Ex-factory</div>
+            {showLc ? <div>LC</div> : null}
             <div style={{ textAlign: 'right' }}>Status</div>
           </div>
 
@@ -185,8 +413,8 @@ export default async function OrdersPage() {
                 style={{
                   flex: 1,
                                     display: 'grid',
-                  gridTemplateColumns: '1.1fr 1fr 1.6fr .8fr .9fr .8fr .9fr',
-                  minWidth: 780,
+                  gridTemplateColumns: COLUMNS,
+                  minWidth: showLc ? 900 : 780,
                   gap: 14,
                   padding: '14px 18px',
                   alignItems: 'center',
@@ -258,6 +486,7 @@ export default async function OrdersPage() {
                     </span>
                   ) : null}
                 </div>
+                {showLc ? <LcCell row={lcByOrder.get(row.id) ?? null} /> : null}
                 <div
                   style={{
                     display: 'flex',
@@ -285,6 +514,7 @@ export default async function OrdersPage() {
             </Link>
           ))}
         </div>
+        </section>
       )}
       {/* The Desk skin's pocket bar — never for the viewer, whose only capability is this
           page and whose tabs would point at locked doors. */}

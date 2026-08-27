@@ -110,6 +110,21 @@ export interface PulseShipment {
 }
 
 /**
+ * The slice of a letter of credit the pulse reasons over — commercial's own facts.
+ *
+ * This is the PLAN-level question, and it is the one the merchandiser meets first: the
+ * order is scheduled to leave the factory after the date the credit names, months before
+ * any shipment row exists to notice it. The shipment-level facts below catch the same
+ * breach on the day it happens, which is far too late to move a ship date.
+ */
+export interface PulseLc {
+  number: string
+  /** latest shipment − planned ex-factory, in days. Negative is a conflict. */
+  floatDays: number | null
+  daysToExpiry: number | null
+}
+
+/**
  * One thing the pulse strip says. `key` is a MESSAGES catalogue key (the gate
  * reasonKeys land here verbatim — they are already sentences with copy in both
  * languages); `params` are its numbers. Structured facts, never prose: the strip
@@ -161,6 +176,8 @@ export function orderPulse(input: {
   /** Sampling's PP gate for the headline style; null when there is no style to gate. */
   ppGate: { passed: boolean; reasonKey?: string; facts?: Record<string, unknown> } | null
   shipments: readonly PulseShipment[]
+  /** The credits covering this order. Absent where the tenant does not run commercial. */
+  lcs?: readonly PulseLc[]
 }): OrderPulse {
   // A closed or cancelled order has no pulse — the file stays readable, the strip
   // stops claiming anything is owed.
@@ -245,6 +262,35 @@ export function orderPulse(input: {
           severity: 'warning',
         })
       }
+    }
+  }
+
+  /*
+   * The credit against the PLAN (design canvas, order page).
+   *
+   * Suppressed once a shipment has reported the same breach: the shipment fact names a
+   * real consignment and a real date, and saying both would tell a merchandiser the same
+   * bad news twice under two different numbers.
+   */
+  const shipmentBreached = input.shipments.some(
+    (s) => s.daysAgainstLatestShipment !== null && s.daysAgainstLatestShipment < 0,
+  )
+  for (const lc of input.lcs ?? []) {
+    if (lc.floatDays !== null && lc.floatDays < 0 && !shipmentBreached) {
+      facts.push({
+        key: 'pulse.lc_plan_conflict',
+        params: { number: lc.number, days: -lc.floatDays },
+        severity: 'critical',
+      })
+    }
+    // Three weeks is roughly the runway to amend a credit through two banks. Nearer than
+    // that and the amendment itself becomes the thing that is late.
+    if (lc.daysToExpiry !== null && lc.daysToExpiry >= 0 && lc.daysToExpiry <= 21) {
+      facts.push({
+        key: 'pulse.lc_expiring',
+        params: { number: lc.number, days: lc.daysToExpiry },
+        severity: 'warning',
+      })
     }
   }
 

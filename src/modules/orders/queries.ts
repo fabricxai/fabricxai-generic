@@ -813,3 +813,219 @@ export async function orderTimeline(
     return events.sort((a, b) => b.at.getTime() - a.at.getTime()).slice(0, limit)
   })
 }
+
+/* ── The week, and the book's headline figures ────────────── */
+
+/**
+ * Every milestone falling in a window, across every open order (design canvas,
+ * "Your week").
+ *
+ * The desk could already say which ORDERS were late. It could not say what a
+ * merchandiser is supposed to DO today, which is the question the Excel order book
+ * answered by being sorted by date — and the reason the book survived the app. This is
+ * that column, read from the same `tna_milestones` rows the nightly scan escalates, so
+ * the week and the alert cannot disagree.
+ *
+ * Milestones owned by other departments are included deliberately. A merchandiser is
+ * accountable for the order, not for their own rows in it: trims landing late is
+ * store's task and the merchandiser's problem, and a week that hid it would be a
+ * calendar of only the things that were already under control.
+ *
+ * Closed and cancelled orders drop out — their dates are history, and history does not
+ * belong in a week somebody is planning.
+ */
+export interface WeekMilestone {
+  id: string
+  orderId: string
+  poNumber: string | null
+  buyerName: string | null
+  name: string
+  plannedDate: string
+  actualDate: string | null
+  status: string
+  critical: boolean
+  ownerRole: string | null
+}
+
+export async function weekMilestones(
+  ctx: AnyCtx,
+  input: { from: string; to: string },
+): Promise<WeekMilestone[]> {
+  return withTenantRead(ctx, async (tx) => {
+    const rows = await tx
+      .select({
+        id: tnaMilestones.id,
+        orderId: tnaMilestones.orderId,
+        name: tnaMilestones.name,
+        plannedDate: tnaMilestones.plannedDate,
+        actualDate: tnaMilestones.actualDate,
+        status: tnaMilestones.status,
+        critical: tnaMilestones.critical,
+        ownerRole: tnaMilestones.ownerRole,
+        poNumbers: orders.poNumbers,
+        buyerName: buyers.name,
+        orderStatus: orders.status,
+      })
+      .from(tnaMilestones)
+      .innerJoin(orders, eq(orders.id, tnaMilestones.orderId))
+      .leftJoin(buyers, eq(buyers.id, orders.buyerId))
+      .where(
+        scoped(
+          tnaMilestones,
+          ctx,
+          and(
+            sql`${tnaMilestones.plannedDate} >= ${input.from}`,
+            sql`${tnaMilestones.plannedDate} <= ${input.to}`,
+          ),
+        ),
+      )
+      .orderBy(asc(tnaMilestones.plannedDate))
+      .limit(300)
+
+    return rows
+      .filter((row) => row.orderStatus !== 'closed' && row.orderStatus !== 'cancelled')
+      .map((row) => ({
+        id: row.id,
+        orderId: row.orderId,
+        poNumber: row.poNumbers?.[0] ?? null,
+        buyerName: row.buyerName,
+        name: row.name,
+        plannedDate: row.plannedDate,
+        actualDate: row.actualDate,
+        status: row.status,
+        critical: row.critical,
+        ownerRole: row.ownerRole,
+      }))
+  })
+}
+
+/**
+ * The four figures across the top of the order desk (design canvas, "Your week").
+ *
+ * Every one is a sum over rows this module already owns, computed on read rather than
+ * stored — the same reasoning as `healthOf` above. A cached book value is a number that
+ * is wrong from the first amendment onward, and nobody would ever see it go stale.
+ *
+ * `bookValue` is summed PER CURRENCY and returned as a list. A factory quoting one buyer
+ * in EUR and the rest in USD has two book values and no single one; adding them would
+ * invent an exchange rate this module has no business holding an opinion about.
+ */
+export interface OrderBookSummary {
+  openOrders: number
+  lateOrders: number
+  bookValue: { currency: string; total: string }[]
+  /** Pieces whose planned ex-factory falls in the named month — what ships next. */
+  shipping: { month: string; qty: number; poNumbers: string[] } | null
+  /** Milestones not yet done that the scan has flagged, across the open book. */
+  atRiskMilestones: number
+  lateMilestones: number
+}
+
+/** Decimal strings added as scaled integers — these are money (rule 4). */
+function sumMoney(amounts: readonly (string | null)[]): string {
+  const total = amounts.reduce((acc, amount) => {
+    if (!amount) return acc
+    const negative = amount.startsWith('-')
+    const [whole = '0', frac = ''] = (negative ? amount.slice(1) : amount).split('.')
+    const scaled = BigInt(whole + frac.padEnd(2, '0').slice(0, 2))
+    return negative ? acc - scaled : acc + scaled
+  }, 0n)
+  const negative = total < 0n
+  const digits = (negative ? -total : total).toString().padStart(3, '0')
+  return `${negative ? '-' : ''}${digits.slice(0, -2)}.${digits.slice(-2)}`
+}
+
+export async function orderBookSummary(
+  ctx: AnyCtx,
+  input: { now: Date } = { now: new Date() },
+): Promise<OrderBookSummary> {
+  return withTenantRead(ctx, async (tx) => {
+    const openRows = await tx
+      .select({
+        id: orders.id,
+        poNumbers: orders.poNumbers,
+        totalValue: orders.totalValue,
+        currency: orders.currency,
+        plannedExFactoryDate: orders.plannedExFactoryDate,
+      })
+      .from(orders)
+      .where(
+        scoped(orders, ctx, sql`${orders.status} NOT IN ('closed', 'cancelled')`),
+      )
+      .limit(500)
+
+    if (openRows.length === 0) {
+      return {
+        openOrders: 0,
+        lateOrders: 0,
+        bookValue: [],
+        shipping: null,
+        atRiskMilestones: 0,
+        lateMilestones: 0,
+      }
+    }
+
+    const ids = openRows.map((row) => row.id)
+
+    const [milestones, styles] = await Promise.all([
+      tx
+        .select({
+          orderId: tnaMilestones.orderId,
+          status: tnaMilestones.status,
+        })
+        .from(tnaMilestones)
+        .where(scoped(tnaMilestones, ctx, inArray(tnaMilestones.orderId, ids))),
+      tx
+        .select({ orderId: orderStyles.orderId, contractedQty: orderStyles.contractedQty })
+        .from(orderStyles)
+        .where(scoped(orderStyles, ctx, inArray(orderStyles.orderId, ids))),
+    ])
+
+    // An order still being negotiated has no total yet. It counts as open, but it must not
+    // conjure a currency bucket of its own — a book value of "0.00 EUR" reads as a real
+    // figure somebody could act on, and it is the absence of one.
+    const byCurrency = new Map<string, string[]>()
+    for (const row of openRows) {
+      if (row.totalValue === null) continue
+      byCurrency.set(row.currency, [...(byCurrency.get(row.currency) ?? []), row.totalValue])
+    }
+
+    const lateOrderIds = new Set(
+      milestones.filter((m) => m.status === 'late').map((m) => m.orderId),
+    )
+
+    /*
+     * "Shipping in <month>" is the EARLIEST month still ahead that has orders in it —
+     * not the current one. Asked at the end of a month, the current month's answer is
+     * usually zero and reads as though the factory has nothing to ship, when what it
+     * has is nothing to ship THIS WEEK.
+     */
+    const todayIso = input.now.toISOString().slice(0, 10)
+    const upcoming = openRows
+      .filter((row) => row.plannedExFactoryDate && row.plannedExFactoryDate >= todayIso)
+      .sort((a, b) => (a.plannedExFactoryDate! < b.plannedExFactoryDate! ? -1 : 1))
+
+    const month = upcoming[0]?.plannedExFactoryDate?.slice(0, 7) ?? null
+    const qtyByOrder = new Map(styles.map((s) => [s.orderId, s.contractedQty ?? 0]))
+    const inMonth = month
+      ? upcoming.filter((row) => row.plannedExFactoryDate!.startsWith(month))
+      : []
+
+    return {
+      openOrders: openRows.length,
+      lateOrders: lateOrderIds.size,
+      bookValue: [...byCurrency.entries()]
+        .map(([currency, amounts]) => ({ currency, total: sumMoney(amounts) }))
+        .sort((a, b) => a.currency.localeCompare(b.currency)),
+      shipping: month
+        ? {
+            month,
+            qty: inMonth.reduce((sum, row) => sum + (qtyByOrder.get(row.id) ?? 0), 0),
+            poNumbers: inMonth.flatMap((row) => row.poNumbers?.slice(0, 1) ?? []),
+          }
+        : null,
+      atRiskMilestones: milestones.filter((m) => m.status === 'at_risk').length,
+      lateMilestones: milestones.filter((m) => m.status === 'late').length,
+    }
+  })
+}

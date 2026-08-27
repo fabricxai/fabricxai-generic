@@ -445,6 +445,9 @@ export const MESSAGES: Catalogue = {
       'Shipment {partialNo} is {days} day(s) past the LC’s latest-shipment date.',
     'pulse.lc_deadline_near':
       'Shipment {partialNo} is {days} day(s) from the LC’s latest-shipment date.',
+    'pulse.lc_plan_conflict':
+      'Ex-factory is {days} day(s) after {number}’s latest shipment — move the date or amend the credit, or the bank will refuse the documents.',
+    'pulse.lc_expiring': '{number} expires in {days} day(s).',
     'gates.pp_approval.not_approved':
       'The buyer has not approved the PP sample for this style, so cutting cannot start.',
     'gates.pp_approval.no_sample':
@@ -932,6 +935,9 @@ export const MESSAGES: Catalogue = {
       'শিপমেন্ট {partialNo} এলসির শেষ-শিপমেন্ট তারিখ {days} দিন পেরিয়ে গেছে।',
     'pulse.lc_deadline_near':
       'শিপমেন্ট {partialNo} এলসির শেষ-শিপমেন্ট তারিখ থেকে {days} দিন দূরে।',
+    'pulse.lc_plan_conflict':
+      'এক্স-ফ্যাক্টরি {number}-এর শেষ-শিপমেন্ট তারিখের {days} দিন পরে — তারিখ সরান বা এলসি সংশোধন করুন, নয়তো ব্যাংক কাগজ নেবে না।',
+    'pulse.lc_expiring': '{number} {days} দিনে মেয়াদ শেষ হবে।',
     'gates.pp_approval.not_approved':
       'এই স্টাইলের PP স্যাম্পল বায়ার এখনও অ্যাপ্রুভ করেননি, তাই কাটিং শুরু করা যাবে না।',
     'gates.pp_approval.no_sample':

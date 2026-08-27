@@ -430,3 +430,125 @@ export async function searchLcs(
       .limit(input.limit),
   )
 }
+
+/* ── LC coverage, read from an order ──────────────────────── */
+
+/**
+ * The credit as an ORDER needs to see it (design canvas, Merchandiser flow).
+ *
+ * The register answers "which credits need attention"; the order desk asks the mirror
+ * question — "is the credit behind this PO going to pay for it" — and had no way to ask
+ * it. A merchandiser met the answer for the first time at the bank, which is the most
+ * expensive place to meet it.
+ *
+ * Three facts decide that, and all three are commercial's to state:
+ *
+ *  - `floatDays`: latest shipment − planned ex-factory. Negative means the plan already
+ *    ships too late for the credit, so the documents will be refused for goods that left
+ *    after the date the bank named. Computed here, from the same subtraction `lcDetail`
+ *    and `linkLcToOrder` use, so the desk cannot disagree with the register.
+ *  - `daysToExpiry`: the second clock, which bites after the first.
+ *  - `headroom`: what is left of the back-to-back limit, because the import PO that buys
+ *    this order's fabric is refused against it.
+ *
+ * Read-only by construction: this file has no writes, and the order screen says so. The
+ * LC belongs to commercial (rule 11) and the merchandiser's copy is a window, not a
+ * second register.
+ */
+export interface LcCoverageRow {
+  orderId: string
+  lcId: string
+  number: string
+  status: LcStatus
+  value: string
+  currency: string
+  latestShipmentDate: string | null
+  expiryDate: string | null
+  /** latest shipment − planned ex-factory, in days. Negative is a conflict, not a warning. */
+  floatDays: number | null
+  daysToExpiry: number | null
+  /** True when this order's own plan already breaches the credit's latest shipment. */
+  conflict: boolean
+  headroom: { limit: string; used: string; free: string; limitPct: number }
+}
+
+export async function lcCoverageForOrders(
+  ctx: AnyCtx,
+  orderIds: readonly string[],
+  input: { now: Date; limitPct: number },
+): Promise<LcCoverageRow[]> {
+  if (orderIds.length === 0) return []
+
+  const { btbHeadroom } = await import('./lc-conflicts')
+  const { orderLcs, orders } = await import('@/modules/orders/schema')
+
+  return withTenantRead(ctx, async (tx) => {
+    const rows = await tx
+      .select({
+        orderId: orders.id,
+        plannedExFactoryDate: orders.plannedExFactoryDate,
+        lcId: lcs.id,
+        number: lcs.number,
+        status: lcs.status,
+        value: lcs.value,
+        currency: lcs.currency,
+        latestShipmentDate: lcs.latestShipmentDate,
+        expiryDate: lcs.expiryDate,
+      })
+      .from(orderLcs)
+      .innerJoin(orders, eq(orders.id, orderLcs.orderId))
+      .innerJoin(lcs, eq(lcs.id, orderLcs.lcId))
+      .where(scoped(orderLcs, ctx, inArray(orderLcs.orderId, [...orderIds])))
+
+    if (rows.length === 0) return []
+
+    // One pass for every master in the set — the headroom question is per credit, and an
+    // order desk showing six POs on two credits should not ask the same one six times.
+    const masterIds = [...new Set(rows.map((r) => r.lcId))]
+    const btbs = await tx
+      .select({ masterLcId: btbLcs.masterLcId, value: btbLcs.value, status: btbLcs.status })
+      .from(btbLcs)
+      .where(scoped(btbLcs, ctx, inArray(btbLcs.masterLcId, masterIds)))
+
+    const liveByMaster = new Map<string, string[]>()
+    for (const btb of btbs) {
+      // Draft and active hold headroom; settled ones no longer stand in the way of
+      // opening another — the same rule `lcDetail` applies, stated once per file.
+      if (btb.status !== 'draft' && btb.status !== 'active') continue
+      liveByMaster.set(btb.masterLcId, [...(liveByMaster.get(btb.masterLcId) ?? []), btb.value])
+    }
+
+    return rows.map((row) => {
+      const floatDays =
+        row.latestShipmentDate && row.plannedExFactoryDate
+          ? Math.round(
+              (Date.parse(`${row.latestShipmentDate}T00:00:00Z`) -
+                Date.parse(`${row.plannedExFactoryDate}T00:00:00Z`)) /
+                86_400_000,
+            )
+          : null
+
+      return {
+        orderId: row.orderId,
+        lcId: row.lcId,
+        number: row.number,
+        status: row.status as LcStatus,
+        value: row.value,
+        currency: row.currency,
+        latestShipmentDate: row.latestShipmentDate,
+        expiryDate: row.expiryDate,
+        floatDays,
+        daysToExpiry: row.expiryDate ? daysUntil(row.expiryDate, input.now) : null,
+        conflict: floatDays !== null && floatDays < 0,
+        headroom: {
+          ...btbHeadroom({
+            masterValue: row.value,
+            existingBtbValues: liveByMaster.get(row.lcId) ?? [],
+            limitPct: input.limitPct,
+          }),
+          limitPct: input.limitPct,
+        },
+      }
+    })
+  })
+}

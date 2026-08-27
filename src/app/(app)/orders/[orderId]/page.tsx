@@ -13,6 +13,8 @@ import { requestLocale } from '@/lib/ui-locale'
 import { activeModuleIds } from '@/modules/core/activation'
 import { getCtx } from '@/modules/core/session'
 import { companyProfile } from '@/modules/settings/service'
+import { lcCoverageForOrders, type LcCoverageRow } from '@/modules/commercial/queries'
+import type { BankDocsPolicy } from '@/modules/commercial/service'
 import { orderDetail, orderFileRefs, orderTimeline, tnaTemplateChoices } from '@/modules/orders/queries'
 import { orderPulse, orderStatusMachine, type OrderStatus } from '@/modules/orders/service'
 import { orderRunRate } from '@/modules/production/queries'
@@ -23,6 +25,7 @@ import { shipmentBoard } from '@/modules/shipment/queries'
 import { factoryToday, FACTORY_TIMEZONE } from '@/lib/dates'
 
 import { OrderBreakdown } from './breakdown-client'
+import { LcCard } from './lc-card'
 import { OrderDocuments } from './documents'
 import { PulseStrip } from './pulse-strip'
 import { OrderStatusControl } from './status-control'
@@ -124,12 +127,35 @@ export default async function OrderDetailPage({
   const shipRows = showShipping
     ? (await shipmentBoard(ctx)).filter((row) => row.orderId === order.id)
     : []
+
+  /*
+   * The credits covering this order (design canvas, order page). Read through
+   * commercial's own query — the LC belongs to that module and this screen is a window
+   * onto it (rule 11), which is also why the card offers no way to change one.
+   *
+   * The plan-level conflict reaches the strip as a fact: ex-factory falling after the
+   * credit's latest shipment is a refusal already written into the schedule, and it was
+   * previously discovered by the bank because no screen put the two dates together.
+   */
+  const showLc = activeModules.has('commercial')
+  const lcRows: LcCoverageRow[] = showLc
+    ? await lcCoverageForOrders(ctx, [order.id], {
+        now: new Date(),
+        limitPct: (await getPolicy<BankDocsPolicy>(ctx, 'commercial')).btbLimitPct ?? 75,
+      })
+    : []
+
   const pulse = orderPulse({
     status: order.status as OrderStatus,
     today,
     milestones: order.milestones,
     ppGate,
     shipments: shipRows,
+    lcs: lcRows.map((lc) => ({
+      number: lc.number,
+      floatDays: lc.floatDays,
+      daysToExpiry: lc.daysToExpiry,
+    })),
   })
 
   // The run rate is only meaningful once there is a quantity to burn down against. An order
@@ -287,6 +313,14 @@ export default async function OrderDetailPage({
             </FactPair>
           </div>
         </Card>
+
+        {showLc ? (
+          <LcCard
+            rows={lcRows}
+            plannedExFactoryDate={order.plannedExFactoryDate}
+            seesPrices={seesPrices}
+          />
+        ) : null}
 
         <section>
           <SectionHeading eyebrow={late > 0 ? `${late} late` : undefined}>

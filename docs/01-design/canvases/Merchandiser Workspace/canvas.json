@@ -1,0 +1,340 @@
+{
+  "artboards": [
+    {
+      "file": "Main.dc.html",
+      "title": "Your week",
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 1360,
+      "page": "page-1"
+    },
+    {
+      "file": "OrderDetail.dc.html",
+      "title": "Order PO-88203",
+      "x": 1560,
+      "y": 0,
+      "w": 1440,
+      "h": 2320,
+      "page": "page-1"
+    },
+    {
+      "file": "OrderDossier.dc.html",
+      "title": "Style and documents",
+      "x": 3120,
+      "y": 0,
+      "w": 1440,
+      "h": 2320,
+      "page": "page-1"
+    },
+    {
+      "file": "MainBn.dc.html",
+      "title": "Your week — Bangla",
+      "x": 4680,
+      "y": 0,
+      "w": 1440,
+      "h": 1440,
+      "page": "page-1"
+    },
+    {
+      "file": "Sampling.dc.html",
+      "title": "Sampling room",
+      "x": 0,
+      "y": 2420,
+      "w": 1440,
+      "h": 1300,
+      "page": "page-1"
+    },
+    {
+      "file": "MarbimDraft.dc.html",
+      "title": "Email to MARBIM draft",
+      "x": 1560,
+      "y": 2420,
+      "w": 1440,
+      "h": 1060,
+      "page": "page-1"
+    },
+    {
+      "file": "TnaTimeline.dc.html",
+      "title": "Option B — timeline",
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 700,
+      "page": "page-2"
+    },
+    {
+      "file": "TnaDrawer.dc.html",
+      "title": "Option C — side drawer",
+      "x": 0,
+      "y": 780,
+      "w": 1440,
+      "h": 940,
+      "page": "page-2"
+    },
+    {
+      "file": "MorningDigest.dc.html",
+      "title": "1 — Morning digest",
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "page": "page-3"
+    },
+    {
+      "file": "QuoteDesk.dc.html",
+      "title": "2 — Enquiry to quote",
+      "x": 1560,
+      "y": 0,
+      "w": 1440,
+      "h": 1120,
+      "page": "page-3"
+    },
+    {
+      "file": "InputsMatrix.dc.html",
+      "title": "3 — Inputs readiness",
+      "x": 3120,
+      "y": 0,
+      "w": 1440,
+      "h": 960,
+      "page": "page-3"
+    },
+    {
+      "file": "WaitingOnBuyer.dc.html",
+      "title": "4 — Waiting on the buyer",
+      "x": 0,
+      "y": 1240,
+      "w": 1440,
+      "h": 1000,
+      "page": "page-3"
+    },
+    {
+      "file": "BuyerPack.dc.html",
+      "title": "5 — Buyer status pack",
+      "x": 1560,
+      "y": 1240,
+      "w": 1440,
+      "h": 940,
+      "page": "page-3"
+    },
+    {
+      "file": "DropsColours.dc.html",
+      "title": "6+7 — Drops and colour approvals",
+      "x": 3120,
+      "y": 1240,
+      "w": 1440,
+      "h": 1180,
+      "page": "page-3"
+    },
+    {
+      "file": "Shortcuts.dc.html",
+      "title": "8 — Keyboard",
+      "x": 4680,
+      "y": 1240,
+      "w": 900,
+      "h": 700,
+      "page": "page-3"
+    },
+    {
+      "file": "OrderMemory.dc.html",
+      "title": "9 — Order memory and repeats",
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 1160,
+      "page": "page-4"
+    },
+    {
+      "file": "FabricLeg.dc.html",
+      "title": "10 — Where the fabric is",
+      "x": 1560,
+      "y": 0,
+      "w": 1440,
+      "h": 1280,
+      "page": "page-4"
+    },
+    {
+      "file": "ShipAndDocs.dc.html",
+      "title": "11 — Ship dates and papers",
+      "x": 3120,
+      "y": 0,
+      "w": 1440,
+      "h": 1140,
+      "page": "page-4"
+    },
+    {
+      "file": "SampleRequisition.dc.html",
+      "title": "12 — Sample requisition",
+      "x": 0,
+      "y": 1400,
+      "w": 1440,
+      "h": 1120,
+      "page": "page-4"
+    },
+    {
+      "file": "RatioPacks.dc.html",
+      "title": "13 — Ratio packs and lengths",
+      "x": 1560,
+      "y": 1400,
+      "w": 1440,
+      "h": 1060,
+      "page": "page-4"
+    },
+    {
+      "file": "CapacityQuote.dc.html",
+      "title": "14 — Capacity and the floors",
+      "x": 3120,
+      "y": 1400,
+      "w": 1440,
+      "h": 1040,
+      "page": "page-4"
+    },
+    {
+      "file": "AgentDesk.dc.html",
+      "title": "15 — Agents and buyer questions",
+      "x": 0,
+      "y": 2640,
+      "w": 1440,
+      "h": 1040,
+      "page": "page-4"
+    },
+    {
+      "file": "OwnerBook.dc.html",
+      "title": "16 — The owner's book",
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 1060,
+      "page": "page-5"
+    },
+    {
+      "file": "Alerts.dc.html",
+      "title": "17 — Alerts and where they land",
+      "x": 1560,
+      "y": 0,
+      "w": 1440,
+      "h": 1140,
+      "page": "page-5"
+    },
+    {
+      "file": "BuyerScorecard.dc.html",
+      "title": "18 — Buyer scorecard",
+      "x": 3120,
+      "y": 0,
+      "w": 1440,
+      "h": 1120,
+      "page": "page-5"
+    },
+    {
+      "file": "MailIntake.dc.html",
+      "title": "19 — Mail that files itself",
+      "x": 0,
+      "y": 1300,
+      "w": 1440,
+      "h": 1020,
+      "page": "page-5"
+    },
+    {
+      "file": "PrintSheet.dc.html",
+      "title": "20 — Printed for the meeting",
+      "x": 1560,
+      "y": 1300,
+      "w": 794,
+      "h": 1123,
+      "print": "fixed",
+      "page": "page-5"
+    }
+  ],
+  "annotations": [
+    {
+      "id": "reading-order",
+      "x": 0,
+      "y": -190,
+      "w": 380,
+      "page": "page-1",
+      "text": "The merchandiser's day, left to right: the morning workspace replaces the Excel order book; the order page carries the TNA and the size grid; the sampling room shows the PP gate; and MARBIM turns a buyer email into a draft the merchandiser verifies."
+    },
+    {
+      "id": "dossier-note",
+      "x": 3120,
+      "y": -190,
+      "w": 350,
+      "page": "page-1",
+      "text": "The order's second tab, mirroring the merchandiser's real paper trail: tech pack and measurement spec, open costing revisions, the confirmation sheet signed through the chairman, sales contract, BTB budget ledger, fabric booking and mill PI, sample requisitions — each department's sign-off visible under the order."
+    },
+    {
+      "id": "bangla-note",
+      "x": 4680,
+      "y": -190,
+      "w": 340,
+      "page": "page-1",
+      "text": "The same morning screen in Bangla — the app's en/bn toggle already carries it. Identifiers and money stay Latin, per the app's typography rules. Status now reads three ways at once: color, shape, word."
+    },
+    {
+      "id": "marbim-drafts-only",
+      "x": 3060,
+      "y": 2420,
+      "w": 300,
+      "page": "page-1",
+      "text": "MARBIM drafts; the merchandiser verifies. They correct values in place or ask for a specific change, and Verify applies the update as them — the audit trail keeps the draft, the corrections, and who verified."
+    },
+    {
+      "id": "additions-note",
+      "x": 0,
+      "y": -240,
+      "w": 420,
+      "page": "page-3",
+      "text": "Eight proposals, sketched from the factory's own documents rather than invented: the morning digest, the enquiry-to-quote lane with its 24-hour clock, the inputs readiness matrix (their In-House Check List, with cells that take a date OR a word OR a note), the chasing queue, a buyer-safe status pack, multi-drop POs, per-colour lab dip approvals, and keyboard shortcuts. Nothing here is decided — they are here to be argued with."
+    },
+    {
+      "id": "papers-note",
+      "x": 0,
+      "y": -260,
+      "w": 430,
+      "page": "page-4",
+      "text": "Seven more, each answering something the factory's own documents already do and the app does not: order memory with repeat-order drift, the fabric's journey from mill to store with the booking's penalty ladder, ship-date history as a trail rather than an overwritten field, a pre-filled sample requisition, a breakdown grid that survives leg lengths and ratio packs, capacity and the two price floors, and the buying agent as a real party."
+    },
+    {
+      "id": "plumbing-note",
+      "x": 0,
+      "y": -260,
+      "w": 430,
+      "page": "page-5",
+      "text": "Five that serve people around the merchandiser, or the plumbing under them: the owner's read-only view of the same book, an alert model with only three channels and a rule for what never becomes an alert, a buyer scorecard honest about how thin its data still is, mail intake for the inbox where work really arrives, and a print sheet, because they print for meetings."
+    },
+    {
+      "id": "tna-options",
+      "x": 1560,
+      "y": 0,
+      "w": 340,
+      "page": "page-2",
+      "text": "Three ways to show Time and action, same data. Option A is the table on the order page — the Excel habit, dense and printable. Option B answers 'where are we against the calendar' in one glance. Option C peeks at any order's TNA without leaving the book. They can coexist: table on the page, drawer from the book, timeline as a toggle."
+    }
+  ],
+  "launch": {
+    "view": "canvas",
+    "page": "page-4"
+  },
+  "pages": [
+    {
+      "id": "page-1",
+      "name": "Merchandiser flow"
+    },
+    {
+      "id": "page-2",
+      "name": "Time and action options"
+    },
+    {
+      "id": "page-3",
+      "name": "Proposed additions"
+    },
+    {
+      "id": "page-4",
+      "name": "From their own papers"
+    },
+    {
+      "id": "page-5",
+      "name": "Oversight and plumbing"
+    }
+  ]
+}

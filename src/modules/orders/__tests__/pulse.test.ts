@@ -11,6 +11,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   orderPulse,
+  type PulseLc,
   type PulseMilestone,
   type PulseShipment,
 } from '@/modules/orders/service'
@@ -31,6 +32,13 @@ const shipment = (over: Partial<PulseShipment> = {}): PulseShipment => ({
   expNumber: 'EXP-123',
   portStatus: 'booked',
   daysAgainstLatestShipment: null,
+  ...over,
+})
+
+const lc = (over: Partial<PulseLc> = {}): PulseLc => ({
+  number: 'LC-DHK-0142',
+  floatDays: 30,
+  daysToExpiry: 90,
   ...over,
 })
 
@@ -193,5 +201,59 @@ describe('ordering', () => {
       shipments: [shipment({ expNumber: null, portStatus: 'gated_in' })],
     })
     expect(pulse.facts.map((f) => f.severity)).toEqual(['critical', 'warning'])
+  })
+})
+
+describe('the credit against the plan', () => {
+  it('ex-factory after the latest shipment is critical, and says by how many days', () => {
+    const pulse = orderPulse({ ...base, lcs: [lc({ floatDays: -4 })] })
+    expect(pulse.facts).toContainEqual({
+      key: 'pulse.lc_plan_conflict',
+      params: { number: 'LC-DHK-0142', days: 4 },
+      severity: 'critical',
+    })
+  })
+
+  it('a credit the plan fits inside says nothing at all', () => {
+    // The card still shows the dates; the strip is for what is IN THE WAY.
+    expect(orderPulse({ ...base, lcs: [lc({ floatDays: 4 })] }).facts).toHaveLength(0)
+  })
+
+  it('does not repeat a breach a shipment has already reported', () => {
+    // Same bad news under two numbers reads as two problems, and a merchandiser
+    // chasing "two LC problems" finds one.
+    const pulse = orderPulse({
+      ...base,
+      lcs: [lc({ floatDays: -4 })],
+      shipments: [shipment({ daysAgainstLatestShipment: -2 })],
+    })
+    expect(pulse.facts.filter((f) => f.key === 'pulse.lc_plan_conflict')).toHaveLength(0)
+    expect(pulse.facts).toContainEqual({
+      key: 'pulse.lc_deadline_breached',
+      params: { partialNo: 1, days: 2 },
+      severity: 'critical',
+    })
+  })
+
+  it('an expiry inside three weeks warns — the runway to amend through two banks', () => {
+    expect(orderPulse({ ...base, lcs: [lc({ daysToExpiry: 12 })] }).facts).toContainEqual({
+      key: 'pulse.lc_expiring',
+      params: { number: 'LC-DHK-0142', days: 12 },
+      severity: 'warning',
+    })
+    expect(orderPulse({ ...base, lcs: [lc({ daysToExpiry: 22 })] }).facts).toHaveLength(0)
+  })
+
+  it('an already-expired credit is not reported as expiring in negative days', () => {
+    expect(orderPulse({ ...base, lcs: [lc({ daysToExpiry: -3 })] }).facts).toHaveLength(0)
+  })
+
+  it('a closed order stays silent even with a conflicted credit', () => {
+    const pulse = orderPulse({ ...base, status: 'closed', lcs: [lc({ floatDays: -40 })] })
+    expect(pulse.facts).toHaveLength(0)
+  })
+
+  it('no lcs supplied is not the same as a clean credit — it simply says nothing', () => {
+    expect(orderPulse({ ...base }).facts).toHaveLength(0)
   })
 })
