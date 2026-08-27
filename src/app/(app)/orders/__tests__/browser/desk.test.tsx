@@ -14,6 +14,7 @@ import type { LcCoverageRow } from '@/modules/commercial/queries'
 import type { WeekMilestone } from '@/modules/orders/queries'
 
 import { LcCard } from '../../[orderId]/lc-card'
+import { lcConflictBasis } from '../../lc-tile'
 import { WeekStrip, weekDays } from '../../week-strip'
 
 const milestone = (over: Partial<WeekMilestone> = {}): WeekMilestone => ({
@@ -128,5 +129,34 @@ describe('the LC card', () => {
   it('links to the register, where the credit is actually amended', () => {
     render(<LcCard rows={[lc()]} plannedExFactoryDate="2026-10-12" seesPrices />)
     expect(screen.getByText('LC-DHK-0142').closest('a')).toHaveAttribute('href', '/lcs/lc-1')
+  })
+})
+
+/*
+ * The tile's own wording, pinned after a real tenant showed the defect: a desk where no
+ * order carried a credit was told "every credit covers its dates".
+ */
+describe('the LC conflicts tile’s sentence', () => {
+  const po = (orderId: string) => (orderId === 'ord-1' ? 'PO-88203' : 'PO-88214')
+
+  it('does not reassure about a check that had nothing to check', () => {
+    expect(lcConflictBasis([], po)).toBe('no credit is linked to any order yet')
+  })
+
+  it('gives a clean bill only when there is something to clear', () => {
+    expect(lcConflictBasis([lc()], po)).toBe('every credit covers its dates')
+  })
+
+  it('names the PO and the credit, so somebody can go straight to it', () => {
+    expect(lcConflictBasis([lc({ conflict: true })], po)).toBe('PO-88203 vs LC-DHK-0142')
+  })
+
+  it('names two and counts the rest — a tile is a headline', () => {
+    const rows = [
+      lc({ conflict: true }),
+      lc({ orderId: 'ord-2', lcId: 'lc-2', number: 'LC-DHK-0139', conflict: true }),
+      lc({ orderId: 'ord-3', lcId: 'lc-3', number: 'LC-DHK-0133', conflict: true }),
+    ]
+    expect(lcConflictBasis(rows, po)).toBe('PO-88203 vs LC-DHK-0142 · PO-88214 vs LC-DHK-0139 · and 1 more')
   })
 })

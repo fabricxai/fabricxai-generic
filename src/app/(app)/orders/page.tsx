@@ -30,6 +30,7 @@ import {
 import { requestLocale } from '@/lib/ui-locale'
 
 import { AskStrip } from './ask-strip'
+import { lcConflictBasis } from './lc-tile'
 import { NewOrderButton } from './new-order'
 import { WeekStrip, weekDays } from './week-strip'
 
@@ -292,17 +293,9 @@ export default async function OrdersPage() {
                     {lcConflicts.length}
                   </span>
                 }
-                basis={
-                  lcConflicts.length === 0
-                    ? 'every credit covers its dates'
-                    : lcConflicts
-                        .slice(0, 2)
-                        .map((row) => {
-                          const po = rows.find((r) => r.id === row.orderId)?.poNumbers[0]
-                          return `${po ?? 'order'} vs ${row.number}`
-                        })
-                        .join(' · ')
-                }
+                basis={lcConflictBasis([...lcByOrder.values()], (orderId) =>
+                  rows.find((row) => row.id === orderId)?.poNumbers[0] ?? null,
+                )}
                 status={lcConflicts.length > 0 ? 'late' : 'on-track'}
                 critical={lcConflicts.length > 0}
               />
