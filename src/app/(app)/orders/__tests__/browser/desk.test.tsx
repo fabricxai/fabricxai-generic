@@ -92,6 +92,24 @@ describe('the week strip', () => {
     render(<WeekStrip days={days} milestones={[]} today="2026-08-25" locale="en" />)
     expect(screen.getByText(/Nothing is due on any order this week/)).toBeInTheDocument()
   })
+
+  /*
+   * The canvas carries a Bangla artboard of this exact screen, and the annotation on it is
+   * the requirement: identifiers and money stay Latin, everything a person READS turns
+   * over. So the PO and the buyer are unchanged and the status word is not.
+   */
+  it('turns over for a Bangla device, and leaves the identifiers alone', () => {
+    render(<WeekStrip days={days} milestones={[milestone()]} today="2026-08-25" locale="bn" />)
+
+    expect(screen.getByText('দেরি')).toBeInTheDocument()
+    expect(screen.getByText(/আজ/)).toBeInTheDocument()
+    expect(screen.getByText(/PO-88203/)).toBeInTheDocument()
+  })
+
+  it('says an empty week in Bangla too', () => {
+    render(<WeekStrip days={days} milestones={[]} today="2026-08-25" locale="bn" />)
+    expect(screen.getByText(/এই সপ্তাহে কোনো অর্ডারে কিছু বাকি নেই/)).toBeInTheDocument()
+  })
 })
 
 describe('the LC card', () => {
@@ -149,6 +167,11 @@ describe('the LC conflicts tile’s sentence', () => {
 
   it('names the PO and the credit, so somebody can go straight to it', () => {
     expect(lcConflictBasis([lc({ conflict: true })], po)).toBe('PO-88203 vs LC-DHK-0142')
+  })
+
+  it('reads in Bangla, keeping the PO and the credit number Latin', () => {
+    expect(lcConflictBasis([], po, 'bn')).toBe('কোনো অর্ডারের সঙ্গে এখনো এলসি যুক্ত নেই')
+    expect(lcConflictBasis([lc({ conflict: true })], po, 'bn')).toBe('PO-88203 vs LC-DHK-0142')
   })
 
   it('names two and counts the rest — a tile is a headline', () => {

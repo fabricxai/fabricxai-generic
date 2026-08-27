@@ -3,6 +3,7 @@
 import { MarbimMark } from '@/components/fx/mark'
 import { Kbd } from '@/components/fx/primitives'
 
+import { useT } from '@/components/fx/locale'
 import { requestMarbimOpen } from '@/components/shell/marbim-open'
 
 /**
@@ -18,13 +19,11 @@ import { requestMarbimOpen } from '@/components/shell/marbim-open'
  * The prompts are about the ORDER BOOK, not about the app. "What slips if fabric lands
  * three days late" is a merchandiser's morning; "how do I use this screen" is a manual.
  */
-const PROMPTS = [
-  'What slips if fabric lands 3 days late?',
-  'Draft a buyer update',
-  'Which orders are waiting on me?',
-] as const
+const PROMPTS = ['ui.orders.ask_slip', 'ui.orders.ask_update', 'ui.orders.ask_waiting'] as const
 
 export function AskStrip() {
+  const t = useT()
+
   return (
     <div
       style={{
@@ -48,14 +47,14 @@ export function AskStrip() {
         }}
       >
         <MarbimMark size={20} />
-        Ask MARBIM
+        {t('ui.orders.ask_marbim')}
       </span>
 
-      {PROMPTS.map((prompt) => (
+      {PROMPTS.map((key) => (
         <button
-          key={prompt}
+          key={key}
           type="button"
-          onClick={() => requestMarbimOpen(`${prompt} `)}
+          onClick={() => requestMarbimOpen(`${t(key)} `)}
           style={{
             font: '400 13px/1.3 var(--fx-font-sans)',
             color: 'var(--fx-text-primary)',
@@ -67,7 +66,7 @@ export function AskStrip() {
             cursor: 'pointer',
           }}
         >
-          {prompt}
+          {t(key)}
         </button>
       ))}
 

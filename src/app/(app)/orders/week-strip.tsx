@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { StatusLabel } from '@/components/fx/signature'
 import { milestoneLabel } from '@/components/fx/tna'
 import type { Locale } from '@/lib/i18n'
+import { tui } from '@/lib/i18n-ui'
 import { FACTORY_TIMEZONE } from '@/lib/dates'
 import type { WeekMilestone } from '@/modules/orders/queries'
 
@@ -26,15 +27,15 @@ import type { WeekMilestone } from '@/modules/orders/queries'
  * calendar of the things already under control.
  */
 const STATUS: Record<string, { tone: 'on-track' | 'at-risk' | 'late' | 'done'; word: string }> = {
-  done: { tone: 'done', word: 'done' },
-  late: { tone: 'late', word: 'late' },
-  at_risk: { tone: 'at-risk', word: 'at risk' },
-  on_track: { tone: 'on-track', word: 'on track' },
-  pending: { tone: 'on-track', word: 'planned' },
+  done: { tone: 'done', word: 'ui.orders.milestone_done' },
+  late: { tone: 'late', word: 'ui.orders.health_late' },
+  at_risk: { tone: 'at-risk', word: 'ui.orders.health_risk' },
+  on_track: { tone: 'on-track', word: 'ui.orders.health_ok' },
+  pending: { tone: 'on-track', word: 'ui.orders.milestone_planned' },
 }
 
-const dayName = (iso: string) =>
-  new Intl.DateTimeFormat('en-GB', {
+const dayName = (iso: string, locale: Locale) =>
+  new Intl.DateTimeFormat(locale === 'bn' ? 'bn-BD' : 'en-GB', {
     timeZone: FACTORY_TIMEZONE,
     weekday: 'short',
     day: 'numeric',
@@ -68,8 +69,7 @@ export function WeekStrip({
   if (milestones.length === 0) {
     return (
       <p style={{ font: '400 14px/1.6 var(--fx-font-sans)', color: 'var(--fx-text-secondary)' }}>
-        Nothing is due on any order this week. Milestones appear here from each order&rsquo;s
-        time and action plan.
+        {tui(locale, 'ui.orders.week_empty')}
       </p>
     )
   }
@@ -107,15 +107,15 @@ export function WeekStrip({
                 color: isToday ? 'var(--fx-text-primary)' : 'var(--fx-text-tertiary)',
               }}
             >
-              {dayName(day)}
-              {isToday ? ' · today' : ''}
+              {dayName(day, locale)}
+              {isToday ? ` · ${tui(locale, 'ui.orders.week_today')}` : ''}
             </div>
 
             {rows.length === 0 ? (
               <span
                 style={{ font: '400 12.5px/1.4 var(--fx-font-sans)', color: 'var(--fx-text-tertiary)' }}
               >
-                nothing due
+                {tui(locale, 'ui.orders.week_nothing_due')}
               </span>
             ) : (
               rows.map((row) => {
@@ -150,7 +150,9 @@ export function WeekStrip({
                       <span style={{ font: '500 13px/1.35 var(--fx-font-sans)' }}>
                         {milestoneLabel(row.name, locale)}
                       </span>
-                      <StatusLabel status={status.tone}>{status.word}</StatusLabel>
+                      <StatusLabel status={status.tone}>
+                        {tui(locale, status.word)}
+                      </StatusLabel>
                     </span>
                     <span
                       style={{

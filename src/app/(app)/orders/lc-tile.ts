@@ -1,3 +1,5 @@
+import type { Locale } from '@/lib/i18n'
+import { tui } from '@/lib/i18n-ui'
 import type { LcCoverageRow } from '@/modules/commercial/queries'
 
 /**
@@ -14,11 +16,12 @@ import type { LcCoverageRow } from '@/modules/commercial/queries'
 export function lcConflictBasis(
   coverage: readonly LcCoverageRow[],
   poFor: (orderId: string) => string | null,
+  locale: Locale = 'en',
 ): string {
-  if (coverage.length === 0) return 'no credit is linked to any order yet'
+  if (coverage.length === 0) return tui(locale, 'ui.orders.tile_lc_none_linked')
 
   const conflicts = coverage.filter((row) => row.conflict)
-  if (conflicts.length === 0) return 'every credit covers its dates'
+  if (conflicts.length === 0) return tui(locale, 'ui.orders.tile_lc_clear')
 
   // Two names, then a count: a tile is a headline, and the card on each order carries the
   // rest. Naming the PO and the credit is what lets somebody go straight to the right one.
@@ -27,5 +30,7 @@ export function lcConflictBasis(
     .map((row) => `${poFor(row.orderId) ?? 'order'} vs ${row.number}`)
     .join(' · ')
 
-  return conflicts.length > 2 ? `${named} · and ${conflicts.length - 2} more` : named
+  return conflicts.length > 2
+    ? tui(locale, 'ui.orders.tile_lc_more', { names: named, count: conflicts.length - 2 })
+    : named
 }

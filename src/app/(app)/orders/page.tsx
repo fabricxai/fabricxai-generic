@@ -28,6 +28,8 @@ import {
   type OrderHealth,
 } from '@/modules/orders/queries'
 import { requestLocale } from '@/lib/ui-locale'
+import type { Locale } from '@/lib/i18n'
+import { tui } from '@/lib/i18n-ui'
 
 import { AskStrip } from './ask-strip'
 import { lcConflictBasis } from './lc-tile'
@@ -51,10 +53,10 @@ const SELVAGE: Record<OrderHealth, 'on-track' | 'at-risk' | 'late' | 'done'> = {
 }
 
 const WORD: Record<OrderHealth, string> = {
-  ok: 'on track',
-  risk: 'at risk',
-  late: 'late',
-  done: 'closed',
+  ok: 'ui.orders.health_ok',
+  risk: 'ui.orders.health_risk',
+  late: 'ui.orders.health_late',
+  done: 'ui.orders.health_done',
 }
 
 /**
@@ -87,11 +89,11 @@ const STATUS_WORD: Record<string, string> = {
  * which is most of them for their first few weeks, and the cell says so plainly instead of
  * showing a dash somebody has to interpret.
  */
-function LcCell({ row }: { row: LcCoverageRow | null }) {
+function LcCell({ row, locale }: { row: LcCoverageRow | null; locale: Locale }) {
   if (!row) {
     return (
       <span style={{ font: '400 12.5px/1.3 var(--fx-font-sans)', color: 'var(--fx-text-tertiary)' }}>
-        no LC yet
+        {tui(locale, 'ui.orders.lc_none')}
       </span>
     )
   }
@@ -102,10 +104,12 @@ function LcCell({ row }: { row: LcCoverageRow | null }) {
         {row.number}
       </span>
       {row.conflict ? (
-        <StatusLabel status="late">conflict</StatusLabel>
+        <StatusLabel status="late">{tui(locale, 'ui.orders.lc_conflict')}</StatusLabel>
       ) : row.daysToExpiry !== null ? (
         <span style={{ font: '400 12px/1.3 var(--fx-font-mono)', color: 'var(--fx-text-tertiary)' }}>
-          {row.daysToExpiry >= 0 ? `${row.daysToExpiry} d` : `expired ${-row.daysToExpiry} d ago`}
+          {row.daysToExpiry >= 0
+            ? tui(locale, 'ui.orders.days', { days: row.daysToExpiry })
+            : tui(locale, 'ui.orders.lc_expired', { days: -row.daysToExpiry })}
         </span>
       ) : null}
     </div>
@@ -188,13 +192,21 @@ export default async function OrdersPage() {
     ? '1.1fr 1fr 1.6fr .8fr .9fr .8fr .9fr .9fr'
     : '1.1fr 1fr 1.6fr .8fr .9fr .8fr .9fr'
 
+  /*
+   * Dates and month names turn over with the device, identifiers and money do not (the
+   * canvas's Bangla artboard states the rule). `en-GB` here printed "August-এ শিপমেন্ট"
+   * on a Bangla desk — the sentence translated and the month inside it did not, which is
+   * worse than either language alone.
+   */
+  const dateLocale = locale === 'bn' ? 'bn-BD' : 'en-GB'
+
   const monthName = summary.shipping
-    ? new Intl.DateTimeFormat('en-GB', { timeZone: FACTORY_TIMEZONE, month: 'long' }).format(
+    ? new Intl.DateTimeFormat(dateLocale, { timeZone: FACTORY_TIMEZONE, month: 'long' }).format(
         new Date(`${summary.shipping.month}-01T00:00:00Z`),
       )
     : null
 
-  const weekOf = new Intl.DateTimeFormat('en-GB', {
+  const weekOf = new Intl.DateTimeFormat(dateLocale, {
     timeZone: FACTORY_TIMEZONE,
     day: 'numeric',
     month: 'short',
@@ -203,14 +215,21 @@ export default async function OrdersPage() {
   return (
     <>
       <PageHeader
-        eyebrow={`Order desk · week of ${weekOf}`}
-        title={rows.length === 0 ? 'No orders yet' : 'Your week'}
+        eyebrow={tui(locale, 'ui.orders.desk_eyebrow', { date: weekOf })}
+        title={rows.length === 0 ? 'No orders yet' : tui(locale, 'ui.orders.desk_title')}
         meta={
           rows.length === 0
             ? undefined
-            : `${summary.openOrders} open order${summary.openOrders === 1 ? '' : 's'}${
-                late > 0 ? ` · ${late} late` : ''
-              }`
+            : [
+                tui(
+                  locale,
+                  summary.openOrders === 1
+                    ? 'ui.orders.desk_meta_one'
+                    : 'ui.orders.desk_meta_other',
+                  { count: summary.openOrders },
+                ),
+                ...(late > 0 ? [tui(locale, 'ui.orders.desk_meta_late', { count: late })] : []),
+              ].join(' · ')
         }
         ownsAmber
         actions={mayWrite ? <NewOrderButton buyers={buyers} /> : undefined}
@@ -233,7 +252,7 @@ export default async function OrdersPage() {
             }}
           >
             <StatTile
-              label="Order book value"
+              label={tui(locale, 'ui.orders.tile_book_value')}
               value={
                 <span data-numeric data-mono style={{ font: '600 26px/1.1 var(--fx-font-mono)' }}>
                   {!seesPrices
@@ -245,27 +264,35 @@ export default async function OrdersPage() {
                           .join(' · ')}
                 </span>
               }
-              basis={`${summary.openOrders} open order${summary.openOrders === 1 ? '' : 's'}`}
+              basis={tui(
+                locale,
+                summary.openOrders === 1 ? 'ui.orders.desk_meta_one' : 'ui.orders.desk_meta_other',
+                { count: summary.openOrders },
+              )}
             />
             <StatTile
-              label={monthName ? `Shipping in ${monthName}` : 'Shipping'}
+              label={
+                monthName
+                  ? tui(locale, 'ui.orders.tile_shipping', { month: monthName })
+                  : tui(locale, 'ui.orders.tile_shipping_none')
+              }
               value={
                 <span data-numeric data-mono style={{ font: '600 26px/1.1 var(--fx-font-mono)' }}>
                   {summary.shipping ? summary.shipping.qty.toLocaleString() : '—'}
                   <span style={{ font: '400 13px/1 var(--fx-font-sans)', color: 'var(--fx-text-secondary)' }}>
                     {' '}
-                    pcs
+                    {tui(locale, 'ui.production.unit_pcs')}
                   </span>
                 </span>
               }
               basis={
                 summary.shipping && summary.shipping.poNumbers.length > 0
                   ? summary.shipping.poNumbers.slice(0, 2).join(' and ')
-                  : 'nothing dated yet'
+                  : tui(locale, 'ui.orders.tile_shipping_undated')
               }
             />
             <StatTile
-              label="At-risk milestones"
+              label={tui(locale, 'ui.orders.tile_at_risk')}
               value={
                 <span data-numeric data-mono style={{ font: '600 26px/1.1 var(--fx-font-mono)' }}>
                   {summary.atRiskMilestones + summary.lateMilestones}
@@ -273,8 +300,8 @@ export default async function OrdersPage() {
               }
               basis={
                 summary.lateMilestones > 0
-                  ? `${summary.lateMilestones} already late`
-                  : 'none late yet'
+                  ? tui(locale, 'ui.orders.tile_at_risk_late', { count: summary.lateMilestones })
+                  : tui(locale, 'ui.orders.tile_at_risk_clear')
               }
               status={
                 summary.lateMilestones > 0
@@ -287,14 +314,16 @@ export default async function OrdersPage() {
             />
             {showLc ? (
               <StatTile
-                label="LC conflicts"
+                label={tui(locale, 'ui.orders.tile_lc')}
                 value={
                   <span data-numeric data-mono style={{ font: '600 26px/1.1 var(--fx-font-mono)' }}>
                     {lcConflicts.length}
                   </span>
                 }
-                basis={lcConflictBasis([...lcByOrder.values()], (orderId) =>
-                  rows.find((row) => row.id === orderId)?.poNumbers[0] ?? null,
+                basis={lcConflictBasis(
+                  [...lcByOrder.values()],
+                  (orderId) => rows.find((row) => row.id === orderId)?.poNumbers[0] ?? null,
+                  locale,
                 )}
                 status={lcConflicts.length > 0 ? 'late' : 'on-track'}
                 critical={lcConflicts.length > 0}
@@ -305,7 +334,9 @@ export default async function OrdersPage() {
           {env.MARBIM_ENABLED ? <AskStrip /> : null}
 
           <section>
-            <SectionHeading eyebrow="every milestone on your orders">This week</SectionHeading>
+            <SectionHeading eyebrow={tui(locale, 'ui.orders.week_eyebrow')}>
+              {tui(locale, 'ui.orders.week_title')}
+            </SectionHeading>
             <WeekStrip
               days={weekDays(today, 5)}
               milestones={week}
@@ -350,7 +381,9 @@ export default async function OrdersPage() {
          * than the screen does not.
          */
         <section>
-        <SectionHeading eyebrow="every open PO · sorted by ex-factory">Order book</SectionHeading>
+        <SectionHeading eyebrow={tui(locale, 'ui.orders.book_eyebrow')}>
+          {tui(locale, 'ui.orders.book_title')}
+        </SectionHeading>
         <div
           className="fx-scroll-x"
           // Focusable, or a keyboard cannot scroll it (WCAG 2.1.1). Found by 7.2's
@@ -378,14 +411,14 @@ export default async function OrdersPage() {
               color: 'var(--fx-text-tertiary)',
             }}
           >
-            <div>PO</div>
-            <div>Buyer</div>
-            <div>Style</div>
-            <div style={{ textAlign: 'right' }}>Qty</div>
-            <div style={{ textAlign: 'right' }}>Value</div>
-            <div>Ex-factory</div>
-            {showLc ? <div>LC</div> : null}
-            <div style={{ textAlign: 'right' }}>Status</div>
+            <div>{tui(locale, 'ui.orders.col_po')}</div>
+            <div>{tui(locale, 'ui.orders.col_buyer')}</div>
+            <div>{tui(locale, 'ui.orders.col_style')}</div>
+            <div style={{ textAlign: 'right' }}>{tui(locale, 'ui.orders.col_qty')}</div>
+            <div style={{ textAlign: 'right' }}>{tui(locale, 'ui.orders.col_value')}</div>
+            <div>{tui(locale, 'ui.orders.col_ex_factory')}</div>
+            {showLc ? <div>{tui(locale, 'ui.orders.col_lc')}</div> : null}
+            <div style={{ textAlign: 'right' }}>{tui(locale, 'ui.orders.col_status')}</div>
           </div>
 
           {rows.map((row) => (
@@ -475,11 +508,13 @@ export default async function OrdersPage() {
                     <span
                       style={{ font: "400 12px/1.3 var(--fx-font-mono)", color: 'var(--fx-text-tertiary)' }}
                     >
-                      {row.daysToExFactory >= 0 ? `${row.daysToExFactory} d` : `${-row.daysToExFactory} d over`}
+                      {row.daysToExFactory >= 0
+                        ? tui(locale, 'ui.orders.days', { days: row.daysToExFactory })
+                        : tui(locale, 'ui.orders.days_over', { days: -row.daysToExFactory })}
                     </span>
                   ) : null}
                 </div>
-                {showLc ? <LcCell row={lcByOrder.get(row.id) ?? null} /> : null}
+                {showLc ? <LcCell row={lcByOrder.get(row.id) ?? null} locale={locale} /> : null}
                 <div
                   style={{
                     display: 'flex',
@@ -489,7 +524,7 @@ export default async function OrdersPage() {
                     textAlign: 'right',
                   }}
                 >
-                  <StatusLabel status={SELVAGE[row.health]}>{WORD[row.health]}</StatusLabel>
+                  <StatusLabel status={SELVAGE[row.health]}>{tui(locale, WORD[row.health])}</StatusLabel>
                   {row.headline ? (
                     <span
                       style={{
