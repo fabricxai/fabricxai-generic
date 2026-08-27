@@ -1,0 +1,32 @@
+{
+  "_intakeKind": "buyer_amendment",
+  "_door": "/marbim/intake → \"A buyer's amendment\" · or /orders/<id> → Paste the buyer's mail",
+  "_context": {
+    "orderStyleId": "picked from the order/style dropdown — NKA-PO-70318 · ST-2815. Never in the document: the mail names the style code but not the factory's own id for it."
+  },
+  "cells": [
+    { "color": "Charcoal Melange", "size": "XS", "qty": 1800 },
+    { "color": "Charcoal Melange", "size": "S", "qty": 3600 },
+    { "color": "Charcoal Melange", "size": "M", "qty": 4200 },
+    { "color": "Charcoal Melange", "size": "L", "qty": 3000 },
+    { "color": "Charcoal Melange", "size": "XL", "qty": 1800 },
+    { "color": "Deep Navy", "size": "XS", "qty": 1600 },
+    { "color": "Deep Navy", "size": "S", "qty": 3200 },
+    { "color": "Deep Navy", "size": "M", "qty": 4800 },
+    { "color": "Deep Navy", "size": "L", "qty": 3200 },
+    { "color": "Deep Navy", "size": "XL", "qty": 1600 },
+    { "color": "Off White", "size": "XS", "qty": 1200 },
+    { "color": "Off White", "size": "S", "qty": 2400 },
+    { "color": "Off White", "size": "M", "qty": 5100 },
+    { "color": "Off White", "size": "L", "qty": 3300 },
+    { "color": "Off White", "size": "XL", "qty": 1500 }
+  ],
+  "reason": "AMD-02, 6 Jan 2027 — volume moved from Charcoal Melange to Off White; total unchanged at 42,000 pcs",
+  "_notes": [
+    "The mail states FOUR changed cells and the schema wants the WHOLE grid — `applyRevision` replaces the revision wholesale, because a partial update leaves cells the new grid does not mention and 'the ratio still has an XXL nobody ordered' is a real way to over-cut. An extraction returning only the four changed cells is a finding, and the approve screen shows the total to catch it: four cells sum to 15,600, not 42,000.",
+    "The unchanged eleven cells are NOT on this paper. They come from the order's current revision, which is why this door is worth a human reading before it commits — the model has to carry forward what the document does not repeat.",
+    "Total must still be 42,000. The buyer says so in prose ('unchanged at 42,000 pcs') and the arithmetic agrees; a grid that does not sum to it is refused by the tolerance check, not merely flagged.",
+    "Ex-factory is mentioned and must NOT be drafted here — this schema carries the grid and a reason, nothing else. AMD-01 is the date amendment and it is a different door (a TNA date is actualised, never drafted).",
+    "AMD-01 (05-…) has no expected.json on purpose: it changes only the ex-factory date, and there is no intake kind that drafts a date. It is kit paper for the LC-conflict walk, not for an extractor."
+  ]
+}

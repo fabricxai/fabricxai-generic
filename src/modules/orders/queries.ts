@@ -1041,3 +1041,49 @@ export async function orderBookSummary(
     }
   })
 }
+
+/**
+ * The styles a buyer amendment could be about (design canvas, "Email to MARBIM draft").
+ *
+ * A revision names an `orderStyleId` and no buyer email ever will — the mail says "White /
+ * M up 1,500" and expects the reader to know which order that is. So the person picks,
+ * exactly as they pick the buyer on a PO intake, and the choice rides in at confidence 1.
+ *
+ * Open orders only. An amendment against a closed order is not a thing anybody does, and a
+ * picker of every style the factory has ever made is a picker nobody can use.
+ */
+export interface OrderStyleChoice {
+  id: string
+  styleCode: string
+  description: string | null
+  poNumber: string | null
+  buyerName: string | null
+}
+
+export async function orderStyleChoices(ctx: AnyCtx): Promise<OrderStyleChoice[]> {
+  return withTenantRead(ctx, async (tx) => {
+    const rows = await tx
+      .select({
+        id: orderStyles.id,
+        styleCode: orderStyles.styleCode,
+        description: orderStyles.description,
+        poNumbers: orders.poNumbers,
+        buyerName: buyers.name,
+        createdAt: orderStyles.createdAt,
+      })
+      .from(orderStyles)
+      .innerJoin(orders, eq(orders.id, orderStyles.orderId))
+      .leftJoin(buyers, eq(buyers.id, orders.buyerId))
+      .where(scoped(orderStyles, ctx, sql`${orders.status} NOT IN ('closed', 'cancelled')`))
+      .orderBy(desc(orderStyles.createdAt))
+      .limit(200)
+
+    return rows.map((row) => ({
+      id: row.id,
+      styleCode: row.styleCode,
+      description: row.description,
+      poNumber: row.poNumbers?.[0] ?? null,
+      buyerName: row.buyerName,
+    }))
+  })
+}

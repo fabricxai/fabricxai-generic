@@ -205,6 +205,8 @@ export const MESSAGES: Catalogue = {
     'orders.errors.po_draft_insert_only':
       'An order drafted from a PO is created, not edited. Amending a confirmed order is a revision with its own trail.',
     'orders.errors.style_not_found': 'That style is not on this order.',
+    'orders.errors.revision_without_style':
+      'This amendment does not say which order and style it changes, so there is nothing to apply it to.',
     'orders.errors.template_invalid': 'That TNA template cannot be read as it stands.',
     'orders.errors.template_not_found': 'That TNA template no longer exists.',
     'orders.errors.tna_template_unschedulable':
@@ -766,6 +768,8 @@ export const MESSAGES: Catalogue = {
     // ── 1.3 ──
     // The floor says these terms in English anyway (PP, QA, ex-factory), so the
     // Bangla keeps them rather than inventing translations nobody uses out loud.
+    'orders.errors.revision_without_style':
+      'এই সংশোধনীতে কোন অর্ডার ও স্টাইল বদলাচ্ছে তা বলা নেই, তাই এটি কোথাও প্রয়োগ করার নেই।',
     'orders.milestones.order_confirmed': 'পিও গৃহীত',
     'orders.milestones.yarn_booking': 'সুতা বুকিং',
     'orders.milestones.yarn_in_house': 'সুতা ইন-হাউস',

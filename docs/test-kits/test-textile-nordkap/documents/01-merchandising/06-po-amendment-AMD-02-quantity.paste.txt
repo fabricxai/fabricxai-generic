@@ -1,0 +1,22 @@
+Nordkap Apparel AB
+PURCHASE ORDER AMENDMENT — NKA-PO-70318 · AMD-02
+
+Original PO: NKA-PO-70318 dated 2026-09-02
+Amendment: AMD-02
+Amendment date: 2027-01-06
+Style: ST-2815
+
+Our Off White sell-through in the Nordic doors is ahead of plan and Charcoal is behind.
+Please move volume between the two colours as below. Total order quantity is unchanged
+at 42,000 pcs and the unit price stays USD 8.95, so the order value does not move.
+
+Colour            Size    Was       Now
+Off White         M       3,600     5,100
+Off White         L       2,700     3,300
+Charcoal Melange  M       5,400     4,200
+Charcoal Melange  L       3,600     3,000
+
+All other cells unchanged. Deep Navy is unchanged in full.
+Ex-factory stays 2027-02-14 per AMD-01. Do not re-cut the marker for Deep Navy.
+
+Please confirm by return that the amended grid is in production planning.

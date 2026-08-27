@@ -612,6 +612,16 @@ export async function applyRevision(
 ): Promise<{ rowId: string; before: Record<string, unknown>; after: Record<string, unknown> }> {
   const payload = orderRevisionDraft.parse(input.payload)
 
+  /*
+   * The draft schema lets this be absent so a reading can validate before the picker's
+   * answer is merged in (see `orderRevisionDraft`). By commit time it must be real: a
+   * revision with no style is a grid belonging to nothing, and the failure would otherwise
+   * surface as a not-found against `undefined` from three frames down.
+   */
+  if (!payload.orderStyleId) {
+    throw new AppError('validation_failed', 'orders.errors.revision_without_style', {})
+  }
+
   const result = await saveBreakdownIn(ctx, tx, {
     orderStyleId: payload.orderStyleId,
     cells: payload.cells,

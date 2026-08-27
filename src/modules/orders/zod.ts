@@ -259,9 +259,19 @@ export const orderFromPoDraft = z.object({
   styles: z.array(orderStyleDraft).min(1),
 })
 
-/** A buyer's amendment, drafted from an email or an amended PO. */
+/**
+ * A buyer's amendment, drafted from an email or an amended PO.
+ *
+ * `orderStyleId` is optional HERE and required by everything downstream, for the same
+ * reason `orderFromPoDraft.buyerId` is: no email carries the id, the person picks it on
+ * the intake screen, and context values are merged over the model's reading AFTER the
+ * provider has validated against this schema. A required uuid would fail every reading at
+ * the provider call, before the picker's answer had anywhere to go. `.catch(undefined)`
+ * drops whatever id-shaped string a model invented — the picker's value is the one that
+ * counts, and `applyRevision` refuses a payload that reaches commit without one.
+ */
 export const orderRevisionDraft = z.object({
-  orderStyleId: z.uuid(),
+  orderStyleId: z.uuid().optional().catch(undefined),
   cells: z.array(breakdownCell).min(1),
   reason: z.string().min(1),
   documentId: z.uuid().optional(),

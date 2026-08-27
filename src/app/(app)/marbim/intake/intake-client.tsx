@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useRef, useState, useTransition } from 'react'
+import { useEffect, useRef, useState, useTransition } from 'react'
 
 import { InlineAlert } from '@/components/fx/feedback'
 import { actionErrorMessage } from '@/lib/action-error'
@@ -88,21 +88,54 @@ const SERVER_READABLE =
  * rate, and a screen that said "drafted" would send somebody to an approve inbox that is
  * still empty.
  */
-export function IntakeClient({ kinds }: { kinds: readonly Kind[] }) {
+/**
+ * `initialKind` and `initialContext` come from the URL (`?kind=…`), so a screen that knows
+ * what somebody is about to file can hand them a door already open — the order page's
+ * "Paste the buyer's mail" arrives here with the amendment kind picked and that order's
+ * style already chosen. Everything about the flow is otherwise unchanged: the same chip is
+ * selected, the same context request runs, and the person can pick a different one.
+ */
+export function IntakeClient({
+  kinds,
+  initialKind = null,
+  initialContext = {},
+}: {
+  kinds: readonly Kind[]
+  initialKind?: string | null
+  initialContext?: Record<string, string>
+}) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const fileRef = useRef<HTMLInputElement>(null)
 
-  const [chosen, setChosen] = useState<string | null>(null)
+  const [chosen, setChosen] = useState<string | null>(
+    initialKind && kinds.some((k) => k.id === initialKind) ? initialKind : null,
+  )
   const [text, setText] = useState('')
   const [attachment, setAttachment] = useState<Attachment>({ state: 'none' })
   const [queued, setQueued] = useState<string | null>(null)
   const [failure, setFailure] = useState<string | null>(null)
 
   const [context, setContext] = useState<ContextField[]>([])
-  const [contextValues, setContextValues] = useState<Record<string, string>>({})
+  const [contextValues, setContextValues] = useState<Record<string, string>>(initialContext)
 
   const kind = kinds.find((k) => k.id === chosen) ?? null
+
+  /*
+   * A deep-linked kind still has to load its pickers, and `pick()` only runs on a click.
+   * Without this the amendment door opened with the chip lit, no dropdown, and a submit
+   * button disabled by a context requirement the screen had never asked about.
+   */
+  useEffect(() => {
+    if (!kind?.needsContext || context.length > 0) return
+    void intakeContext(kind.id)
+      .then((result) => setContext(unwrap(result)))
+      .catch((error: unknown) =>
+        setFailure(actionErrorMessage(error, 'The choices could not be loaded.')),
+      )
+    // Runs once per chosen kind; `context` is the guard, not a dependency to re-fire on.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kind?.id])
 
   // Every declared field answered. The button is disabled until then rather than the
   // server refusing after an upload — the person has already done the work by that point.
@@ -113,7 +146,9 @@ export function IntakeClient({ kinds }: { kinds: readonly Kind[] }) {
     setQueued(null)
     setFailure(null)
     setContext([])
-    setContextValues({})
+    // A pre-filled context belongs to the kind it was passed for; picking another door
+    // must not carry somebody else's order id into it.
+    setContextValues(k.id === initialKind ? initialContext : {})
 
     if (!k.needsContext) return
     void intakeContext(k.id)

@@ -315,3 +315,48 @@ describe('the enquiry that starts the chain', () => {
     expect(kind!.context?.map((c) => c.field)).toEqual(['buyerId'])
   })
 })
+
+/**
+ * The amendment door (design canvas, "Email to MARBIM draft").
+ *
+ * Everything behind it existed since 1.3 — `order_breakdowns` as a pending target,
+ * `order_revision_v1` as a schema, `applyRevision` as the commit handler — and the door
+ * did not, so the document a buyer sends most often had no intake at all.
+ */
+describe('the buyer amendment', () => {
+  const amendment = INTAKE_KINDS.find((k) => k.id === 'buyer_amendment')!
+
+  it('drafts the breakdown, not the order, and asks which style', () => {
+    expect(amendment).toMatchObject({
+      moduleId: 'orders',
+      targetTable: 'order_breakdowns',
+      zodSchemaKey: 'order_revision_v1',
+    })
+    expect(amendment.context?.[0]).toMatchObject({
+      field: 'orderStyleId',
+      source: 'order_styles',
+    })
+  })
+
+  it('is a merchandiser’s paper, and is filed rather than filling a form', () => {
+    // A quantity change on a live order belongs in an approve inbox: `applyRevision`
+    // bumps the revision the cutting floor works to.
+    expect(amendment.roles).toContain('merchandiser')
+    expect(amendment.fillsFormOnly).toBeUndefined()
+  })
+
+  it('reaches a merchandiser’s chips only where orders is switched on', () => {
+    expect(intakeKindsFor(['merchandiser'], new Set(['orders'])).map((k) => k.id)).toContain(
+      'buyer_amendment',
+    )
+    expect(intakeKindsFor(['merchandiser'], new Set(['rfq'])).map((k) => k.id)).not.toContain(
+      'buyer_amendment',
+    )
+  })
+
+  it('is not on the storekeeper’s desk', () => {
+    expect(intakeKindsFor(['store'], new Set(['orders'])).map((k) => k.id)).not.toContain(
+      'buyer_amendment',
+    )
+  })
+})

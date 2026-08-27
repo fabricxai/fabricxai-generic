@@ -47,7 +47,14 @@ const STATUS_TONE: Record<string, 'success' | 'warning' | 'danger' | 'neutral'> 
   rejected: 'danger',
 }
 
-export default async function IntakePage() {
+/** Deep-link params: `?kind=<intake kind>` plus any of that kind's context ids by field
+    name (`?orderStyleId=…`). Anything unrecognised is ignored rather than refused — a
+    stale link should open the screen, not an error. */
+export default async function IntakePage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>
+}) {
   const ctx = await getCtx(await headers())
   if (!ctx) redirect('/login')
 
@@ -68,6 +75,26 @@ export default async function IntakePage() {
    * their own screens; the proforma's home is the procurement quote dialog.
    */
   const kinds = intakeKindsFor(ctx.roles, await activeModuleIds(ctx))
+
+  /*
+   * A kind from the URL is honoured only if it is one of THIS person's kinds. The chip
+   * list is already the role ∩ activation answer, so checking against it means a link
+   * cannot open a door somebody's roles do not hold — the wall stays in the actions
+   * either way, but a screen that lit an unreachable chip would be lying about it.
+   */
+  const params = await searchParams
+  const asString = (value: string | string[] | undefined): string | null =>
+    typeof value === 'string' && value.trim() ? value : null
+
+  const requestedKind = asString(params.kind)
+  const initialKind = kinds.some((k) => k.id === requestedKind) ? requestedKind : null
+
+  const initialContext: Record<string, string> = {}
+  const chosenKind = kinds.find((k) => k.id === initialKind)
+  for (const field of chosenKind?.context ?? []) {
+    const value = asString(params[field.field])
+    if (value) initialContext[field.field] = value
+  }
 
   const recent = await withTenantRead(ctx, (tx) =>
     tx
@@ -103,6 +130,8 @@ export default async function IntakePage() {
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 30 }}>
         <IntakeClient
+          initialKind={initialKind}
+          initialContext={initialContext}
           kinds={kinds.map((k) => ({
             id: k.id,
             label: k.label,

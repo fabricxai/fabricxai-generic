@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { headers } from 'next/headers'
 import { notFound, redirect } from 'next/navigation'
 
@@ -9,6 +10,7 @@ import { SectionHeading } from '@/components/fx/signature'
 import { FactPair } from '@/components/fx/tna'
 import { PageHeader } from '@/components/shell/page-shell'
 import { canSee, canWrite, NAV } from '@/components/shell/nav'
+import { env } from '@/lib/env'
 import { requestLocale } from '@/lib/ui-locale'
 import { activeModuleIds } from '@/modules/core/activation'
 import { getCtx } from '@/modules/core/session'
@@ -95,6 +97,14 @@ export default async function OrderDetailPage({
   const po = order.poNumbers[0] ?? order.id.slice(0, 8)
   const late = order.milestones.filter((m) => m.status === 'late').length
   const today = factoryToday()
+  // Days to the promised date — the number a merchandiser reacts to, and the one the
+  // header printed a bare date instead of.
+  const daysToShip = order.plannedExFactoryDate
+    ? Math.round(
+        (Date.parse(`${order.plannedExFactoryDate}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) /
+          86_400_000,
+      )
+    : null
 
   const showProduction = tabAllowed('lines', 'production')
   const showShipping = tabAllowed('shipment', 'shipment')
@@ -224,7 +234,52 @@ export default async function OrderDetailPage({
         back={{ href: '/orders', label: 'Order desk' }}
         eyebrow={order.buyerName ?? 'Order'}
         title={po}
-        meta={order.plannedExFactoryDate ? `ship ${order.plannedExFactoryDate}` : undefined}
+        meta={
+          order.plannedExFactoryDate
+            ? [
+                `ship ${order.plannedExFactoryDate}`,
+                ...(daysToShip !== null && order.status !== 'closed'
+                  ? [daysToShip >= 0 ? `${daysToShip} d` : `${-daysToShip} d over`]
+                  : []),
+              ].join(' · ')
+            : undefined
+        }
+        /*
+         * "Paste the buyer's mail" (design canvas, order page).
+         *
+         * The amendment email is the document a merchandiser handles most and the only
+         * quantity change that costs real money, and it had no door: the intake screen
+         * offered no amendment kind, so the choice was to retype the grid or do nothing.
+         * This is the entry — the intake screen, opened on that kind with THIS order's
+         * style already picked, so the one id the mail cannot carry is answered before
+         * anybody starts reading.
+         *
+         * It goes where every other draft goes: `pending_changes`, then somebody signs it.
+         * The canvas draws a Verify button that applies the revision as the person who
+         * asked for the draft; that is self-approval on a ⚖ table and the platform
+         * forbids it (`pending-changes.ts`), so it is a product decision, not a screen —
+         * recorded in STUBS rather than quietly built.
+         */
+        actions={
+          mayWrite && env.MARBIM_ENABLED && order.style ? (
+            <Link
+              href={`/marbim/intake?kind=buyer_amendment&orderStyleId=${order.style.id}`}
+              style={{
+                font: '500 13px/1 var(--fx-font-sans)',
+                color: 'var(--fx-accent-pressed)',
+                textDecoration: 'none',
+                padding: '9px 14px',
+                minHeight: 'var(--fx-tap-min)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                border: '1px solid var(--fx-border-default)',
+                borderRadius: 'var(--fx-radius-sm)',
+              }}
+            >
+              Paste the buyer&rsquo;s mail
+            </Link>
+          ) : undefined
+        }
         // The header thread rule IS this view's amber moment, so nothing below
         // it takes an amber fill.
         ownsAmber

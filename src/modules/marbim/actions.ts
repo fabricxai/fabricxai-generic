@@ -193,7 +193,24 @@ export interface ContextOption {
  * copies would drift, and the copy that drifted would be the one deciding whether a
  * submitted id is allowed.
  */
-async function contextOptions(ctx: AnyCtx, source: 'buyers' | 'audits'): Promise<ContextOption[]> {
+async function contextOptions(
+  ctx: AnyCtx,
+  source: 'buyers' | 'audits' | 'order_styles',
+): Promise<ContextOption[]> {
+  if (source === 'order_styles') {
+    // Read through the orders module's own queries (rule 11), open orders only.
+    const { orderStyleChoices } = await import('@/modules/orders/queries')
+    const rows = await orderStyleChoices(ctx)
+    return rows.map((style) => ({
+      id: style.id,
+      // The PO is what somebody reads off the email; the style code is what the grid
+      // belongs to. Both, because an order with two styles is common and picking the
+      // wrong one writes a revision against the wrong garment.
+      label: [style.poNumber, style.styleCode].filter(Boolean).join(' · ') || style.styleCode,
+      detail: [style.buyerName, style.description].filter(Boolean).join(' · '),
+    }))
+  }
+
   if (source === 'buyers') {
     const rows = await buyerAccounts(ctx)
     return rows.map((buyer) => ({

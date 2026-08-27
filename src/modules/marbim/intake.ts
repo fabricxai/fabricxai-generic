@@ -37,7 +37,7 @@ export interface IntakeContextField {
   /** What the picker asks, in the words a person would use. */
   label: string
   /** Which list the screen offers. The action resolves it; the id never comes from a form. */
-  source: 'buyers' | 'audits'
+  source: 'buyers' | 'audits' | 'order_styles'
 }
 
 export interface IntakeKind {
@@ -99,6 +99,36 @@ export const INTAKE_KINDS: readonly IntakeKind[] = [
     zodSchemaKey: 'order_from_po_v1',
     roles: ['merchandiser'],
     context: [{ field: 'buyerId', label: 'Which buyer sent it?', source: 'buyers' }],
+  },
+  {
+    /*
+     * The buyer amendment — the mail the design canvas opens with ("Please increase White /
+     * M by 1,500 pcs and bring delivery forward 5 days").
+     *
+     * Everything behind it already existed: `order_breakdowns` has been a pending target
+     * since 1.3, `order_revision_v1` is a registered schema, and `applyRevision` is its
+     * commit handler. What did not exist was the DOOR. A merchandiser holding an amendment
+     * email could type the new grid by hand or nothing — the one document a buyer sends
+     * most often, and the only quantity change that costs real money, had no intake.
+     *
+     * The style is the id no email carries: the mail says "White / M up 1,500" and expects
+     * the reader to know which order that is. So it is picked, the way a PO's buyer is, and
+     * rides in at confidence 1.
+     *
+     * Not `fillsFormOnly`. A quantity change on a live order is exactly the kind of thing
+     * that belongs in an approve inbox — `applyRevision` bumps the revision the cutting
+     * floor works to.
+     */
+    id: 'buyer_amendment',
+    label: "A buyer's amendment",
+    hint: 'The email or amended sheet changing quantities on an order already open. Drafts the new colour × size grid.',
+    moduleId: 'orders',
+    targetTable: 'order_breakdowns',
+    zodSchemaKey: 'order_revision_v1',
+    roles: ['merchandiser'],
+    context: [
+      { field: 'orderStyleId', label: 'Which order and style is it about?', source: 'order_styles' },
+    ],
   },
   {
     /*
