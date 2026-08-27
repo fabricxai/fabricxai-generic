@@ -33,7 +33,7 @@ backlog and building one without a decision would be inventing product.
 | `OrderDetail.dc.html` — Order PO-88203 | `/orders/[orderId]` | facts, TNA with ripple preview, size breakdown, revision history, **LC card** |
 | `TnaTimeline` / `TnaDrawer` (option B / C) | — | not built; option A (the table) is what shipped, with click-to-actualise and a ripple preview the canvas only implies |
 | `OrderDossier.dc.html` — Style & documents | `/orders/[orderId]?tab=documents` | style identity, colourways and size run off the grid, the BOM from costing, the measurement chart with the last check, the order's papers. **Not built:** the department sign-off panel — see STUBS |
-| `Sampling.dc.html` — Sampling room | `/sampling` | partly: the board exists, the desk view's PP-gate framing does not |
+| `Sampling.dc.html` — Sampling room | `/sampling` | already matched before this pass — the PP section with "N styles cleared", per-round comments, "gates cutting on ⟨PO⟩ →", "the rest of the room", the library link. **Missing:** the canvas frames a due date in the past as "2 d overdue"; the screen prints the date and leaves the arithmetic to the reader |
 | `MarbimDraft.dc.html` — mail → draft → verify | `/orders/[orderId]` → "Paste the buyer's mail" | the door exists: `buyer_amendment` intake, this order's style pre-picked, draft to the approve inbox. **Not built:** the canvas's "Verify & apply", which is self-approval on a ⚖ table — see STUBS |
 | `MainBn.dc.html` — Your week in Bangla | `/orders` | the en/bn toggle carries the screen; the copy added for it is in both catalogues |
 
