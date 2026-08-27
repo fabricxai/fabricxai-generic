@@ -17,7 +17,9 @@ import { lcCoverageForOrders, type LcCoverageRow } from '@/modules/commercial/qu
 import type { BankDocsPolicy } from '@/modules/commercial/service'
 import { orderDetail, orderFileRefs, orderTimeline, tnaTemplateChoices } from '@/modules/orders/queries'
 import { orderPulse, orderStatusMachine, type OrderStatus } from '@/modules/orders/service'
+import { styleBom } from '@/modules/costing/queries'
 import { orderRunRate } from '@/modules/production/queries'
+import { styleMeasurementChart } from '@/modules/quality/queries'
 import { preFinalReadiness, type QualityPolicy } from '@/modules/quality/service'
 import { checkPpApprovalFor } from '@/modules/sampling/service'
 import { getPolicy } from '@/modules/settings/service'
@@ -25,6 +27,7 @@ import { shipmentBoard } from '@/modules/shipment/queries'
 import { factoryToday, FACTORY_TIMEZONE } from '@/lib/dates'
 
 import { OrderBreakdown } from './breakdown-client'
+import { StyleDossier } from './dossier'
 import { LcCard } from './lc-card'
 import { OrderDocuments } from './documents'
 import { PulseStrip } from './pulse-strip'
@@ -98,12 +101,23 @@ export default async function OrderDetailPage({
 
   const files = await orderFileRefs(ctx, order.id)
 
+  /*
+   * The tabs, in the order the design's own flow reads (design canvas, order page):
+   * the ORDER first — dates, quantities, money — then its PAPERS, then the trail.
+   *
+   * "Style & documents" is one tab because it is one question. A merchandiser opening
+   * the file to answer the buyer wants the tech pack, the cloth, the chart and the
+   * scanned PO together; splitting the papers from the style that describes them was a
+   * filing decision made by the software rather than by anybody who files.
+   */
   const TABS: WorkspaceTab[] = [
-    { id: 'overview', label: 'Overview' },
+    { id: 'overview', label: 'Order' },
+    {
+      id: 'documents',
+      label: 'Style & documents',
+      ...(files.length > 0 ? { hint: String(files.length) } : {}),
+    },
     { id: 'timeline', label: 'Timeline' },
-    ...(files.length > 0
-      ? [{ id: 'documents', label: 'Documents', hint: String(files.length) }]
-      : [{ id: 'documents', label: 'Documents' }]),
     ...(showProduction ? [{ id: 'production', label: 'Production' }] : []),
     ...(showShipping ? [{ id: 'shipping', label: 'Shipping' }] : []),
   ]
@@ -187,6 +201,23 @@ export default async function OrderDetailPage({
   // Only the tab being rendered pays for its own read — the point of server tabs.
   const events = tab === 'timeline' ? await orderTimeline(ctx, order.id) : []
 
+  /*
+   * The papers, each read through its owning module (rule 11): the cloth from costing,
+   * the chart from quality. Both are gated on the module actually running here — a
+   * factory that does not use the costing studio gets a sentence saying no BOM exists,
+   * not a panel implying a screen it does not have.
+   */
+  const styleCode = order.style?.styleCode ?? null
+  const [bom, chart] =
+    tab === 'documents' && styleCode
+      ? await Promise.all([
+          activeModules.has('costing') ? styleBom(ctx, styleCode) : null,
+          activeModules.has('quality')
+            ? styleMeasurementChart(ctx, { styleCode, orderId: order.id })
+            : null,
+        ])
+      : [null, null]
+
   return (
     <>
       <PageHeader
@@ -206,7 +237,21 @@ export default async function OrderDetailPage({
         <WorkspaceTabs tabs={TABS} active={tab} basePath={`/orders/${order.id}`} />
 
         {tab === 'timeline' ? <OrderTimeline events={events} /> : null}
-        {tab === 'documents' ? <OrderDocuments files={files} /> : null}
+        {tab === 'documents' ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 36 }}>
+            <StyleDossier
+              style={order.style}
+              breakdown={order.breakdown}
+              bom={bom}
+              chart={chart}
+              canWrite={mayWrite}
+            />
+            <section>
+              <SectionHeading eyebrow="filed against this order">Documents</SectionHeading>
+              <OrderDocuments files={files} />
+            </section>
+          </div>
+        ) : null}
 
         {tab === 'production' ? (
           forecast ? (

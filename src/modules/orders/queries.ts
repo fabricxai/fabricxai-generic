@@ -201,6 +201,13 @@ export interface OrderDetail {
     unitPrice: string | null
     currency: string
     activeRevision: number
+    /* The dossier fields — the style as the buyer describes it. Null where nobody has
+       said yet, which for a hand-entered style is most of them. */
+    season: string | null
+    customerLabel: string | null
+    patternNo: string | null
+    basedOnStyle: string | null
+    packingMethod: string | null
   } | null
   milestones: MilestoneRow[]
   breakdown: BreakdownCell[]
@@ -331,6 +338,11 @@ export async function orderDetail(ctx: AnyCtx, orderId: string): Promise<OrderDe
             unitPrice: style.unitPrice,
             currency: style.currency,
             activeRevision: style.activeRevision,
+            season: style.season,
+            customerLabel: style.customerLabel,
+            patternNo: style.patternNo,
+            basedOnStyle: style.basedOnStyle,
+            packingMethod: style.packingMethod,
           }
         : null,
       milestones: milestones.map((m) => {

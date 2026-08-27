@@ -197,3 +197,81 @@ export async function bomDetail(
     }
   })
 }
+
+/**
+ * The BOM behind a style, for a screen rather than for a requisition (design canvas,
+ * "Style & documents").
+ *
+ * `getBomForStyle` throws when a style has no approved sheet, which is right for the
+ * requisition path — sizing an order against a guess is how a factory buys the wrong
+ * quantity of fabric. It is wrong for a dossier: a style being quoted has no approved
+ * sheet yet, and a merchandiser opening its papers should be told that in a sentence, not
+ * met with a not-found.
+ *
+ * So this returns null instead, and prefers the approved sheet's BOM when one exists,
+ * falling back to the newest BOM for the style. `approved` travels with the answer,
+ * because "these are the numbers a live quote rests on" and "somebody extracted this from
+ * a tech pack last week" are different claims and the screen must not make them look the
+ * same.
+ */
+export async function styleBom(
+  ctx: AnyCtx,
+  styleCode: string,
+): Promise<{ bomId: string; approved: boolean; sheetVersion: number | null; lines: BomDetailLine[] } | null> {
+  return withTenantRead(ctx, async (tx) => {
+    const [sheet] = await tx
+      .select({ bomId: costSheets.bomId, version: costSheets.version })
+      .from(costSheets)
+      .where(
+        scoped(
+          costSheets,
+          ctx,
+          and(eq(costSheets.styleCode, styleCode), eq(costSheets.status, 'approved')),
+        ),
+      )
+      .orderBy(desc(costSheets.version))
+      .limit(1)
+
+    let bomId = sheet?.bomId ?? null
+    if (!bomId) {
+      const [bom] = await tx
+        .select({ id: boms.id })
+        .from(boms)
+        .where(scoped(boms, ctx, eq(boms.styleCode, styleCode)))
+        .orderBy(desc(boms.createdAt))
+        .limit(1)
+      bomId = bom?.id ?? null
+    }
+
+    if (!bomId) return null
+
+    const lines = await tx
+      .select()
+      .from(bomLines)
+      .where(scoped(bomLines, ctx, eq(bomLines.bomId, bomId)))
+      // Fabric first: it is most of the cost and the first thing anybody checks.
+      .orderBy(
+        sql`case ${bomLines.lineGroup}
+              when 'fabric' then 0 when 'trims' then 1
+              when 'embellishment' then 2 else 3 end`,
+        bomLines.itemRef,
+      )
+
+    return {
+      bomId,
+      approved: Boolean(sheet?.bomId),
+      sheetVersion: sheet?.version ?? null,
+      lines: lines.map((l) => ({
+        id: l.id,
+        lineGroup: l.lineGroup,
+        itemRef: l.itemRef,
+        spec: l.spec,
+        consumption: l.consumption,
+        consumptionBasis: l.consumptionBasis,
+        uom: l.uom,
+        wastagePct: l.wastagePct,
+        sourcePage: l.sourcePage,
+      })),
+    }
+  })
+}

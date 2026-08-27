@@ -85,6 +85,21 @@ export const createOrderPayload = z.object({
   agentSnapshot: z.record(z.string(), z.unknown()).optional(),
 })
 
+/**
+ * The style's identity as the buyer states it — season, pattern, how it packs.
+ *
+ * Split out because it is written from three directions: at order creation, by a
+ * merchandiser correcting the dossier afterwards, and by MARBIM reading a tech pack. Every
+ * field optional, because a style entered by hand carries a code and nothing else.
+ */
+export const styleDetails = z.object({
+  season: z.string().min(1).max(40).optional(),
+  customerLabel: z.string().min(1).max(120).optional(),
+  patternNo: z.string().min(1).max(60).optional(),
+  basedOnStyle: z.string().min(1).max(60).optional(),
+  packingMethod: z.string().min(1).max(120).optional(),
+})
+
 export const orderStylePayload = z.object({
   styleCode: z.string().min(1),
   description: z.string().optional(),
@@ -92,6 +107,13 @@ export const orderStylePayload = z.object({
   contractedQty: z.number().int().positive().optional(),
   unitPrice: moneyAmount.optional(),
   currency: currencyCode.default('USD'),
+  ...styleDetails.shape,
+})
+
+/** Correcting the dossier after the fact — the style is named, the rest is what changed. */
+export const updateStyleDetailsPayload = z.object({
+  orderStyleId: z.uuid(),
+  ...styleDetails.shape,
 })
 
 /** One cell of the colour × size grid. Pieces are integers. */
@@ -211,6 +233,7 @@ const orderStyleDraft = z.object({
    * for this target now says which is which.
    */
   breakdown: z.array(breakdownCell).optional(),
+  ...styleDetails.shape,
 })
 
 /** What MARBIM extracts from a buyer PO scan. Every field is uncertain, hence optional. */

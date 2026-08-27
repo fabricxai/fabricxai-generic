@@ -530,6 +530,71 @@ export async function saveBreakdownIn(
 }
 
 /**
+ * Correct the style's dossier — season, pattern, how it packs (design canvas,
+ * "Style & documents").
+ *
+ * Not ⚖ and deliberately so. None of these fields moves money, a date or a quantity:
+ * they are the buyer's own description of what is being made, and getting the season
+ * wrong costs a re-read of the tech pack, not a claim. `recordChange` still runs, so the
+ * correction is attributable — a dossier field that silently changed between two people
+ * reading it would be worse than one that was blank.
+ *
+ * Absent keys are left alone rather than blanked. A form that posts only what somebody
+ * typed must not erase the four fields they did not touch, and a partial payload is what
+ * every drafting path (MARBIM reading a tech pack, an inline correction) actually sends.
+ * Clearing a field is therefore not expressible here, which is the right trade: a wrong
+ * season is corrected by typing the right one.
+ */
+export async function updateStyleDetails(
+  ctx: RequestCtx,
+  input: {
+    orderStyleId: string
+    season?: string
+    customerLabel?: string
+    patternNo?: string
+    basedOnStyle?: string
+    packingMethod?: string
+  },
+): Promise<{ orderStyleId: string; orderId: string }> {
+  return withTenantTx(ctx, async (tx) => {
+    const [style] = await tx
+      .select()
+      .from(orderStyles)
+      .where(scoped(orderStyles, ctx, eq(orderStyles.id, input.orderStyleId)))
+      .for('update')
+
+    if (!style) throw notFound('orders.errors.style_not_found', { id: input.orderStyleId })
+
+    const fields = ['season', 'customerLabel', 'patternNo', 'basedOnStyle', 'packingMethod'] as const
+    const patch: Record<string, string> = {}
+    const before: Record<string, string | null> = {}
+    for (const field of fields) {
+      const value = input[field]
+      if (value === undefined || value === style[field]) continue
+      patch[field] = value
+      before[field] = style[field]
+    }
+
+    if (Object.keys(patch).length === 0) return { orderStyleId: style.id, orderId: style.orderId }
+
+    await tx
+      .update(orderStyles)
+      .set({ ...patch, updatedAt: new Date() })
+      .where(scoped(orderStyles, ctx, eq(orderStyles.id, style.id)))
+
+    await recordChange(ctx, tx, {
+      action: 'update',
+      targetTable: 'order_styles',
+      targetId: style.id,
+      before,
+      after: patch,
+    })
+
+    return { orderStyleId: style.id, orderId: style.orderId }
+  })
+}
+
+/**
  * Commit an approved buyer amendment (brief §Operations: `applyRevision`).
  *
  * This is the far end of the propose → approve → commit loop for 1.3: MARBIM drafts a
@@ -1074,6 +1139,11 @@ export async function createOrderIn(
           contractedQty: style.contractedQty ?? null,
           unitPrice: style.unitPrice ?? null,
           currency: style.currency,
+          season: style.season ?? null,
+          customerLabel: style.customerLabel ?? null,
+          patternNo: style.patternNo ?? null,
+          basedOnStyle: style.basedOnStyle ?? null,
+          packingMethod: style.packingMethod ?? null,
         })
         .returning({ id: orderStyles.id })
 

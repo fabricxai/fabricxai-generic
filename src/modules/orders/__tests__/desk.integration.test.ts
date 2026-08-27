@@ -19,7 +19,8 @@ import { btbLcs, lcs } from '@/modules/commercial/schema'
 import { lcCoverageForOrders } from '@/modules/commercial/queries'
 import type { RequestCtx } from '@/modules/core/ctx'
 import { orderLcs, orderStyles, orders, tnaMilestones } from '@/modules/orders/schema'
-import { orderBookSummary, weekMilestones } from '@/modules/orders/queries'
+import { orderBookSummary, orderDetail, weekMilestones } from '@/modules/orders/queries'
+import { updateStyleDetails } from '@/modules/orders/service'
 
 const client = createDirectClient()
 const db = createDirectDb(client)
@@ -41,6 +42,7 @@ let lateOrderId: string
 let cleanOrderId: string
 let closedOrderId: string
 let conflictedLcId: string
+let lateStyleId: string
 
 beforeAll(async () => {
   await db
@@ -109,7 +111,7 @@ beforeAll(async () => {
   cleanOrderId = inserted[1]!.id
   closedOrderId = inserted[2]!.id
 
-  await db.insert(orderStyles).values([
+  const styleRows = await db.insert(orderStyles).values([
     {
       companyId: COMPANY_A,
       orderId: lateOrderId,
@@ -117,6 +119,7 @@ beforeAll(async () => {
       contractedQty: 50_000,
       unitPrice: '4.85',
       currency: 'USD',
+      season: 'AW-26',
     },
     {
       companyId: COMPANY_A,
@@ -126,7 +129,8 @@ beforeAll(async () => {
       unitPrice: '7.07',
       currency: 'USD',
     },
-  ])
+  ]).returning({ id: orderStyles.id })
+  lateStyleId = styleRows[0]!.id
 
   await db.insert(tnaMilestones).values([
     {
@@ -324,5 +328,133 @@ describe('the credit behind the order', () => {
 
   it('another company cannot read the credit behind this order', async () => {
     expect(await lcCoverageForOrders(ctxB, [lateOrderId], { now: NOW, limitPct: 75 })).toEqual([])
+  })
+})
+
+describe('the style dossier', () => {
+  it('records the identity the buyer states, and leaves untouched fields alone', async () => {
+    await updateStyleDetails(ctxA, {
+      orderStyleId: lateStyleId,
+      patternNo: 'PTN-4471',
+      packingMethod: 'Flat pack · poly bag + hanger',
+    })
+
+    const detail = await orderDetail(ctxA, lateOrderId)
+    expect(detail?.style).toMatchObject({
+      patternNo: 'PTN-4471',
+      packingMethod: 'Flat pack · poly bag + hanger',
+      // Set at insert and not mentioned by the update — a partial post must not blank it.
+      season: 'AW-26',
+      customerLabel: null,
+    })
+  })
+
+  it('a correction that changes nothing is a no-op rather than an audit row', async () => {
+    await updateStyleDetails(ctxA, { orderStyleId: lateStyleId, patternNo: 'PTN-4471' })
+    const detail = await orderDetail(ctxA, lateOrderId)
+    expect(detail?.style?.patternNo).toBe('PTN-4471')
+  })
+
+  it('another company cannot correct this style — not found, not forbidden', async () => {
+    await expect(
+      updateStyleDetails(ctxB, { orderStyleId: lateStyleId, season: 'SS-27' }),
+    ).rejects.toMatchObject({ code: 'not_found' })
+  })
+})
+
+describe('the papers, read through the modules that own them', () => {
+  it('falls back to the newest BOM when no cost sheet has been approved', async () => {
+    const { boms, bomLines } = await import('@/modules/costing/schema')
+    const { styleBom } = await import('@/modules/costing/queries')
+
+    const [bom] = await db
+      .insert(boms)
+      .values({ companyId: COMPANY_A, styleCode: 'SH-4471', source: 'tech_pack_extract' })
+      .returning({ id: boms.id })
+
+    await db.insert(bomLines).values({
+      companyId: COMPANY_A,
+      bomId: bom!.id,
+      lineGroup: 'fabric',
+      itemRef: 'KM-27917',
+      spec: '95% cotton 5% elastane rib',
+      consumption: '1.1700',
+      uom: 'm',
+      wastagePct: '3.00',
+    })
+
+    const result = await styleBom(ctxA, 'SH-4471')
+    // A style being quoted has no approved sheet; the dossier must still show its cloth,
+    // and must say the numbers are not the ones a live quote rests on.
+    expect(result).toMatchObject({ approved: false, sheetVersion: null })
+    expect(result?.lines[0]).toMatchObject({ itemRef: 'KM-27917', consumption: '1.1700' })
+  })
+
+  it('a style nobody has costed returns null rather than throwing at a screen', async () => {
+    const { styleBom } = await import('@/modules/costing/queries')
+    expect(await styleBom(ctxA, 'NOT-A-STYLE')).toBeNull()
+  })
+
+  it('puts the last measurement beside the spec, judged as it was judged at capture', async () => {
+    const { measurementChecks, measurementSpecs } = await import('@/modules/quality/schema')
+    const { styleMeasurementChart } = await import('@/modules/quality/queries')
+
+    const [spec] = await db
+      .insert(measurementSpecs)
+      .values({
+        companyId: COMPANY_A,
+        styleCode: 'SH-4471',
+        version: 1,
+        unit: 'cm',
+        points: [
+          { name: 'Bust', spec: '52.5', tolPlus: '1.0', tolMinus: '1.0' },
+          { name: 'Back neck width', spec: '18.5', tolPlus: '0.5', tolMinus: '0.5' },
+        ],
+      })
+      .returning({ id: measurementSpecs.id })
+
+    await db.insert(measurementChecks).values({
+      companyId: COMPANY_A,
+      measurementSpecId: spec!.id,
+      orderId: lateOrderId,
+      sampledSize: 'M',
+      values: { Bust: '52.0', 'Back neck width': '19.4' },
+      // Stored at capture against the version live then — never recomputed on read.
+      outOfTolerance: [{ name: 'Back neck width', measured: '19.4' }],
+      missingPoints: [],
+      result: 'fail',
+    })
+
+    const chart = await styleMeasurementChart(ctxA, {
+      styleCode: 'SH-4471',
+      orderId: lateOrderId,
+    })
+
+    expect(chart?.points).toEqual([
+      { name: 'Bust', spec: '52.5', tolPlus: '1.0', tolMinus: '1.0', measured: '52.0', outOfTolerance: false },
+      { name: 'Back neck width', spec: '18.5', tolPlus: '0.5', tolMinus: '0.5', measured: '19.4', outOfTolerance: true },
+    ])
+    expect(chart?.lastCheck).toMatchObject({ sampledSize: 'M', result: 'fail' })
+  })
+
+  it('shows the spec with no measurements against an order nobody has checked', async () => {
+    const { styleMeasurementChart } = await import('@/modules/quality/queries')
+
+    const chart = await styleMeasurementChart(ctxA, {
+      styleCode: 'SH-4471',
+      orderId: cleanOrderId,
+    })
+    expect(chart?.lastCheck).toBeNull()
+    expect(chart?.points.every((point) => point.measured === null)).toBe(true)
+  })
+
+  it('another company reads neither the cloth nor the chart', async () => {
+    const { styleBom } = await import('@/modules/costing/queries')
+    const { styleMeasurementChart } = await import('@/modules/quality/queries')
+
+    expect(await styleBom(ctxB, 'SH-4471')).toBeNull()
+    expect(
+      await styleMeasurementChart(ctxB, { styleCode: 'SH-4471', orderId: lateOrderId }),
+    ).toBeNull()
   })
 })

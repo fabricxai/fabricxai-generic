@@ -158,6 +158,25 @@ export const orderStyles = pgTable(
     /** Which breakdown revision the floor is currently cutting to. */
     activeRevision: integer('active_revision').notNull().default(1),
 
+    /*
+     * The style's identity as the buyer states it (design canvas, "Style & documents").
+     *
+     * Every one of these is on the tech pack and on the buyer's own order sheet, and none
+     * of them had anywhere to go — so a merchandiser answering "which season is this" or
+     * "how does it pack" went back to the spreadsheet the app was meant to replace. All
+     * nullable: a style entered by hand in thirty seconds carries a code and nothing else,
+     * and the screen prints what it has rather than demanding the rest.
+     */
+    /** AW-26, SS-27 — the buyer's season code, verbatim. */
+    season: text('season'),
+    /** The buyer's own label for the style, when it differs from the factory's code. */
+    customerLabel: text('customer_label'),
+    /** Pattern number, and the pattern it was cut from — repeat orders are the norm. */
+    patternNo: text('pattern_no'),
+    basedOnStyle: text('based_on_style'),
+    /** Flat pack, hanger, poly bag — decides carton sizing and the packing list. */
+    packingMethod: text('packing_method'),
+
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },

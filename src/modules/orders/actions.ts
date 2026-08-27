@@ -14,6 +14,7 @@ import {
   previewRipple,
   saveBreakdown,
   setOrderStatus as setOrderStatusIn,
+  updateStyleDetails as updateStyleDetailsIn,
   type OrderStatus,
 } from './service'
 import type { RipplePreview } from './tna'
@@ -138,6 +139,31 @@ export async function actualizeMilestone(input: {
   revalidatePath('/cutting')
 
   return rippleView(result)
+}
+
+/**
+ * Correct the style's dossier — season, pattern number, how it packs.
+ *
+ * Surfaced rather than thrown: the only refusal it can produce is "this style is not
+ * yours", and a production build masks a thrown message into React #441. Absent fields
+ * are left alone by the service, so a form posting one corrected value does not blank
+ * the four beside it.
+ */
+export async function updateStyleDetails(input: {
+  orderStyleId: string
+  season?: string
+  customerLabel?: string
+  patternNo?: string
+  basedOnStyle?: string
+  packingMethod?: string
+}): Promise<{ orderStyleId: string } | ActionFailure> {
+  const ctx = await requireRole(await headers(), ...WRITERS)
+
+  return surfaced(async () => {
+    const result = await updateStyleDetailsIn(ctx, input)
+    refresh(result.orderId)
+    return { orderStyleId: result.orderStyleId }
+  })
 }
 
 /**

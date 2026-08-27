@@ -792,3 +792,110 @@ export async function measurementSubjects(ctx: AnyCtx): Promise<MeasurementSubje
     })
   })
 }
+
+/* ── The measurement chart, as an order's papers show it ──── */
+
+/**
+ * The spec a style is measured against, with the last check taken on this order
+ * (design canvas, "Style & documents").
+ *
+ * The chart has been in the database since quality shipped and reached only the QC
+ * capture screen — so a merchandiser arguing with a buyer about a rejected fit sample
+ * had the buyer's email and no access to the numbers the factory itself measured. Both
+ * halves are here because neither is useful alone: a spec without the measurement is a
+ * document, and a measurement without the spec is a number.
+ *
+ * `outOfTolerance` is read from the CHECK, not recomputed. The QC screen derived it at
+ * capture against the spec version live at that moment, and re-deriving it here against
+ * today's version would silently re-judge a piece under a chart that did not exist when
+ * it was measured.
+ */
+export interface SpecPoint {
+  name: string
+  spec: string
+  tolPlus: string
+  tolMinus: string
+  /** What the last check on this order measured for this point, if it measured it. */
+  measured: string | null
+  outOfTolerance: boolean
+}
+
+export interface StyleMeasurementChart {
+  specId: string
+  version: number
+  unit: string
+  points: SpecPoint[]
+  /** The check the `measured` column came from — null when nobody has measured yet. */
+  lastCheck: { sampledSize: string; result: string; at: Date; missingPoints: string[] } | null
+}
+
+export async function styleMeasurementChart(
+  ctx: AnyCtx,
+  input: { styleCode: string; orderId: string },
+): Promise<StyleMeasurementChart | null> {
+  const { measurementChecks, measurementSpecs } = await import('./schema')
+
+  return withTenantRead(ctx, async (tx) => {
+    const [spec] = await tx
+      .select()
+      .from(measurementSpecs)
+      .where(scoped(measurementSpecs, ctx, eq(measurementSpecs.styleCode, input.styleCode)))
+      .orderBy(desc(measurementSpecs.version))
+      .limit(1)
+
+    if (!spec) return null
+
+    const [check] = await tx
+      .select()
+      .from(measurementChecks)
+      .where(
+        scoped(
+          measurementChecks,
+          ctx,
+          and(
+            eq(measurementChecks.orderId, input.orderId),
+            eq(measurementChecks.measurementSpecId, spec.id),
+          ),
+        ),
+      )
+      .orderBy(desc(measurementChecks.createdAt))
+      .limit(1)
+
+    const values = (check?.values ?? {}) as Record<string, string>
+    const failed = new Set(
+      ((check?.outOfTolerance ?? []) as { name?: unknown }[])
+        .map((entry) => (typeof entry?.name === 'string' ? entry.name : null))
+        .filter((name): name is string => name !== null),
+    )
+
+    const points = ((spec.points ?? []) as Record<string, unknown>[])
+      .map((raw): SpecPoint | null => {
+        const name = typeof raw.name === 'string' ? raw.name : null
+        if (!name) return null
+        return {
+          name,
+          spec: String(raw.spec ?? ''),
+          tolPlus: String(raw.tolPlus ?? ''),
+          tolMinus: String(raw.tolMinus ?? ''),
+          measured: values[name] ?? null,
+          outOfTolerance: failed.has(name),
+        }
+      })
+      .filter((point): point is SpecPoint => point !== null)
+
+    return {
+      specId: spec.id,
+      version: spec.version,
+      unit: spec.unit,
+      points,
+      lastCheck: check
+        ? {
+            sampledSize: check.sampledSize,
+            result: check.result,
+            at: check.createdAt,
+            missingPoints: check.missingPoints ?? [],
+          }
+        : null,
+    }
+  })
+}
