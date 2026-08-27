@@ -31,10 +31,10 @@ backlog and building one without a decision would be inventing product.
 | --- | --- | --- |
 | `Main.dc.html` — Your week | `/orders` | book value, shipping month, at-risk and LC-conflict tiles; the week strip; the Ask MARBIM openings; the LC column |
 | `OrderDetail.dc.html` — Order PO-88203 | `/orders/[orderId]` | facts, TNA with ripple preview, size breakdown, revision history, **LC card** |
-| `TnaTimeline` / `TnaDrawer` (option B / C) | — | not built; option A (the table) is what shipped |
-| `OrderDossier.dc.html` — Style & documents | — | not built — see STUBS |
+| `TnaTimeline` / `TnaDrawer` (option B / C) | — | not built; option A (the table) is what shipped, with click-to-actualise and a ripple preview the canvas only implies |
+| `OrderDossier.dc.html` — Style & documents | `/orders/[orderId]?tab=documents` | style identity, colourways and size run off the grid, the BOM from costing, the measurement chart with the last check, the order's papers. **Not built:** the department sign-off panel — see STUBS |
 | `Sampling.dc.html` — Sampling room | `/sampling` | partly: the board exists, the desk view's PP-gate framing does not |
-| `MarbimDraft.dc.html` — mail → draft → verify | — | not built — see STUBS |
+| `MarbimDraft.dc.html` — mail → draft → verify | `/orders/[orderId]` → "Paste the buyer's mail" | the door exists: `buyer_amendment` intake, this order's style pre-picked, draft to the approve inbox. **Not built:** the canvas's "Verify & apply", which is self-approval on a ⚖ table — see STUBS |
 | `MainBn.dc.html` — Your week in Bangla | `/orders` | the en/bn toggle carries the screen; the copy added for it is in both catalogues |
 
 Anything in the right-hand column that is not a screen path is owed, and owed things live
