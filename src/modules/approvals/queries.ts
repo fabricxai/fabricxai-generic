@@ -15,6 +15,7 @@ import { approvalRules, pendingChangeApprovals, pendingChanges, users } from '@/
 import type { AnyCtx, RequestCtx } from '@/modules/core/ctx'
 import { buyerAccounts } from '@/modules/buyers/queries'
 import { readJsonbObject } from '@/modules/core/jsonb'
+import { selfApprovableDrafts } from '@/modules/core/pending-changes'
 import { scoped } from '@/modules/core/scoped'
 import { withTenantRead } from '@/modules/core/tenancy'
 
@@ -539,6 +540,8 @@ export interface ApprovalRuleRow {
   approvalsRequired: number
   autoApprove: boolean
   minConfidence: string | null
+  /** null = the module's own answer. See `approval_rules.self_approval_allowed`. */
+  selfApprovalAllowed: boolean | null
   priority: number
 }
 
@@ -561,6 +564,7 @@ export async function listApprovalRules(ctx: RequestCtx): Promise<ApprovalRuleRo
         approvalsRequired: approvalRules.approvalsRequired,
         autoApprove: approvalRules.autoApprove,
         minConfidence: approvalRules.minConfidence,
+        selfApprovalAllowed: approvalRules.selfApprovalAllowed,
         priority: approvalRules.priority,
       })
       .from(approvalRules)
@@ -595,6 +599,15 @@ export interface UnconfirmedDraft {
   /** The document it was read from, when one was attached. */
   sourceDocumentId: string | null
   model: string | null
+  /**
+   * May this person sign it themselves rather than send it on — the "Verify & apply" door.
+   *
+   * False for most drafts and that is the normal case: on a ⚖ table the ban stands unless
+   * the module (or the factory's own rule) opened it, and even then only for a machine
+   * reading. Resolved by core, which is also the wall, so the button and the server cannot
+   * drift apart.
+   */
+  canApply: boolean
 }
 
 /**
@@ -663,6 +676,8 @@ export async function myUnconfirmedDrafts(
     ? new Map((await buyerAccounts(ctx)).map((b) => [b.id, b.name]))
     : new Map<string, string>()
 
+  const selfApprovable = await selfApprovableDrafts(ctx, rows.map((row) => row.id))
+
   return rows.map((row) => {
     const payload = (row.payload ?? {}) as Record<string, unknown>
     const confidence = (row.fieldConfidence ?? {}) as Record<string, number>
@@ -673,6 +688,7 @@ export async function myUnconfirmedDrafts(
       createdAt: row.createdAt,
       sourceDocumentId: row.sourceDocumentId,
       model: row.model,
+      canApply: selfApprovable.has(row.id),
       fields: Object.keys(payload)
         .sort()
         .map((name) => {

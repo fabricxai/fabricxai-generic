@@ -181,6 +181,7 @@ const ruleInput = z.object({
   operation: z.enum(['insert', 'update', 'delete']).optional(),
   requiredRoles: z.array(z.string().min(1)).min(1),
   approvalsRequired: z.number().int().min(1).max(5).optional(),
+  selfApprovalAllowed: z.boolean().optional(),
   priority: z.number().int().optional(),
 })
 
@@ -245,6 +246,12 @@ const confirmInput = z.object({
   pendingChangeId: z.uuid(),
   /** Field → the value the raiser corrected it to. Absent means "as read". */
   corrections: z.record(z.string(), z.unknown()).optional(),
+  /**
+   * Sign it here rather than send it on. Passed straight through: the service decides
+   * whether this person may, and refuses before submitting if they may not — so a client
+   * asking for a door it was never offered gets a 403 and an unchanged draft.
+   */
+  apply: z.boolean().optional(),
 })
 
 /**
@@ -263,6 +270,7 @@ export async function confirmMyDraft(
     const result = await confirmDraft(ctx, {
       pendingChangeId: parsed.pendingChangeId,
       ...(parsed.corrections ? { corrections: parsed.corrections } : {}),
+      ...(parsed.apply ? { apply: true } : {}),
     })
     revalidatePath('/home')
     revalidatePath('/approve')

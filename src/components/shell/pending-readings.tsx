@@ -30,6 +30,7 @@ export async function PendingReadings() {
         moduleId: d.moduleId,
         targetTable: d.targetTable,
         model: d.model,
+        canApply: d.canApply,
         fields: d.fields,
       }))}
     />

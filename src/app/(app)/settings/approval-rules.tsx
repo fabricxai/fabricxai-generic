@@ -79,7 +79,7 @@ export function ApprovalRules({
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: '1.2fr 1.4fr 2fr .7fr .8fr',
+            gridTemplateColumns: '1.2fr 1.4fr 2fr .7fr .9fr .8fr',
             gap: 12,
             padding: '9px 16px',
             background: 'var(--fx-bg-sunken)',
@@ -87,13 +87,14 @@ export function ApprovalRules({
             letterSpacing: '.06em',
             textTransform: 'uppercase',
             color: 'var(--fx-text-tertiary)',
-            minWidth: 640,
+            minWidth: 720,
           }}
         >
           <div>Module</div>
           <div>Scope</div>
           <div>Approved by</div>
           <div style={{ textAlign: 'right' }}>Signs</div>
+          <div>Self-sign</div>
           <div />
         </div>
 
@@ -107,13 +108,13 @@ export function ApprovalRules({
               key={rule.id}
               style={{
                 display: 'grid',
-                gridTemplateColumns: '1.2fr 1.4fr 2fr .7fr .8fr',
+                gridTemplateColumns: '1.2fr 1.4fr 2fr .7fr .9fr .8fr',
                 gap: 12,
                 padding: '11px 16px',
                 borderTop: '1px solid var(--fx-border-subtle)',
                 alignItems: 'center',
                 font: "400 13px/1.4 var(--fx-font-sans)",
-                minWidth: 640,
+                minWidth: 720,
               }}
             >
               <span data-mono style={{ font: "400 12.5px/1.3 var(--fx-font-mono)" }}>{rule.moduleId}</span>
@@ -124,6 +125,16 @@ export function ApprovalRules({
               <span>{rule.requiredRoles.join(', ')}</span>
               <span data-numeric style={{ textAlign: 'right', font: "400 13px/1.3 var(--fx-font-mono)" }}>
                 {rule.approvalsRequired}
+              </span>
+              {/* Three states, and the third is the common one: a rule that says nothing
+                  about self-signing leaves the module's own answer standing. Printing
+                  "no" there would be a lie about what the rule does. */}
+              <span style={{ color: 'var(--fx-text-secondary)' }}>
+                {rule.selfApprovalAllowed === null
+                  ? 'module default'
+                  : rule.selfApprovalAllowed
+                    ? 'allowed'
+                    : 'blocked'}
               </span>
               <span style={{ textAlign: 'right' }}>
                 {canEdit ? (
@@ -185,6 +196,7 @@ interface RulePayload {
   operation?: 'insert' | 'update' | 'delete'
   requiredRoles: string[]
   approvalsRequired: number
+  selfApprovalAllowed: boolean
 }
 
 function RuleForm({
@@ -200,6 +212,7 @@ function RuleForm({
   const [targetTable, setTargetTable] = useState('')
   const [roles, setRoles] = useState<string[]>([])
   const [count, setCount] = useState(1)
+  const [selfSign, setSelfSign] = useState(false)
 
   const ready = moduleId.trim() !== '' && roles.length > 0
 
@@ -281,6 +294,25 @@ function RuleForm({
         </div>
       </div>
 
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <Checkbox
+          label="The person who raised an AI reading may sign it themselves"
+          checked={selfSign}
+          onChange={setSelfSign}
+        />
+        <span
+          style={{
+            font: "400 12px/1.5 var(--fx-font-sans)",
+            color: 'var(--fx-text-tertiary)',
+            paddingLeft: 26,
+          }}
+        >
+          Only ever applies to a reading taken off a document — a draft somebody typed always
+          needs a second name on the ⚖ tables, whatever this says. Leave it off if a buyer
+          audit requires the proposer and the approver to be different people.
+        </span>
+      </div>
+
       <div style={{ display: 'flex', gap: 10 }}>
         <Button
           disabled={!ready || pending}
@@ -290,6 +322,7 @@ function RuleForm({
               targetTable: targetTable || undefined,
               requiredRoles: roles,
               approvalsRequired: count,
+              selfApprovalAllowed: selfSign,
             })
           }
         >

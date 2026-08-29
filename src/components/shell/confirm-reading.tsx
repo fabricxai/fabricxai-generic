@@ -43,6 +43,11 @@ export interface UnconfirmedDraft {
   targetTable: string
   fields: DraftField[]
   model: string | null
+  /**
+   * Whether this person may sign it themselves. Decided by the server (`selfApprovableDrafts`),
+   * never inferred here from a role — the button must not appear where the write would fail.
+   */
+  canApply: boolean
 }
 
 /** The reading's weakest field — the one worth reading first. */
@@ -139,7 +144,7 @@ function ReadingModal({ draft, onClose }: { draft: UnconfirmedDraft; onClose: ()
   // an array of cells — so nothing here has to parse anything, and there is no JSON for a
   // person to get wrong.
   const [edits, setEdits] = useState<Record<string, unknown>>({})
-  const [busy, setBusy] = useState<'confirm' | 'discard' | null>(null)
+  const [busy, setBusy] = useState<'apply' | 'confirm' | 'discard' | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   function corrections(): Record<string, unknown> {
@@ -156,14 +161,20 @@ function ReadingModal({ draft, onClose }: { draft: UnconfirmedDraft; onClose: ()
     return out
   }
 
-  async function run(what: 'confirm' | 'discard') {
+  async function run(what: 'apply' | 'confirm' | 'discard') {
     setBusy(what)
     setError(null)
     try {
-      if (what === 'confirm') {
-        unwrap(await confirmMyDraft({ pendingChangeId: draft.id, corrections: corrections() }))
-      } else {
+      if (what === 'discard') {
         unwrap(await discardMyDraft({ pendingChangeId: draft.id }))
+      } else {
+        unwrap(
+          await confirmMyDraft({
+            pendingChangeId: draft.id,
+            corrections: corrections(),
+            ...(what === 'apply' ? { apply: true } : {}),
+          }),
+        )
       }
       onClose()
       window.location.reload()
@@ -185,9 +196,33 @@ function ReadingModal({ draft, onClose }: { draft: UnconfirmedDraft; onClose: ()
           <Button variant="ghost" disabled={busy !== null} onClick={() => void run('discard')}>
             {busy === 'discard' ? 'Discarding…' : 'It read it wrong — discard'}
           </Button>
-          <Button variant="primary" disabled={busy !== null} onClick={() => void run('confirm')}>
-            {busy === 'confirm' ? 'Sending…' : 'This is right — send for approval'}
+          {/*
+           * Two doors when this person may sign it, and the order is the argument.
+           *
+           * "Send for approval" stays, and stays first, because holding the document does
+           * not always mean being sure — a grid that moves 26,400 pieces between colours is
+           * exactly the kind of thing somebody may want a second name on, and taking that
+           * away to save a click would be the platform deciding for them.
+           *
+           * "Verify & apply" is the primary because it is the honest default for the case it
+           * is offered in: the person reading this is the only one who has the paper.
+           */}
+          <Button
+            variant={draft.canApply ? 'secondary' : 'primary'}
+            disabled={busy !== null}
+            onClick={() => void run('confirm')}
+          >
+            {busy === 'confirm'
+              ? 'Sending…'
+              : draft.canApply
+                ? 'Send for approval instead'
+                : 'This is right — send for approval'}
           </Button>
+          {draft.canApply ? (
+            <Button variant="primary" disabled={busy !== null} onClick={() => void run('apply')}>
+              {busy === 'apply' ? 'Applying…' : 'Verify & apply'}
+            </Button>
+          ) : null}
         </>
       }
     >
@@ -205,6 +240,20 @@ function ReadingModal({ draft, onClose }: { draft: UnconfirmedDraft; onClose: ()
           The percentage is how sure the reader was of that field — low is worth checking, high
           is not a guarantee. Anything you change is recorded as yours and counts as certain.
         </p>
+
+        {draft.canApply ? (
+          <p
+            style={{
+              margin: 0,
+              font: "400 12.5px/1.6 var(--fx-font-sans)",
+              color: 'var(--fx-text-tertiary)',
+            }}
+          >
+            You hold the document, so you can apply this yourself — it is written straight to
+            the module, under your name, and the trail keeps what was read, how sure it was and
+            every change you made. Send it for approval instead if you want a second name on it.
+          </p>
+        ) : null}
 
         {draft.fields.map((field) => {
           const shown = field.name in edits ? edits[field.name] : field.value

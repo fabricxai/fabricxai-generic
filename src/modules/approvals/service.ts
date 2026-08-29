@@ -529,6 +529,12 @@ export async function upsertApprovalRule(
     autoApprove?: boolean
     minConfidence?: string
     priority?: number
+    /**
+     * May the raiser of an AI reading sign it themselves on a ⚖ table? Undefined leaves it
+     * to the module's own declaration, which is what a rule written for some other reason
+     * should do rather than silently answering a question nobody asked it.
+     */
+    selfApprovalAllowed?: boolean
   },
 ): Promise<{ ruleId: string; supersededRuleIds: string[] }> {
   if (!ctx.roles.includes('owner')) {
@@ -573,6 +579,7 @@ export async function upsertApprovalRule(
         approvalsRequired: approvalRules.approvalsRequired,
         autoApprove: approvalRules.autoApprove,
         minConfidence: approvalRules.minConfidence,
+        selfApprovalAllowed: approvalRules.selfApprovalAllowed,
         priority: approvalRules.priority,
       })
 
@@ -587,6 +594,7 @@ export async function upsertApprovalRule(
         approvalsRequired: input.approvalsRequired ?? 1,
         autoApprove: input.autoApprove ?? false,
         minConfidence: input.minConfidence ?? null,
+        selfApprovalAllowed: input.selfApprovalAllowed ?? null,
         priority: input.priority ?? 100,
       })
       .returning({ id: approvalRules.id })
