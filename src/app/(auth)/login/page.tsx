@@ -12,6 +12,8 @@ import { Button } from '@/components/fx/primitives'
 import { MarbimMark } from '@/components/fx/mark'
 import { signIn } from '@/lib/auth-client'
 
+import { loginErrorKey } from './login-error'
+
 export default function LoginPage() {
   const t = useT()
   const router = useRouter()
@@ -29,9 +31,9 @@ export default function LoginPage() {
 
     if (err) {
       setBusy(false)
-      // Better Auth returns the unverified case explicitly; everything else
-      // stays deliberately vague so this form cannot be used to enumerate users.
-      setError(t(err.status === 403 ? 'ui.auth.unconfirmed' : 'ui.auth.bad_credentials'))
+      // Keyed on the error CODE, not the status: 403 covers several unrelated refusals and
+      // only one of them is about the account. See `loginErrorKey`.
+      setError(t(loginErrorKey(err)))
       return
     }
 
