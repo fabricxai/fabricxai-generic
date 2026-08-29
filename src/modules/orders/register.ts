@@ -124,7 +124,23 @@ export const ordersModule = registerModule({
 
   // Breakdown edits after production start route to a manager (brief §Roles). Merchandisers
   // own their buyers' orders but cannot approve a change that costs the factory money.
-  approvalDefaults: { requiredRoles: ['owner', 'admin', 'merchandiser'] },
+  approvalDefaults: {
+    requiredRoles: ['owner', 'admin', 'merchandiser'],
+    /*
+     * A merchandiser may sign the reading of a document they are holding.
+     *
+     * Every ⚖ table this module owns — `orders`, `order_breakdowns`, `order_revisions` —
+     * is written from a buyer's paper: the PO that opens the order, the amendment mail
+     * that moves quantities between colours. The person who received that mail is the only
+     * one who can say the grid matches it; an approver two desks away is being asked to
+     * confirm a document they do not have, which is a signature that means nothing.
+     *
+     * Narrower than it looks: core still refuses this for anything the person typed
+     * themselves, whatever this says. And a factory whose buyer audit demands separated
+     * duties turns it off in Settings → Approval routing without a deploy.
+     */
+    selfApprovalAllowed: true,
+  },
 
   /**
    * The department's craft, versioned. This teaches MARBIM WHEN to call a computation and
