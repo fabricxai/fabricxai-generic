@@ -460,3 +460,64 @@ export async function searchRequisitions(
       .limit(input.limit),
   )
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// What has been booked against one order
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface OrderMaterialPo {
+  id: string
+  poNumber: string
+  supplierName: string
+  origin: 'local' | 'import'
+  totalValue: string
+  currency: string
+  expectedDeliveryDate: string | null
+  status: PoStatus
+  /** An import PO must sit on a back-to-back credit; a local one need not — which is why
+   *  `origin` travels beside it rather than the reader inferring it from the currency. */
+  onBtb: boolean
+}
+
+/**
+ * The supplier POs booked for an order — the "fabric booking → mill PI" row of its
+ * sign-off panel (design canvas).
+ *
+ * Reached through the requisition, which is the only thing that knows about the order:
+ * `supplier_pos` has no `order_id` and should not gain one, because one PO can serve
+ * several orders' requisitions. `purchase_requisitions.order_id` is indexed for exactly
+ * this lookup.
+ *
+ * `onBtb` is reported rather than judged. Whether an import PO lacking a BTB is a problem
+ * is the import-PO gate's question and it already refuses at issue time (rule 8); a read
+ * model repeating that judgement would be a second opinion that can disagree with the
+ * first.
+ */
+export async function orderMaterialPos(
+  ctx: AnyCtx,
+  orderId: string,
+): Promise<OrderMaterialPo[]> {
+  return withTenantRead(ctx, (tx) =>
+    tx
+      .select({
+        id: supplierPos.id,
+        poNumber: supplierPos.poNumber,
+        supplierName: suppliers.name,
+        origin: suppliers.origin,
+        totalValue: supplierPos.totalValue,
+        currency: supplierPos.currency,
+        expectedDeliveryDate: supplierPos.expectedDeliveryDate,
+        status: supplierPos.status,
+        onBtb: sql<boolean>`${supplierPos.btbLcId} is not null`,
+      })
+      .from(supplierPos)
+      .innerJoin(
+        purchaseRequisitions,
+        eq(purchaseRequisitions.id, supplierPos.purchaseRequisitionId),
+      )
+      .innerJoin(suppliers, eq(suppliers.id, supplierPos.supplierId))
+      .where(scoped(supplierPos, ctx, eq(purchaseRequisitions.orderId, orderId)))
+      // Soonest expected first: the one that will hold up cutting is the one to look at.
+      .orderBy(supplierPos.expectedDeliveryDate, supplierPos.poNumber),
+  )
+}

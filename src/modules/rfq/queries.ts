@@ -194,3 +194,60 @@ export async function lossReasonList(ctx: AnyCtx): Promise<LossReasonOption[]> {
       .orderBy(asc(lossReasons.label)),
   )
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// What this style was quoted at, for the order that came out of it
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface StyleQuote {
+  rfqId: string
+  title: string
+  version: number
+  fobPrice: string
+  currency: string
+  status: QuoteStatus
+  sentAt: Date | null
+  validityDate: string | null
+}
+
+/** Mirrors `quoteStatusEnum`. The buyer's answer lives on the ENQUIRY (`won`/`lost`),
+ *  not here — a quote is only ever draft, sent, or replaced by a later version. */
+type QuoteStatus = 'draft' | 'sent' | 'superseded'
+
+/**
+ * The latest quote returned against an enquiry for this style.
+ *
+ * The first row of the order's sign-off panel (design canvas, "What the departments have
+ * signed"): a merchandiser looking at a confirmed order wants the price it was won at,
+ * and that number lives here, frozen at the version that was sent — not recomputed from
+ * today's cost sheet, which is a different number for good reasons.
+ *
+ * Joined by style code rather than by an order id, because there is no link between the
+ * two: an enquiry becomes an order through a person, not a foreign key. That makes this a
+ * best-effort match, and the caller must say so — an order whose style was never quoted
+ * (a repeat, a direct placement) correctly gets null rather than somebody else's price.
+ */
+export async function quoteForStyle(ctx: AnyCtx, styleCode: string): Promise<StyleQuote | null> {
+  return withTenantRead(ctx, async (tx) => {
+    const [row] = await tx
+      .select({
+        rfqId: rfqs.id,
+        title: rfqs.title,
+        version: quotes.version,
+        fobPrice: quotes.fobPrice,
+        currency: quotes.currency,
+        status: quotes.status,
+        sentAt: quotes.sentAt,
+        validityDate: quotes.validityDate,
+      })
+      .from(quotes)
+      .innerJoin(rfqs, eq(rfqs.id, quotes.rfqId))
+      .where(scoped(quotes, ctx, eq(rfqs.styleCode, styleCode)))
+      // Newest enquiry first, then its newest quote: a style re-enquired next season must
+      // not answer with last season's price.
+      .orderBy(desc(rfqs.createdAt), desc(quotes.version))
+      .limit(1)
+
+    return row ?? null
+  })
+}

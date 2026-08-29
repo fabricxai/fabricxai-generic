@@ -19,7 +19,11 @@ import { lcCoverageForOrders, type LcCoverageRow } from '@/modules/commercial/qu
 import type { BankDocsPolicy } from '@/modules/commercial/service'
 import { orderDetail, orderFileRefs, orderTimeline, tnaTemplateChoices } from '@/modules/orders/queries'
 import { orderPulse, orderStatusMachine, type OrderStatus } from '@/modules/orders/service'
-import { styleBom } from '@/modules/costing/queries'
+import { costSheetForStyle, styleBom } from '@/modules/costing/queries'
+import { orderMaterialPos } from '@/modules/procurement/queries'
+import { quoteForStyle } from '@/modules/rfq/queries'
+import { ppStatusForOrder } from '@/modules/sampling/queries'
+import { termsFor } from '@/modules/buyers/service'
 import { orderRunRate } from '@/modules/production/queries'
 import { styleMeasurementChart } from '@/modules/quality/queries'
 import { preFinalReadiness, type QualityPolicy } from '@/modules/quality/service'
@@ -31,6 +35,8 @@ import { factoryToday, FACTORY_TIMEZONE } from '@/lib/dates'
 import { OrderBreakdown } from './breakdown-client'
 import { StyleDossier } from './dossier'
 import { LcCard } from './lc-card'
+import { signOffRows } from './sign-off'
+import { SignOffPanel } from './sign-off-panel'
 import { OrderDocuments } from './documents'
 import { PulseStrip } from './pulse-strip'
 import { OrderStatusControl } from './status-control'
@@ -228,6 +234,43 @@ export default async function OrderDetailPage({
         ])
       : [null, null]
 
+  /*
+   * "What the departments have signed" — the gates, each read from the module that owns it
+   * (rule 11): the quote from rfq, the costing from costing, the credit from commercial,
+   * the booking from procurement, the PP verdict from sampling.
+   *
+   * Every read is gated on its module being switched on, and the panel is told WHICH are —
+   * because a factory that does not run the costing studio must be shown "not switched on
+   * here", never "nothing costed". The two look the same in an empty result and mean
+   * opposite things to somebody deciding whether to chase a colleague.
+   *
+   * Only on this tab, and only when there is a style: the order-level tabs already pay for
+   * their own reads and nothing here is needed to render the desk.
+   */
+  const [quote, costSheet, materialPos, pp, terms] =
+    tab === 'documents' && styleCode
+      ? await Promise.all([
+          activeModules.has('rfq') ? quoteForStyle(ctx, styleCode) : null,
+          activeModules.has('costing') ? costSheetForStyle(ctx, styleCode) : null,
+          activeModules.has('procurement') ? orderMaterialPos(ctx, order.id) : [],
+          activeModules.has('sampling')
+            ? ppStatusForOrder(ctx, { orderId: order.id, styleCode })
+            : null,
+          /*
+           * The terms as at the order's ex-factory plan, not as at today. `termsFor`'s own
+           * docstring says passing today is almost always wrong for an existing order —
+           * an agent renegotiating in August must not change what an order taken in May
+           * says its AQL was. Falls back to today only when the order has no plan yet.
+           */
+          order.buyerId
+            ? termsFor(ctx, {
+                buyerId: order.buyerId,
+                onDate: order.plannedExFactoryDate ?? today,
+              })
+            : null,
+        ])
+      : [null, null, [], null, null]
+
   return (
     <>
       <PageHeader
@@ -300,6 +343,28 @@ export default async function OrderDetailPage({
               bom={bom}
               chart={chart}
               canWrite={mayWrite}
+            />
+            <SignOffPanel
+              rows={signOffRows({
+                order: {
+                  id: order.id,
+                  styleCode,
+                  qtyTolerancePct: order.qtyTolerancePct,
+                },
+                quote,
+                costSheet,
+                lcCoverage: lcRows,
+                materialPos,
+                pp,
+                terms: terms
+                  ? {
+                      tolerancePct: terms.tolerancePct,
+                      aqlLevel: terms.aqlLevel,
+                      nominatedLabs: terms.nominatedLabs,
+                    }
+                  : null,
+                activeModules,
+              })}
             />
             <section>
               <SectionHeading eyebrow="filed against this order">Documents</SectionHeading>

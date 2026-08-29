@@ -187,6 +187,8 @@ export interface BreakdownCell {
 export interface OrderDetail {
   id: string
   poNumbers: string[]
+  /** The id, not only the name: the buyer's terms as at confirmation are read by id. */
+  buyerId: string | null
   buyerName: string | null
   status: string
   totalValue: string | null
@@ -244,6 +246,7 @@ export async function orderDetail(ctx: AnyCtx, orderId: string): Promise<OrderDe
         currency: orders.currency,
         plannedExFactoryDate: orders.plannedExFactoryDate,
         qtyTolerancePct: orders.qtyTolerancePct,
+        buyerId: orders.buyerId,
         buyerName: buyers.name,
       })
       .from(orders)
@@ -323,6 +326,7 @@ export async function orderDetail(ctx: AnyCtx, orderId: string): Promise<OrderDe
     return {
       id: row.id,
       poNumbers: row.poNumbers ?? [],
+      buyerId: row.buyerId,
       buyerName: row.buyerName,
       status: row.status,
       totalValue: row.totalValue,

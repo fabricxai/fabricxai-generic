@@ -397,3 +397,92 @@ export async function searchSampleRequests(
       .limit(input.limit),
   )
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Where this order's PP sample has got to
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface PpStatus {
+  id: string
+  requestNo: string
+  status: SampleStatus
+  dueDate: string | null
+  /** How many times the buyer has come back. Round 3 on a PP is a story in itself. */
+  rounds: number
+  latestVerdict: 'approved' | 'approved_with_comments' | 'rejected' | null
+  latestRecordedOn: string | null
+  /** Comments on the latest round — "approved with comments" means both must be in bulk. */
+  latestComments: number
+}
+
+/**
+ * The PP sample standing between this order and its cutting table.
+ *
+ * `ppApprovedStyles` answers the GATE's question — may cutting start — as a flat list of
+ * codes, which is all a gate needs. A merchandiser's sign-off panel needs the other half:
+ * which round it is on, what the buyer said, and when. "Approved" and "approved with
+ * comments" open the gate identically and mean very different things on the floor, and
+ * only the second of those is visible here.
+ *
+ * Matched on order AND style, the same pair `resolvePpApproval` uses — an order carrying
+ * two styles has two PP samples and one of them can be approved while the other is not.
+ */
+export async function ppStatusForOrder(
+  ctx: AnyCtx,
+  input: { orderId: string; styleCode: string },
+): Promise<PpStatus | null> {
+  return withTenantRead(ctx, async (tx) => {
+    const [request] = await tx
+      .select({
+        id: sampleRequests.id,
+        requestNo: sampleRequests.requestNo,
+        status: sampleRequests.status,
+        dueDate: sampleRequests.dueDate,
+      })
+      .from(sampleRequests)
+      .where(
+        scoped(
+          sampleRequests,
+          ctx,
+          and(
+            eq(sampleRequests.orderId, input.orderId),
+            eq(sampleRequests.styleCode, input.styleCode),
+            eq(sampleRequests.type, 'pp'),
+          ),
+        ),
+      )
+      .orderBy(desc(sampleRequests.createdAt))
+      .limit(1)
+
+    if (!request) return null
+
+    const rounds = await tx
+      .select({
+        round: sampleFeedbackRounds.round,
+        verdict: sampleFeedbackRounds.verdict,
+        recordedOn: sampleFeedbackRounds.recordedOn,
+        comments: sampleFeedbackRounds.comments,
+      })
+      .from(sampleFeedbackRounds)
+      .where(scoped(sampleFeedbackRounds, ctx, eq(sampleFeedbackRounds.sampleRequestId, request.id)))
+      .orderBy(desc(sampleFeedbackRounds.round))
+
+    const latest = rounds[0]
+
+    return {
+      ...request,
+      // The count of rounds, not the highest round number: a gap in the numbering would be
+      // a data fault, and reporting "round 4" over three rows would hide it.
+      rounds: rounds.length,
+      latestVerdict: latest?.verdict ?? null,
+      latestRecordedOn: latest?.recordedOn ?? null,
+      // Parsed rather than counted raw: a malformed comment is not a comment, and the
+      // sign-off panel would otherwise promise a reader notes it cannot show them.
+      latestComments: readJsonbArray(
+        buyerComment,
+        latest?.comments,
+        'sample_feedback_rounds.comments',
+      ).items.length,
+    }
+  })
+}

@@ -275,3 +275,55 @@ export async function styleBom(
     }
   })
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The costing that stands behind an order
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface StyleCostSheet {
+  id: string
+  version: number
+  status: 'draft' | 'approved' | 'superseded'
+  fobPrice: string
+  currency: string
+  cmLocalPerPiece: string
+  localCurrency: string
+  achievedMarginPct: string
+  approvedAt: Date | null
+}
+
+/**
+ * The latest cost sheet for a style, approved or not.
+ *
+ * `styleBom` above answers "what is it made of" and deliberately prefers an APPROVED
+ * sheet. This answers a different question — "has anybody costed this, and did it get
+ * signed off" — so it must return the draft too. A style being quoted with an unapproved
+ * sheet is exactly the state the order's sign-off panel exists to make visible; hiding it
+ * would show an empty row that reads as "no costing", which is a different and much less
+ * alarming fact.
+ */
+export async function costSheetForStyle(
+  ctx: AnyCtx,
+  styleCode: string,
+): Promise<StyleCostSheet | null> {
+  return withTenantRead(ctx, async (tx) => {
+    const [row] = await tx
+      .select({
+        id: costSheets.id,
+        version: costSheets.version,
+        status: costSheets.status,
+        fobPrice: costSheets.fobPrice,
+        currency: costSheets.currency,
+        cmLocalPerPiece: costSheets.cmLocalPerPiece,
+        localCurrency: costSheets.localCurrency,
+        achievedMarginPct: costSheets.achievedMarginPct,
+        approvedAt: costSheets.approvedAt,
+      })
+      .from(costSheets)
+      .where(scoped(costSheets, ctx, eq(costSheets.styleCode, styleCode)))
+      .orderBy(desc(costSheets.version))
+      .limit(1)
+
+    return row ?? null
+  })
+}
