@@ -27,7 +27,7 @@
  */
 import { randomUUID } from 'node:crypto'
 
-import { eq, sql } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { createDirectClient, createDirectDb } from '@/db/direct'
@@ -435,10 +435,19 @@ const CASES: TargetCase[] = [
       // cells beside the old ones. Cutting reads `activeRevision` to know what to cut to.
       expect(style?.activeRevision).toBe(2)
 
+      // Scoped to THIS style. Filtering on the revision number alone read every company's
+      // grid through the direct (RLS-bypassing) client, so the case passed or failed on
+      // whether the dev database happened to hold a seeded order at revision 2 — which it
+      // does after `pnpm seed`, and the failure then reads as a broken commit handler.
       const live = await db
         .select()
         .from(orderBreakdowns)
-        .where(eq(orderBreakdowns.revision, 2))
+        .where(
+          and(
+            eq(orderBreakdowns.orderStyleId, world.orderStyleId),
+            eq(orderBreakdowns.revision, 2),
+          ),
+        )
       expect(live.map((c) => c.qty).sort((a, b) => a - b)).toEqual([900, 1100])
     },
   },
@@ -1179,5 +1188,228 @@ describe('a ⚖ draft is not signed by its own author', () => {
 
     const result = await approve(ctx, { pendingChangeId: draft.id })
     expect(result.status).toBe('committed')
+  })
+})
+
+/**
+ * "Verify & apply" — the one carve-out in the ban above (design canvas, 2026-08-29).
+ *
+ * A merchandiser pastes the buyer's amendment mail, the extractor reads a colour × size
+ * grid out of it, and the merchandiser — the only person in the building holding that mail
+ * — is asked to send it to somebody who is not. The canvas draws a button that signs it
+ * there and then, and STUBS.md had carried the question since 2026-08-06.
+ *
+ * The answer is "yes, and only here", so what these cases are really pinning is the ONLY:
+ * the door opens for a machine's reading on a module that asked for it, and stays shut for
+ * a draft somebody typed, for a chat-composed one, for a module that never asked, and for a
+ * factory that has switched it off — none of which the button's existence should be able to
+ * change.
+ */
+describe('the raiser of a document reading may sign it, and nothing else', () => {
+  const extraction = (payload: Record<string, unknown>) => ({
+    moduleId: 'orders',
+    targetTable: 'order_breakdowns',
+    operation: 'update' as const,
+    targetId: world.orderStyleId,
+    zodSchemaKey: 'order_revision_v1',
+    payload,
+    source: 'ai_extraction' as const,
+    fieldConfidence: { cells: 0.94, reason: 0.88 },
+    model: 'test-extractor',
+  })
+
+  /**
+   * A volume move between two sizes — which is what a buyer's amendment mail usually is.
+   * The total stays at the contracted 2,000, because `saveBreakdown` re-checks the revised
+   * grid against the contract and a fixture that drifts would fail for that reason instead
+   * of the one these cases are about.
+   */
+  const amendment = (qty: number) => ({
+    orderStyleId: world.orderStyleId,
+    cells: [
+      { color: 'Navy', size: 'M', qty },
+      { color: 'Navy', size: 'L', qty: 2000 - qty },
+    ],
+    reason: 'Buyer moved volume between sizes',
+  })
+
+  it('1 · signs its own extraction on an ⚖ orders table', async () => {
+    const { propose, approve } = await import('@/modules/core/pending-changes')
+    const draft = await propose(ctx, extraction(amendment(910)))
+
+    // Same person, same request. Before this the line above threw `self_approval` here.
+    const result = await approve(ctx, { pendingChangeId: draft.id })
+    expect(result.status).toBe('committed')
+  })
+
+  it('2 · refuses the same person on a draft they TYPED', async () => {
+    const { propose, approve } = await import('@/modules/core/pending-changes')
+    /*
+     * The heart of it. `selfApprovalAllowed` is on for this module and this table, and it
+     * still refuses — because the second party the ⚖ mark promises was the extractor, and
+     * a typed draft has no second party at all. If this case ever passes, the flag has
+     * stopped being a carve-out and become a hole.
+     */
+    const draft = await propose(ctx, {
+      ...extraction(amendment(920)),
+      source: 'user_draft',
+      fieldConfidence: {},
+    })
+
+    await expect(approve(ctx, { pendingChangeId: draft.id })).rejects.toThrow(/self_approval/)
+  })
+
+  it('3 · refuses a chat-composed draft — nobody read anything, and nothing was measured', async () => {
+    const { propose, approve } = await import('@/modules/core/pending-changes')
+    // A model composing tool arguments is steered by the person who would then sign it,
+    // and `ai_chat` carries no confidence for anyone to check afterwards (rule 3).
+    const draft = await propose(ctx, {
+      ...extraction(amendment(930)),
+      source: 'ai_chat',
+      fieldConfidence: {},
+    })
+
+    await expect(approve(ctx, { pendingChangeId: draft.id })).rejects.toThrow(/self_approval/)
+  })
+
+  it('4 · refuses on a module that never declared it, extraction or not', async () => {
+    const { propose, approve } = await import('@/modules/core/pending-changes')
+    // commercial does not set `selfApprovalAllowed`. An LC read off a SWIFT advice is still
+    // a credit, and a bank asking who signed it should not find one name.
+    const draft = await propose(ctx, {
+      moduleId: 'commercial',
+      targetTable: 'lcs',
+      operation: 'insert',
+      payload: {
+        buyerId: world.buyerId,
+        number: `LC-SELFX-${randomUUID().slice(0, 6)}`,
+        value: '1000.00',
+        currency: 'USD',
+        tolerancePct: '0',
+        docsRequired: {},
+      },
+      zodSchemaKey: 'lc_from_swift_v1',
+      source: 'ai_extraction',
+      fieldConfidence: { number: 0.97 },
+    })
+
+    await expect(approve(ctx, { pendingChangeId: draft.id })).rejects.toThrow(/self_approval/)
+    // Still signable by anyone else — refused, not consumed.
+    expect((await approve(cosignerCtx, { pendingChangeId: draft.id })).status).toBe('committed')
+  })
+
+  it('5 · a factory rule saying no closes the door the module opened', async () => {
+    const { propose, approve } = await import('@/modules/core/pending-changes')
+    const { approvalRules } = await import('@/db/schema/core')
+
+    // What a buyer's social audit asks for: proposer and approver are different people,
+    // whatever the product thinks. Written the way Settings → Approval routing writes it.
+    const [rule] = await db
+      .insert(approvalRules)
+      .values({
+        companyId: COMPANY,
+        moduleId: 'orders',
+        targetTable: 'order_breakdowns',
+        requiredRoles: ['owner', 'admin', 'merchandiser'],
+        selfApprovalAllowed: false,
+      })
+      .returning({ id: approvalRules.id })
+
+    try {
+      const draft = await propose(ctx, extraction(amendment(940)))
+      await expect(approve(ctx, { pendingChangeId: draft.id })).rejects.toThrow(/self_approval/)
+    } finally {
+      await db.delete(approvalRules).where(eq(approvalRules.id, rule!.id))
+    }
+  })
+
+  it('6 · a rule silent on the question leaves the module default standing', async () => {
+    const { propose, approve } = await import('@/modules/core/pending-changes')
+    const { approvalRules } = await import('@/db/schema/core')
+
+    // The column is nullable for exactly this: every rule row written before the flag
+    // existed says nothing about self-signing, and must not be read as saying no.
+    const [rule] = await db
+      .insert(approvalRules)
+      .values({
+        companyId: COMPANY,
+        moduleId: 'orders',
+        targetTable: 'order_breakdowns',
+        requiredRoles: ['owner', 'admin', 'merchandiser'],
+      })
+      .returning({ id: approvalRules.id })
+
+    try {
+      const draft = await propose(ctx, extraction(amendment(950)))
+      expect((await approve(ctx, { pendingChangeId: draft.id })).status).toBe('committed')
+    } finally {
+      await db.delete(approvalRules).where(eq(approvalRules.id, rule!.id))
+    }
+  })
+
+  it('7 · confirm-and-apply takes a reading from drafted to committed in one step', async () => {
+    const { propose, confirmDraft } = await import('@/modules/core/pending-changes')
+    const { pendingChanges } = await import('@/db/schema/core')
+
+    // `onBehalfOf` is what parks it in `drafted` — the raiser's own check, which is the
+    // screen the button lives on.
+    const draft = await propose(ctx, { ...extraction(amendment(960)), onBehalfOf: OWNER })
+    expect(draft.status).toBe('drafted')
+
+    const result = await confirmDraft(ctx, { pendingChangeId: draft.id, apply: true })
+    expect(result.status).toBe('committed')
+
+    const [row] = await db
+      .select({ status: pendingChanges.status, reviewedBy: pendingChanges.reviewedBy })
+      .from(pendingChanges)
+      .where(eq(pendingChanges.id, draft.id))
+
+    // Signed by a person, not auto-approved: `reviewed_by` is what keeps this out of the
+    // auto-commit telemetry and gives an auditor the name.
+    expect(row?.status).toBe('committed')
+    expect(row?.reviewedBy).toBe(OWNER)
+  })
+
+  it('8 · a refused apply leaves the draft where it was, not in somebody else’s inbox', async () => {
+    const { propose, confirmDraft } = await import('@/modules/core/pending-changes')
+    const { pendingChanges } = await import('@/db/schema/core')
+
+    /*
+     * Why the check runs before the submit. A merchandiser clicking a door they are not
+     * allowed through should get a refusal and their own draft back — not a draft parked
+     * in an approver's queue that they never chose to send, with an error on screen
+     * suggesting nothing happened.
+     */
+    const draft = await propose(ctx, {
+      moduleId: 'commercial',
+      targetTable: 'lcs',
+      operation: 'insert',
+      payload: {
+        buyerId: world.buyerId,
+        number: `LC-SELFY-${randomUUID().slice(0, 6)}`,
+        value: '1000.00',
+        currency: 'USD',
+        tolerancePct: '0',
+        docsRequired: {},
+      },
+      zodSchemaKey: 'lc_from_swift_v1',
+      source: 'ai_extraction',
+      fieldConfidence: { number: 0.97 },
+      onBehalfOf: OWNER,
+    })
+    expect(draft.status).toBe('drafted')
+
+    await expect(
+      confirmDraft(ctx, { pendingChangeId: draft.id, apply: true }),
+    ).rejects.toThrow(/self_approval/)
+
+    const [row] = await db
+      .select({ status: pendingChanges.status })
+      .from(pendingChanges)
+      .where(eq(pendingChanges.id, draft.id))
+    expect(row?.status).toBe('drafted')
+
+    // And sending it on the ordinary way still works.
+    expect((await confirmDraft(ctx, { pendingChangeId: draft.id })).status).toBe('pending')
   })
 })

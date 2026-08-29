@@ -525,6 +525,25 @@ export const approvalRules = pgTable(
     /** Floor every field must clear before auto-approve is even considered. */
     minConfidence: numeric('min_confidence', { precision: 4, scale: 3 }),
 
+    /**
+     * May the person who raised a draft also sign it, on a ⚖ table?
+     *
+     * NULL — not "false" — is the default, and means "whatever the module declares".
+     * A factory that has never opened this screen must not silently get the opposite of
+     * the product's own answer, and a column defaulting to false would do exactly that to
+     * every rule row written before this migration.
+     *
+     * It is configurable because dual control on a compliance-bearing table is the kind of
+     * thing a buyer's social audit asks to see. A factory that has been told to separate
+     * proposer from approver can set it false here and the door closes, whatever the
+     * module thinks.
+     *
+     * Note what this flag can NOT do: it never lets somebody sign a draft they TYPED. The
+     * carve-out is only for a machine reading a document — see `approve()` in
+     * `core/pending-changes.ts`.
+     */
+    selfApprovalAllowed: boolean('self_approval_allowed'),
+
     priority: integer('priority').notNull().default(100),
     isActive: boolean('is_active').notNull().default(true),
 

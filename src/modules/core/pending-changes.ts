@@ -18,7 +18,7 @@
  * Commit, audit row and outbox event all happen in ONE transaction. That is what makes
  * the chain draft → reviewer → committed row auditable end to end.
  */
-import { and, eq, sql } from 'drizzle-orm'
+import { and, eq, inArray, sql } from 'drizzle-orm'
 import type { ZodType } from 'zod'
 
 import { approvalRules, pendingChangeApprovals, pendingChanges } from '@/db/schema/core'
@@ -171,6 +171,7 @@ async function resolveRule(
   autoApprove: boolean
   minConfidence: string | null
   approvalsRequired: number
+  selfApprovalAllowed: boolean
 }> {
   const rules = await tx
     .select()
@@ -185,22 +186,29 @@ async function resolveRule(
       (rule.operation === null || rule.operation === draft.operation),
   )
 
+  const definition = getModule(draft.moduleId)
+  // The module's answer on self-approval, which a rule row may override but only by saying
+  // so explicitly. A rule written before the column existed carries null and means nothing
+  // by it, so it must not read as "no".
+  const moduleSelfApproval = definition?.approvalDefaults.selfApprovalAllowed ?? false
+
   if (match) {
     return {
       requiredRoles: match.requiredRoles,
       autoApprove: match.autoApprove,
       minConfidence: match.minConfidence,
       approvalsRequired: match.approvalsRequired,
+      selfApprovalAllowed: match.selfApprovalAllowed ?? moduleSelfApproval,
     }
   }
 
-  const definition = getModule(draft.moduleId)
   return {
     requiredRoles: definition?.approvalDefaults.requiredRoles ?? ['owner'],
     autoApprove: false,
     minConfidence: null,
     // A module may declare its own default; absent both, one approver.
     approvalsRequired: definition?.approvalDefaults.approvalsRequired ?? 1,
+    selfApprovalAllowed: moduleSelfApproval,
   }
 }
 
@@ -332,6 +340,14 @@ export interface ConfirmDraftInput {
    * exactly as a reviewer's corrections are at approve.
    */
   corrections?: Record<string, unknown>
+  /**
+   * Sign it at the same time, instead of sending it to somebody else's inbox.
+   *
+   * The "Verify & apply" door. Refused before anything is submitted unless this person
+   * could actually approve it — see `mayApproveOwnDraft`. Checking first means a refusal
+   * leaves the draft where it was rather than parking it in a queue nobody asked for.
+   */
+  apply?: boolean
 }
 
 /**
@@ -370,6 +386,23 @@ export async function confirmDraft(
     if (draft.createdBy !== ctx.userId) {
       // Somebody else's unsubmitted reading. Not theirs to send on.
       throw new AppError('forbidden', 'errors.not_the_raiser', { id: draft.id })
+    }
+
+    if (input.apply) {
+      const rule = await resolveRule(tx, ctx, {
+        moduleId: draft.moduleId,
+        targetTable: draft.targetTable,
+        operation: draft.operation,
+      })
+      if (!mayApproveOwnDraft(draft, rule)) {
+        throw new AppError('forbidden', 'errors.self_approval', {
+          targetTable: draft.targetTable,
+          source: draft.source,
+        })
+      }
+      if (!rule.requiredRoles.some((role) => ctx.roles.includes(role))) {
+        throw new AppError('forbidden', 'errors.not_an_approver', { required: rule.requiredRoles })
+      }
     }
 
     const corrections = input.corrections ?? {}
@@ -437,6 +470,22 @@ export async function confirmDraft(
     return { id, status: result.status === 'committed' ? 'committed' : 'pending' }
   }
 
+  /*
+   * "Verify & apply" — as this person, not as the system.
+   *
+   * Deliberately a second call to the ordinary `approve`, with no flag saying where it
+   * came from: the role gate, the self-approval gate, the re-validation, the approvals
+   * ledger and the ⚖ trail all run exactly as they do for anybody else clicking approve.
+   * The pre-check above only decides whether to submit at all; THIS is the wall.
+   *
+   * A rule wanting two approvers still gets two: `approve` records one and returns
+   * `awaiting`, and the draft stays pending in the other approver's inbox.
+   */
+  if (input.apply) {
+    const result = await approve(ctx, { pendingChangeId: id })
+    return { id, status: result.status === 'committed' ? 'committed' : 'pending' }
+  }
+
   return { id, status: 'pending' }
 }
 
@@ -477,6 +526,86 @@ export async function discardDraft(
         updatedAt: new Date(),
       })
       .where(scoped(pendingChanges, ctx, eq(pendingChanges.id, draft.id)))
+  })
+}
+
+/**
+ * May the person who raised this draft also sign it?
+ *
+ * On a table nobody marked ⚖, yes — that is the ordinary intake flow, and always was.
+ *
+ * On a ⚖ table the answer is no by default, and the carve-out has TWO conditions, both
+ * required, because they answer different objections:
+ *
+ *  1. `rule.selfApprovalAllowed` — the factory's own answer, from an `approval_rules` row
+ *     or, absent one, from the module's registration. A buyer's social audit may require
+ *     proposer and approver to be different people; a factory told that can close this.
+ *
+ *  2. `source === 'ai_extraction'` — and this one is NOT configurable. It is what makes
+ *     the carve-out honest rather than a hole. The ban exists so a ⚖ row cannot be written
+ *     with one name where the audit trail promises two. When a merchandiser pastes the
+ *     buyer's amendment mail, there ARE two: the extractor read it and proposed a grid,
+ *     the merchandiser compared that grid to the mail and disposed. The trail records the
+ *     model, its per-field confidence, and every correction the person made against it —
+ *     which is more of a review record than most second signatures carry.
+ *
+ *     A draft somebody TYPED has no such second party. `user_draft`, `import` and
+ *     `integration` therefore stay banned on ⚖ tables no matter what any rule says, and
+ *     so does `ai_chat`: a model composing tool arguments in conversation is steered by
+ *     the very person who would then be signing it, and it carries no measured confidence
+ *     for anyone to check afterwards.
+ *
+ * Decided 2026-08-29 with the merchandiser workspace (design canvas, "Verify & apply"),
+ * closing the question STUBS.md had left open since 2026-08-06.
+ */
+function mayApproveOwnDraft(
+  draft: { source: Source; targetTable: string },
+  rule: { selfApprovalAllowed: boolean },
+): boolean {
+  if (!isAudited(draft.targetTable)) return true
+  return rule.selfApprovalAllowed && draft.source === 'ai_extraction'
+}
+
+/**
+ * Which of these drafts their own raiser may sign — the question the "Verify & apply"
+ * button has to answer before it can decide whether to exist.
+ *
+ * Same two gates `approve` enforces plus the role check, resolved here so a screen never
+ * offers a door that the server would slam. Nothing is written; a wrong answer here costs
+ * a button, not a row.
+ */
+export async function selfApprovableDrafts(
+  ctx: RequestCtx,
+  draftIds: readonly string[],
+): Promise<Set<string>> {
+  if (draftIds.length === 0) return new Set()
+
+  return withTenantRead(ctx, async (tx) => {
+    const drafts = await tx
+      .select({
+        id: pendingChanges.id,
+        moduleId: pendingChanges.moduleId,
+        targetTable: pendingChanges.targetTable,
+        operation: pendingChanges.operation,
+        source: pendingChanges.source,
+        createdBy: pendingChanges.createdBy,
+      })
+      .from(pendingChanges)
+      .where(scoped(pendingChanges, ctx, inArray(pendingChanges.id, [...draftIds])))
+
+    const out = new Set<string>()
+    for (const draft of drafts) {
+      if (draft.createdBy !== ctx.userId) continue
+      const rule = await resolveRule(tx, ctx, {
+        moduleId: draft.moduleId,
+        targetTable: draft.targetTable,
+        operation: draft.operation,
+      })
+      if (!rule.requiredRoles.some((role) => ctx.roles.includes(role))) continue
+      if (!mayApproveOwnDraft(draft, rule)) continue
+      out.add(draft.id)
+    }
+    return out
   })
 }
 
@@ -541,8 +670,11 @@ export async function approve(ctx: AnyCtx, input: ApproveInput): Promise<Approve
      * refusal, and this one should only ever name people who could otherwise sign.
      * Rejection stays open to the proposer — withdrawing your own draft is not approval.
      */
-    if (!isSystemCtx(ctx) && draft.createdBy === ctx.userId && isAudited(draft.targetTable)) {
-      throw new AppError('forbidden', 'errors.self_approval', { targetTable: draft.targetTable })
+    if (!isSystemCtx(ctx) && draft.createdBy === ctx.userId && !mayApproveOwnDraft(draft, rule)) {
+      throw new AppError('forbidden', 'errors.self_approval', {
+        targetTable: draft.targetTable,
+        source: draft.source,
+      })
     }
 
     // ── Multi-approver ──

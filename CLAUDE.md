@@ -66,6 +66,10 @@ description, and the files say so at the top. The rule stands for what is built 
    constants are lint-banned (`no-invented-confidence`). A source with nothing
    to measure (`ai_chat`: a model composed tool args in conversation) carries
    NO confidence and is refused if it offers one; unscored never auto-approves.
+   On ⚖ tables the proposer may not also approve — unless the draft is an
+   `ai_extraction` AND the module (or the company's `approval_rules` row) sets
+   `selfApprovalAllowed`. A draft a person typed never qualifies, whatever the
+   flag says: the second party being counted is the extractor that read the paper.
 4. Money: `Money` type from `lib/money`; string numerics; `parseFloat`/`Number()`
    on money is lint-banned. Every amount carries currency; USD buyer-facing,
    BDT local.

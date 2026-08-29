@@ -54,7 +54,19 @@ export interface ModuleDefinition {
    */
   zodMap: Readonly<Record<string, ZodType>>
   /** Fallback approver roles when no approval_rules row matches. */
-  approvalDefaults: { requiredRoles: readonly Role[]; approvalsRequired?: number }
+  approvalDefaults: {
+    requiredRoles: readonly Role[]
+    approvalsRequired?: number
+    /**
+     * May the person who raised a draft on one of this module's ⚖ tables also sign it?
+     *
+     * The module's own answer, overridable per company by an `approval_rules` row. Set it
+     * only where the draft's author is genuinely reviewing somebody else's work — which,
+     * for a machine extraction, is the case: the reader proposed, the person disposed.
+     * It has no effect on a draft a person typed; `approve()` refuses those regardless.
+     */
+    selfApprovalAllowed?: boolean
+  }
   /** MARBIM tool pack: read tools + draft tools only. Draft tools emit pending rows. */
   toolPack?: unknown
   /** BullMQ processors owned by this module. */
