@@ -172,7 +172,23 @@ function salesContractRow({ order, terms }: SignOffInput): SignOffRow {
    * "we know nothing about your contract" and "we know what it says, not which one it is".
    */
   const known: string[] = []
-  if (order.qtyTolerancePct) known.push(`tolerance ±${order.qtyTolerancePct}%`)
+  if (order.qtyTolerancePct !== null) {
+    /*
+     * Attributed to the ORDER, not to a contract nobody has filed. Found on a live tenant,
+     * where the row read "On file: tolerance ±0.00%" — a schema default (`qty_tolerance_pct`
+     * is NOT NULL DEFAULT 0) rendered as a term somebody had negotiated.
+     *
+     * Zero is not treated as "unknown", because it is not: it is enforced, and a breakdown
+     * that misses the contracted quantity by one piece is refused under it. So it is named
+     * with its consequence instead — a merchandiser skims past "±0.00%" and does not skim
+     * past "exact quantity", which is the thing that will surprise them at shipment.
+     */
+    // Matched as a string, not parsed. `no-float-money` bans the arithmetic and is right
+    // to: "0.00" is a decimal the database wrote, and a regex answers "is it zero" exactly
+    // without turning it into a float first.
+    const exact = /^0(\.0+)?$/.test(order.qtyTolerancePct) ? ' — exact quantity' : ''
+    known.push(`the order allows ±${order.qtyTolerancePct}% over or under${exact}`)
+  }
   if (terms?.aqlLevel) known.push(`AQL ${terms.aqlLevel}`)
   if (terms?.nominatedLabs.length) known.push(`nominated lab ${terms.nominatedLabs.join(', ')}`)
 

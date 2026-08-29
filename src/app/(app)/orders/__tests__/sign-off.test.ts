@@ -84,8 +84,28 @@ describe('the sign-off panel', () => {
 
       expect(contract.state).toBe('unmodelled')
       expect(contract.detail).toBe(
-        'No contract record — its number and date are not held. On file: tolerance ±5.00% · AQL 2.5 · nominated lab Kismet.',
+        'No contract record — its number and date are not held. On file: the order allows ±5.00% over or under · AQL 2.5 · nominated lab Kismet.',
       )
+    })
+
+    it('5b · attributes the tolerance to the ORDER, and names what zero means', () => {
+      /*
+       * Found on a live tenant, where this row read "On file: tolerance ±0.00%" — the
+       * schema default (`qty_tolerance_pct` is NOT NULL DEFAULT 0) dressed as a term
+       * somebody had negotiated with the buyer.
+       *
+       * Zero is NOT rewritten as "unknown", because it is not unknown: it is enforced, and
+       * a grid that misses the contracted quantity by one piece is refused under it. So it
+       * keeps the number and gains the consequence — a merchandiser skims past "±0.00%"
+       * and does not skim past "exact quantity".
+       */
+      const contract = row(
+        { order: { id: 'order-1', styleCode: 'SH-4471', qtyTolerancePct: '0.00' } },
+        'sales_contract',
+      )
+
+      expect(contract.detail).toMatch(/the order allows ±0.00% over or under — exact quantity/)
+      expect(contract.detail).not.toMatch(/tolerance ±0/)
     })
 
     it('6 · and admits when it cannot answer even that', () => {
